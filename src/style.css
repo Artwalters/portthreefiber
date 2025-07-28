@@ -128,3 +128,14 @@ body,
 .project-description.visible {
     opacity: 0.8;
 }
+
+/* Post-transition styles */
+.project-number {
+    font-size: 12px;
+    color: white;
+}
+
+.back-button {
+    cursor: pointer;
+    pointer-events: auto;
+}

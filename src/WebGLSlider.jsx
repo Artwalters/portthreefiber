@@ -4,9 +4,10 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset }) => {
   const meshRef = useRef()
   const hasAnimated = useRef(false)
+  const hasInitialExpanded = useRef(false)
   
   // Use same shader material but without velocity effect after transition complete
   const material = transitionComplete 
@@ -109,9 +110,13 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       material.uniforms.uVelo.value = velocity
     }
     
-    // Set normal position when not transitioning and not complete
-    if (meshRef.current && !isTransitioning && !transitionComplete) {
-      meshRef.current.position.set(position[0], position[1], position[2])
+    // Handle normal positioning only when not expanding and not transitioning
+    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
+      // Check if this is the selected project for subtle z-positioning
+      const isSelectedProject = selectedProject && selectedProject.name === projectData.name
+      const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
+      
+      meshRef.current.position.set(position[0], position[1], zPosition)
       hasAnimated.current = false
     }
   })
@@ -132,10 +137,79 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
     }
   }, [isTransitioning, isClicked, position])
 
+  // Handle post-transition scaling for selected image
+  useEffect(() => {
+    if (meshRef.current && transitionComplete && isClicked) {
+      // After transition completes, make the clicked slide larger by moving it forward
+      // This creates a 1.5x scale effect through perspective
+      gsap.to(meshRef.current.position, {
+        z: position[2] + 1, // Move significantly forward for 1.5x effect
+        duration: 0.8,
+        ease: "power2.out",
+        delay: 0.2 // Small delay after transition completes
+      })
+    }
+  }, [transitionComplete, isClicked, position])
+
+  // Handle reverse scaling when back is clicked
+  useEffect(() => {
+    if (meshRef.current && isScalingDown && isClicked) {
+      // Scale down the selected image back to normal size
+      gsap.to(meshRef.current.position, {
+        z: position[2] + 0.01, // Back to subtle forward position
+        duration: 0.8,
+        ease: "power2.inOut"
+      })
+    }
+  }, [isScalingDown, isClicked, position])
+
+  // Handle scaling down for reset (when back button is clicked)
+  useEffect(() => {
+    if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
+      // Scale down the selected image back to normal size before slider reset
+      gsap.to(meshRef.current.position, {
+        z: position[2] + 0.01, // Back to subtle forward position
+        duration: 0.8,
+        ease: "power2.inOut"
+      })
+    }
+  }, [isScalingDownForReset, transitionComplete, isClicked, position])
+
+
+  // Handle initial expand animation (from center to normal positions)
+  useEffect(() => {
+    if (meshRef.current && isInitialExpanding && !hasInitialExpanded.current) {
+      hasInitialExpanded.current = true
+      
+      // Check if this is the selected project (should stay slightly forward)
+      const isSelectedProject = selectedProject && selectedProject.name === projectData.name
+      const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
+      
+      // Start animation immediately with no delay to prevent gaps
+      gsap.to(meshRef.current.position, {
+        x: position[0],
+        z: zPosition, // Maintain the subtle z-difference
+        duration: 2,
+        ease: "power2.inOut",
+        delay: isScalingDown ? 0.8 : (Math.random() * 0.2) // Wait for scale-down or small random delay
+      })
+    }
+  }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown])
+
+  // Calculate render position - if expanding, start at center
+  const getRenderPosition = () => {
+    if (isInitialExpanding) {
+      const isSelectedProject = selectedProject && selectedProject.name === projectData.name
+      const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
+      return [0, position[1], zPosition]
+    }
+    return position
+  }
+
   return (
     <mesh 
       ref={meshRef} 
-      position={position} 
+      position={getRenderPosition()} 
       material={material}
       onPointerEnter={() => !transitionComplete && onHover && onHover(projectData)}
       onPointerLeave={() => !transitionComplete && onHover && onHover(null)}
@@ -146,14 +220,14 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   )
 }
 
-export default function WebGLSlider({ onHover }) {
+export default function WebGLSlider({ onHover, onTransitionComplete, selectedProject, isScalingDownForReset, initialOffset = 0 }) {
   const { gl } = useThree()
-  const [offset, setOffset] = useState(0)
+  const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, offset: 0 })
   const velocity = useRef(0)
-  const targetOffset = useRef(0)
+  const targetOffset = useRef(initialOffset)
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const [hoveredSlide, setHoveredSlide] = useState(null)
@@ -161,6 +235,8 @@ export default function WebGLSlider({ onHover }) {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
   const [transitionComplete, setTransitionComplete] = useState(false)
+  const [isInitialExpanding, setIsInitialExpanding] = useState(true)
+  const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
   
   // Load textures with correct paths for GitHub Pages
   const textures = useTexture([
@@ -217,13 +293,46 @@ export default function WebGLSlider({ onHover }) {
       // Mark transition as complete to disable all slider effects
       setTimeout(() => {
         setTransitionComplete(true)
+        // Notify parent component about transition completion
+        if (onTransitionComplete) {
+          onTransitionComplete(projectData, true)
+        }
       }, 100) // Small delay to let slides disappear
     }, 2000)
   }
 
-  // Smooth animation loop - disabled when transitioning or complete
+  // Handle initial expand animation - slides start at center and expand out
+  useEffect(() => {
+    if (isInitialExpanding) {
+      console.log('Starting initial expand animation')
+      
+      // Simple timer - always 3 seconds total regardless of other states
+      const timer = setTimeout(() => {
+        console.log('Setting isInitialExpanding to false - slider should be navigatable now')
+        setIsInitialExpanding(false)
+      }, 3000) // Fixed 3 second delay
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isInitialExpanding]) // Remove other dependencies to prevent re-triggers
+
+  // Handle scaling down completion
+  useEffect(() => {
+    if (isScalingDown) {
+      console.log('Starting scale down timer')
+      // After scale-down animation completes, stop scaling down
+      const timer = setTimeout(() => {
+        console.log('Scale down complete')
+        setIsScalingDown(false)
+      }, 800) // Match the scale-down animation duration
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isScalingDown]) // Remove selectedProject dependency
+
+  // Smooth animation loop - disabled when transitioning, complete, or initially expanding
   useFrame(() => {
-    if (!isDragging.current && !isTransitioning && !transitionComplete) {
+    if (!isDragging.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
       // Apply momentum/inertia with smoother friction
       velocity.current *= 0.98 // less friction for longer momentum
       targetOffset.current += velocity.current
@@ -247,7 +356,7 @@ export default function WebGLSlider({ onHover }) {
     const canvas = gl.domElement
 
     const handleMouseDown = (e) => {
-      if (isTransitioning || transitionComplete) return // Disable drag when transitioning or complete
+      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable drag during expand
       
       isDragging.current = true
       velocity.current = 0
@@ -300,7 +409,7 @@ export default function WebGLSlider({ onHover }) {
     }
 
     const handleWheel = (e) => {
-      if (isTransitioning || transitionComplete) return // Disable scroll when transitioning or complete
+      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable scroll during expand
       
       e.preventDefault()
       const scrollSensitivity = 0.0015 // smoother scroll sensitivity
@@ -327,7 +436,7 @@ export default function WebGLSlider({ onHover }) {
       window.removeEventListener('mouseup', handleMouseUp)
       canvas.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [offset, gl, transitionComplete])
+  }, [offset, gl, transitionComplete, isInitialExpanding, isScalingDown])
 
   // Create infinite slides - only show slides within viewport
   const slides = []
@@ -372,6 +481,10 @@ export default function WebGLSlider({ onHover }) {
           isTransitioning={isTransitioning}
           shouldHide={shouldHide}
           transitionComplete={transitionComplete}
+          isInitialExpanding={isInitialExpanding}
+          selectedProject={selectedProject}
+          isScalingDown={isScalingDown}
+          isScalingDownForReset={isScalingDownForReset}
         />
       )
     }

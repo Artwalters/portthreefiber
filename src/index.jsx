@@ -14,6 +14,11 @@ function App() {
     const [isVisible, setIsVisible] = useState(false)
     const [highlightedProject, setHighlightedProject] = useState(null)
     const [isHighlightVisible, setIsHighlightVisible] = useState(false)
+    const [isPostTransition, setIsPostTransition] = useState(false)
+    const [selectedProject, setSelectedProject] = useState(null)
+    const [sliderKey, setSliderKey] = useState(0) // Key to force complete slider recreation
+    const [isScalingDownForReset, setIsScalingDownForReset] = useState(false)
+    const [initialOffset, setInitialOffset] = useState(0)
 
     const projects = [
         { name: 'project-1', description: 'Interactive web experience with modern UI' },
@@ -78,6 +83,56 @@ function App() {
         }
     }, [hoveredProject, displayedProject, isVisible])
 
+    // Handle transition completion
+    const handleTransitionComplete = (projectData, transitionComplete) => {
+        if (transitionComplete) {
+            setIsPostTransition(true)
+            setSelectedProject(projectData)
+            // Clear hover states since we're in post-transition mode
+            setHoveredProject(null)
+            setDisplayedProject(null)
+            setIsVisible(false)
+            setHighlightedProject(null)
+            setIsHighlightVisible(false)
+        } else if (transitionComplete === false && projectData === null) {
+            // This shouldn't happen with new approach - we recreate slider instead
+        }
+    }
+
+    // Handle back button click to return to slider
+    const handleBackToSlider = () => {
+        // Start scale-down animation first
+        setIsScalingDownForReset(true)
+        
+        // After scale-down completes, reset the slider
+        setTimeout(() => {
+            // Calculate initial offset to center the selected project
+            const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
+            const itemWidth = 3.5 // Same as in WebGLSlider
+            const calculatedOffset = selectedIndex * itemWidth
+            setInitialOffset(calculatedOffset)
+            
+            // Reset UI state
+            setIsPostTransition(false)
+            setIsScalingDownForReset(false)
+            
+            // Force complete slider recreation by changing key
+            setSliderKey(prev => prev + 1)
+            
+            // Reset all other states to initial values
+            setHoveredProject(null)
+            setDisplayedProject(null)
+            setIsVisible(false)
+            setHighlightedProject(null)
+            setIsHighlightVisible(false)
+            
+            // Keep selectedProject for initial offset calculation, clear it after delay
+            setTimeout(() => {
+                setSelectedProject(null)
+            }, 100)
+        }, 800) // Wait for scale-down animation (0.8s)
+    }
+
     return (
         <>
             <Canvas
@@ -87,7 +142,12 @@ function App() {
                 }}
             >
                 <WebGLSlider 
+                    key={sliderKey}
                     onHover={setHoveredProject}
+                    onTransitionComplete={handleTransitionComplete}
+                    selectedProject={selectedProject}
+                    isScalingDownForReset={isScalingDownForReset}
+                    initialOffset={initialOffset}
                 />
             </Canvas>
             <UIOverlay 
@@ -96,6 +156,9 @@ function App() {
                 displayedProject={displayedProject}
                 isVisible={isVisible}
                 projects={projects}
+                isPostTransition={isPostTransition}
+                selectedProject={selectedProject}
+                onBackToSlider={handleBackToSlider}
             />
         </>
     )

@@ -1,25 +1,40 @@
-export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects }) {
+export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, selectedProject, onBackToSlider }) {
   return (
     <div className="ui-overlay">
       {/* Top Section */}
       <div className="ui-top">
         <div className="ui-top-left">
-          walters studio
+          {isPostTransition ? (
+            <span 
+              className="back-button"
+              onClick={onBackToSlider}
+            >
+              back
+            </span>
+          ) : (
+            'walters studio'
+          )}
         </div>
         <div className="ui-top-center">
-          <div className="index-section">
-            <div className="index-title">index</div>
-            <div className="project-list">
-              {projects.map((project, index) => (
-                <div 
-                  key={project.name}
-                  className={`project-name ${highlightedProject && highlightedProject.name === project.name && isHighlightVisible ? 'highlighted' : ''}`}
-                >
-                  {project.name}
-                </div>
-              ))}
+          {isPostTransition ? (
+            <div className="project-number">
+              {selectedProject ? projects.findIndex(p => p.name === selectedProject.name) + 1 : '1'}
             </div>
-          </div>
+          ) : (
+            <div className="index-section">
+              <div className="index-title">index</div>
+              <div className="project-list">
+                {projects.map((project, index) => (
+                  <div 
+                    key={project.name}
+                    className={`project-name ${highlightedProject && highlightedProject.name === project.name && isHighlightVisible ? 'highlighted' : ''}`}
+                  >
+                    {project.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="ui-top-right">
           2025
