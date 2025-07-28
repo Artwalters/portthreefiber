@@ -231,6 +231,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const dragStart = useRef({ x: 0, offset: 0 })
   const velocity = useRef(0)
   const targetOffset = useRef(initialOffset)
+  const currentOffset = useRef(initialOffset) // Smooth interpolated value
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const [hoveredSlide, setHoveredSlide] = useState(null)
@@ -333,22 +334,22 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }
   }, [isScalingDown]) // Remove selectedProject dependency
 
-  // Smooth animation loop - disabled when transitioning, complete, or initially expanding
+  // Smooth interpolation with easing - much smoother than direct animations
   useFrame(() => {
-    if (!isDragging.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
-      // Apply momentum/inertia with smoother friction
-      velocity.current *= 0.98 // less friction for longer momentum
-      targetOffset.current += velocity.current
+    if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
+      // Smooth interpolation between current and target
+      const ease = 0.075 // Same as reference slider
+      currentOffset.current += (targetOffset.current - currentOffset.current) * ease
       
-      // Much smoother interpolation
-      const diff = targetOffset.current - offset
-      if (Math.abs(diff) > 0.0001) {
-        setOffset(offset + diff * 0.15) // faster interpolation
+      // Apply velocity-based momentum
+      if (!isDragging.current) {
+        velocity.current *= 0.95 // Friction
+        targetOffset.current += velocity.current
       }
       
-      // Stop very small movements
-      if (Math.abs(velocity.current) < 0.0001) {
-        velocity.current = 0
+      // Only update state if there's significant change
+      if (Math.abs(currentOffset.current - offset) > 0.001) {
+        setOffset(currentOffset.current)
       }
     }
   })
@@ -362,16 +363,16 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable drag during expand
       
       e.preventDefault() // Prevent default touch behavior
+      
       isDragging.current = true
       velocity.current = 0
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       dragStart.current = {
         x: clientX,
-        offset: offset
+        offset: targetOffset.current // Use target offset for smooth continuation
       }
       lastMouseX.current = clientX
       lastMoveTime.current = Date.now()
-      targetOffset.current = offset
       canvas.style.cursor = 'grabbing'
     }
 
@@ -385,15 +386,12 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const deltaX = clientX - lastMouseX.current
       
       if (deltaTime > 0) {
-        velocity.current = -deltaX * 0.002 / deltaTime * 16 // more responsive velocity
+        velocity.current = -deltaX * 0.05 // Calculate velocity for momentum
       }
       
       const totalDeltaX = clientX - dragStart.current.x
-      const dragSensitivity = 0.008 // smoother drag sensitivity
-      const newOffset = dragStart.current.offset - totalDeltaX * dragSensitivity
-      
-      setOffset(newOffset)
-      targetOffset.current = newOffset
+      const dragSpeed = 2 // Same as reference slider
+      targetOffset.current = dragStart.current.offset - totalDeltaX * 0.01 * dragSpeed
       
       lastMouseX.current = clientX
       lastMoveTime.current = currentTime
@@ -405,8 +403,8 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       isDragging.current = false
       canvas.style.cursor = 'grab'
       
-      // Apply momentum based on final velocity
-      velocity.current *= 3 // stronger momentum for smoother feel
+      // Velocity is already being applied in the render loop
+      // No need for additional animation
     }
 
     const handleMouseLeave = () => {
@@ -419,14 +417,13 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable scroll during expand
       
       e.preventDefault()
-      const scrollSensitivity = 0.0015 // smoother scroll sensitivity
       
-      // Add to velocity for smooth scroll with easing
-      const scrollVelocity = e.deltaY * scrollSensitivity * 0.3
-      velocity.current += scrollVelocity
+      // Direct target update for instant response
+      const scrollSpeed = 0.01
+      targetOffset.current += e.deltaY * scrollSpeed
       
-      // Cap velocity with wider range for smoother experience
-      velocity.current = Math.max(-0.8, Math.min(0.8, velocity.current))
+      // Add small velocity for natural momentum
+      velocity.current = e.deltaY * scrollSpeed * 0.5
     }
 
     canvas.style.cursor = 'grab'
