@@ -394,13 +394,13 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   useFrame(() => {
     if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
       // Smooth interpolation between current and target
-      const ease = 0.075 // Same as reference slider
+      const ease = 0.05 // Reduced from 0.075 for smoother, more controlled movement
       currentOffset.current += (targetOffset.current - currentOffset.current) * ease
       
       // Apply velocity-based momentum
       if (!isDragging.current) {
-        velocity.current *= 0.95 // Friction
-        targetOffset.current += velocity.current
+        velocity.current *= 0.88 // Higher friction for faster shader fade-out
+        targetOffset.current += velocity.current * 0.3 // Reduce momentum impact
       }
       
       // Only update state if there's significant change
@@ -461,9 +461,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
         
         if (deltaTime > 0) {
-          velocity.current = deltaY * 0.05 // Fixed: swipe up should move cards up
+          velocity.current = deltaY * 0.02 // Reduced from 0.05 for smoother movement
         }
-        const dragSpeed = 2
+        const dragSpeed = 0.8 // Reduced from 2 for smoother drag
         targetOffset.current = dragStart.current.offset + totalDeltaY * 0.01 * dragSpeed // Fixed: swipe up moves cards up
         lastMouseY.current = clientY
       } else {
@@ -477,9 +477,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
         
         if (deltaTime > 0) {
-          velocity.current = -deltaX * 0.05 // Calculate velocity for momentum
+          velocity.current = -deltaX * 0.02 // Reduced from 0.05 for smoother movement
         }
-        const dragSpeed = 2
+        const dragSpeed = 0.8 // Reduced from 2 for smoother drag
         targetOffset.current = dragStart.current.offset - totalDeltaX * 0.01 * dragSpeed
         lastMouseX.current = clientX
       }
@@ -513,11 +513,11 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       e.preventDefault()
       
       // Direct target update for instant response
-      const scrollSpeed = 0.01
+      const scrollSpeed = 0.0002 // Extremely reduced for very gentle scrolling
       targetOffset.current += e.deltaY * scrollSpeed
       
-      // Add small velocity for natural momentum
-      velocity.current = e.deltaY * scrollSpeed * 0.5
+      // Add velocity for shader deformation (separate from momentum)
+      velocity.current = e.deltaY * 0.01 // Reduced shader intensity
     }
 
     canvas.style.cursor = 'grab'
