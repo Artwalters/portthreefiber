@@ -101,36 +101,31 @@ function App() {
 
     // Handle back button click to return to slider
     const handleBackToSlider = () => {
-        // Start scale-down animation first
-        setIsScalingDownForReset(true)
+        // Calculate initial offset to center the selected project
+        const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
+        const itemWidth = 3.5 // Same as in WebGLSlider
+        const calculatedOffset = selectedIndex * itemWidth
+        setInitialOffset(calculatedOffset)
         
-        // After scale-down completes, reset the slider
+        // Start both animations simultaneously
+        setIsScalingDownForReset(true) // This triggers scale-down of selected image
+        setIsPostTransition(false) // This triggers UI change
+        
+        // Force complete slider recreation immediately for smooth transition
+        setSliderKey(prev => prev + 1)
+        
+        // Reset all other states immediately
+        setHoveredProject(null)
+        setDisplayedProject(null)
+        setIsVisible(false)
+        setHighlightedProject(null)
+        setIsHighlightVisible(false)
+        
+        // Clean up states after animations complete
         setTimeout(() => {
-            // Calculate initial offset to center the selected project
-            const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
-            const itemWidth = 3.5 // Same as in WebGLSlider
-            const calculatedOffset = selectedIndex * itemWidth
-            setInitialOffset(calculatedOffset)
-            
-            // Reset UI state
-            setIsPostTransition(false)
             setIsScalingDownForReset(false)
-            
-            // Force complete slider recreation by changing key
-            setSliderKey(prev => prev + 1)
-            
-            // Reset all other states to initial values
-            setHoveredProject(null)
-            setDisplayedProject(null)
-            setIsVisible(false)
-            setHighlightedProject(null)
-            setIsHighlightVisible(false)
-            
-            // Keep selectedProject for initial offset calculation, clear it after delay
-            setTimeout(() => {
-                setSelectedProject(null)
-            }, 100)
-        }, 800) // Wait for scale-down animation (0.8s)
+            setSelectedProject(null)
+        }, 2000) // Wait for expand animation to complete (2s)
     }
 
     return (

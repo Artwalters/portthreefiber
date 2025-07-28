@@ -166,9 +166,10 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   // Handle scaling down for reset (when back button is clicked)
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
-      // Scale down the selected image back to normal size before slider reset
+      // Only move to center x, keep z-position high to maintain size
       gsap.to(meshRef.current.position, {
-        z: position[2] + 0.01, // Back to subtle forward position
+        x: 0, // Move to center x position
+        // Keep z at +1 to maintain size during transition
         duration: 0.8,
         ease: "power2.inOut"
       })
@@ -181,17 +182,18 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
     if (meshRef.current && isInitialExpanding && !hasInitialExpanded.current) {
       hasInitialExpanded.current = true
       
-      // Check if this is the selected project (should stay slightly forward)
+      // Check if this is the selected project 
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
+      // Selected project animates from +1 to subtle forward position, others to normal
+      const finalZ = isSelectedProject ? position[2] + 0.01 : position[2]
       
       // Start animation immediately with no delay to prevent gaps
       gsap.to(meshRef.current.position, {
         x: position[0],
-        z: zPosition, // Maintain the subtle z-difference
+        z: finalZ, // Reset to normal positions after animation
         duration: 2,
         ease: "power2.inOut",
-        delay: isScalingDown ? 0.8 : (Math.random() * 0.2) // Wait for scale-down or small random delay
+        delay: Math.random() * 0.2 // Small random delay for natural effect
       })
     }
   }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown])
@@ -200,7 +202,8 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   const getRenderPosition = () => {
     if (isInitialExpanding) {
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
+      // Start selected image at same z as scale-down end position to prevent jump
+      const zPosition = isSelectedProject ? position[2] + 1 : position[2]
       return [0, position[1], zPosition]
     }
     return position
