@@ -4,8 +4,9 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide }) => {
   const meshRef = useRef()
+  const hasAnimated = useRef(false)
   
   // Create shader material with curve effect
   const shaderMaterial = new THREE.ShaderMaterial({
@@ -34,19 +35,56 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover }) => {
       varying vec2 vUv;
       
       void main() {
-        vec4 texture = texture2D(uTexture, vUv);
+        // Center and crop the texture to maintain aspect ratio (cover behavior)
+        vec2 uv = vUv;
+        
+        // Calculate aspect ratios
+        vec2 textureSize = vec2(1.0, 1.0); // Assume square texture for now
+        vec2 planeSize = vec2(1.0, 1.0); // Our plane is now square
+        
+        // Center the UV coordinates and scale to cover
+        vec2 ratio = vec2(
+          min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
+          max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
+        );
+        
+        uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
+        
+        vec4 texture = texture2D(uTexture, uv);
         gl_FragColor = texture;
       }
     `,
     side: THREE.DoubleSide
   })
 
-  // Update velocity uniform
+  // Update velocity uniform and position
   useFrame(() => {
     if (meshRef.current && shaderMaterial.uniforms.uVelo) {
       shaderMaterial.uniforms.uVelo.value = velocity
     }
+    
+    // Set normal position when not transitioning
+    if (meshRef.current && !isTransitioning) {
+      meshRef.current.position.set(position[0], position[1], position[2])
+      hasAnimated.current = false
+    }
   })
+
+  // Handle transition animation (only once when transition starts)
+  useEffect(() => {
+    if (meshRef.current && isTransitioning && !hasAnimated.current) {
+      hasAnimated.current = true
+      
+      // Animate this slide to screen center (x = 0) - very subtle z difference
+      gsap.to(meshRef.current.position, {
+        x: 0,
+        y: position[1],
+        z: position[2] + (isClicked ? 0.01 : -0.01), // Very minimal z difference
+        duration: 2,
+        ease: "power2.inOut"
+      })
+    }
+  }, [isTransitioning, isClicked, position])
 
   return (
     <mesh 
@@ -55,8 +93,9 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover }) => {
       material={shaderMaterial}
       onPointerEnter={() => onHover && onHover(projectData)}
       onPointerLeave={() => onHover && onHover(null)}
+      onClick={() => onClick && onClick(projectData)}
     >
-      <planeGeometry args={[2, 2.5, 32, 32]} />
+      <planeGeometry args={[3, 3, 32, 32]} />
     </mesh>
   )
 }
@@ -72,6 +111,9 @@ export default function WebGLSlider({ onHover }) {
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const [hoveredSlide, setHoveredSlide] = useState(null)
+  const [clickedSlide, setClickedSlide] = useState(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [hiddenSlides, setHiddenSlides] = useState(new Set())
   
   // Load textures with correct paths for GitHub Pages
   const textures = useTexture([
@@ -84,7 +126,7 @@ export default function WebGLSlider({ onHover }) {
     './img/project-7.png'
   ])
 
-  const itemWidth = 2.5
+  const itemWidth = 3.5
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
@@ -105,9 +147,31 @@ export default function WebGLSlider({ onHover }) {
     }
   }, [hoveredSlide, onHover])
 
-  // Smooth animation loop
+  // Handle slide click - all slides move to screen center, then remove others
+  const handleSlideClick = (projectData) => {
+    if (isDragging.current || isTransitioning) return
+    
+    setClickedSlide(projectData)
+    setIsTransitioning(true)
+    
+    // Stop all slider movement
+    velocity.current = 0
+    
+    // After 2 seconds, hide all slides except the clicked one
+    setTimeout(() => {
+      const newHiddenSlides = new Set()
+      projects.forEach(project => {
+        if (project.name !== projectData.name) {
+          newHiddenSlides.add(project.name)
+        }
+      })
+      setHiddenSlides(newHiddenSlides)
+    }, 2000)
+  }
+
+  // Smooth animation loop - disabled when transitioning
   useFrame(() => {
-    if (!isDragging.current) {
+    if (!isDragging.current && !isTransitioning) {
       // Apply momentum/inertia with smoother friction
       velocity.current *= 0.98 // less friction for longer momentum
       targetOffset.current += velocity.current
@@ -129,6 +193,8 @@ export default function WebGLSlider({ onHover }) {
     const canvas = gl.domElement
 
     const handleMouseDown = (e) => {
+      if (isTransitioning) return // Disable drag when transitioning
+      
       isDragging.current = true
       velocity.current = 0
       dragStart.current = {
@@ -180,6 +246,8 @@ export default function WebGLSlider({ onHover }) {
     }
 
     const handleWheel = (e) => {
+      if (isTransitioning) return // Disable scroll when transitioning
+      
       e.preventDefault()
       const scrollSensitivity = 0.0015 // smoother scroll sensitivity
       
@@ -207,9 +275,10 @@ export default function WebGLSlider({ onHover }) {
     }
   }, [offset, gl])
 
-  // Create infinite slides
+  // Create infinite slides - only show slides within viewport
   const slides = []
-  const visibleRange = Math.ceil(window.innerWidth / (itemWidth * 100)) + 2
+  const viewportWidth = window.innerWidth / 100 // Convert to Three.js units
+  const visibleRange = Math.ceil(viewportWidth / itemWidth) + 1 // Reduce range
 
   // Calculate how many full cycles we need to show
   const cycleOffset = Math.floor(offset / totalWidth) * totalWidth
@@ -220,16 +289,37 @@ export default function WebGLSlider({ onHover }) {
     const textureIndex = ((i % totalItems) + totalItems) % totalItems
     const position = [cycleOffset + i * itemWidth - offset, 0, 0]
     
-    slides.push(
-      <SlideItem
-        key={`slide-${i}-${Math.floor(offset / totalWidth)}`}
-        texture={textures[textureIndex]}
-        position={position}
-        velocity={velocity.current}
-        projectData={projects[textureIndex]}
-        onHover={setHoveredSlide}
-      />
-    )
+    // Only render slides that are within or close to viewport bounds
+    const slideLeftEdge = position[0] - itemWidth/2
+    const slideRightEdge = position[0] + itemWidth/2
+    const viewportLeft = -viewportWidth/2
+    const viewportRight = viewportWidth/2
+    
+    // Skip slides that are completely outside viewport bounds
+    if (slideRightEdge < viewportLeft - itemWidth || slideLeftEdge > viewportRight + itemWidth) {
+      continue
+    }
+    
+    const isClicked = clickedSlide && clickedSlide.name === projects[textureIndex].name
+    const projectName = projects[textureIndex].name
+    const shouldHide = hiddenSlides.has(projectName)
+    
+    if (!shouldHide) {
+      slides.push(
+        <SlideItem
+          key={`slide-${i}-${Math.floor(offset / totalWidth)}`}
+          texture={textures[textureIndex]}
+          position={position}
+          velocity={velocity.current}
+          projectData={projects[textureIndex]}
+          onHover={setHoveredSlide}
+          onClick={handleSlideClick}
+          isClicked={isClicked}
+          isTransitioning={isTransitioning}
+          shouldHide={shouldHide}
+        />
+      )
+    }
   }
 
   return (
