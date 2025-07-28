@@ -142,3 +142,41 @@ body,
     cursor: pointer;
     pointer-events: auto;
 }
+
+/* Desktop-specific styles - 2x larger UI elements */
+@media (min-width: 769px) {
+    .ui-overlay {
+        font-size: 20px; /* Adjusted desktop size */
+        padding: 0.75rem 1.5rem; /* Reduced padding for more compact feel */
+    }
+    
+    .ui-top {
+        top: 0.75rem; /* Reduced spacing */
+        width: calc(100% - 3rem); /* Adjust for smaller padding */
+    }
+    
+    .ui-bottom {
+        bottom: 0.75rem; /* Reduced spacing */
+        width: calc(100% - 3rem); /* Adjust for smaller padding */
+    }
+    
+    .index-section {
+        gap: 2rem; /* 2x larger gap */
+    }
+    
+    .project-list {
+        gap: 0.2rem; /* 2x larger gap */
+    }
+    
+    .creative-section {
+        gap: 2rem; /* 2x larger gap */
+    }
+    
+    .project-description {
+        max-width: 600px; /* 2x larger max width */
+    }
+    
+    .project-number {
+        font-size: 20px; /* Adjusted desktop size */
+    }
+}

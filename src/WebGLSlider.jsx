@@ -81,22 +81,30 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
         x: isMobile ? 0 : 0, // Always center x
         y: isMobile ? 0 : 0, // Always center y
         z: position[2] + (isClicked ? 0.01 : -0.01), // Very minimal z difference
-        duration: 2,
-        ease: "power2.inOut"
+        duration: 1.5, // 25% faster (was 2s)
+        ease: "power3.inOut" // Smoother easing
       })
     }
   }, [isTransitioning, isClicked, position])
 
   // Handle post-transition scaling for selected image
   useEffect(() => {
+    console.log('POST-TRANSITION CHECK:', projectData.name, {
+      meshRef: !!meshRef.current,
+      transitionComplete,
+      isClicked,
+      position: position[2]
+    })
+    
     if (meshRef.current && transitionComplete && isClicked) {
+      console.log('POST-TRANSITION SCALING TRIGGERED:', projectData.name, 'z-position:', position[2] + 1.25)
       // After transition completes, make the clicked slide larger by moving it forward
-      // This creates a 1.5x scale effect through perspective
+      // This creates a 1.75x scale effect through perspective (25% bigger than before)
       gsap.to(meshRef.current.position, {
-        z: position[2] + 1, // Move significantly forward for 1.5x effect
-        duration: 0.8,
-        ease: "power2.out",
-        delay: 0.2 // Small delay after transition completes
+        z: position[2] + 1.25, // Move further forward for 1.75x effect (25% bigger)
+        duration: 0.6, // 25% faster (was 0.8s)
+        ease: "power3.out", // Smoother easing
+        delay: 0.15 // Slightly reduced delay for faster feel
       })
     }
   }, [transitionComplete, isClicked, position])
@@ -107,8 +115,8 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       // Scale down the selected image back to normal size
       gsap.to(meshRef.current.position, {
         z: position[2] + 0.01, // Back to subtle forward position
-        duration: 0.8,
-        ease: "power2.inOut"
+        duration: 0.6, // 25% faster (was 0.8s)
+        ease: "power3.inOut" // Smoother easing
       })
     }
   }, [isScalingDown, isClicked, position])
@@ -117,13 +125,13 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
       const isMobile = window.innerWidth <= 768
-      // Move to center for both mobile and desktop
+      // Scale down from +1.25 to normal position, keeping it on top
       gsap.to(meshRef.current.position, {
         x: 0, // Always center x
         y: 0, // Always center y
-        // Keep z at +1 to maintain size during transition
-        duration: 0.8,
-        ease: "power2.inOut"
+        z: position[2] + 0.02, // Scale down to slightly above normal position
+        duration: 0.6, // 25% faster (was 0.8s)
+        ease: "power3.inOut" // Smoother easing
       })
     }
   }, [isScalingDownForReset, transitionComplete, isClicked, position])
@@ -136,7 +144,7 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       
       // Check if this is the selected project 
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      // Selected project animates from +1 to subtle forward position, others to normal
+      // Selected project animates from scale-down position to subtle forward position, others to normal
       const finalZ = isSelectedProject ? position[2] + 0.01 : position[2]
       
       // Debug log to see positions
@@ -149,9 +157,9 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
         x: position[0], // Should be 0 for mobile
         y: position[1], // Should be the vertical offset for mobile
         z: finalZ, // Reset to normal positions after animation
-        duration: 2,
-        ease: "power2.inOut",
-        delay: Math.random() * 0.2 // Small random delay for natural effect
+        duration: 1.5, // 25% faster (was 2s)
+        ease: "power3.inOut", // Smoother easing
+        delay: Math.random() * 0.15 // Slightly reduced delay for faster feel
       })
     }
   }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown, isMobile])
@@ -160,8 +168,8 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   const getRenderPosition = () => {
     if (isInitialExpanding) {
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      // Start selected image at same z as scale-down end position to prevent jump
-      const zPosition = isSelectedProject ? position[2] + 1 : position[2]
+      // Start selected image at scale-down end position (slightly above normal) to prevent jump
+      const zPosition = isSelectedProject ? position[2] + 0.02 : position[2]
       // Always start from center (0,0) for both mobile and desktop
       return [0, 0, zPosition]
     }
@@ -308,7 +316,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     // Stop all slider movement
     velocity.current = 0
     
-    // After 2 seconds, hide all slides except the clicked one and complete transition
+    // After 1.5 seconds, hide all slides except the clicked one and complete transition
     setTimeout(() => {
       const newHiddenSlides = new Set()
       projects.forEach(project => {
@@ -326,7 +334,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           onTransitionComplete(projectData, true)
         }
       }, 100) // Small delay to let slides disappear
-    }, 2000)
+    }, 1500) // 25% faster (was 2000ms)
   }
 
   // Handle touch end specifically for mobile clicks - TESTING: ignore drag detection
@@ -370,7 +378,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const timer = setTimeout(() => {
         console.log('Setting isInitialExpanding to false - slider should be navigatable now')
         setIsInitialExpanding(false)
-      }, 3000) // Fixed 3 second delay
+      }, 2250) // 25% faster (was 3000ms)
       
       return () => clearTimeout(timer)
     }
@@ -384,7 +392,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const timer = setTimeout(() => {
         console.log('Scale down complete')
         setIsScalingDown(false)
-      }, 800) // Match the scale-down animation duration
+      }, 600) // Match the scale-down animation duration (25% faster)
       
       return () => clearTimeout(timer)
     }

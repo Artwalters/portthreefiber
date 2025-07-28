@@ -99,7 +99,7 @@ function App() {
         }
     }
 
-    // Handle back button click to return to slider
+    // Handle back button click to return to slider - 2 phase transition
     const handleBackToSlider = () => {
         // Calculate initial offset to center the selected project
         const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
@@ -108,25 +108,27 @@ function App() {
         const calculatedOffset = selectedIndex * itemWidth
         setInitialOffset(calculatedOffset)
         
-        // Start both animations simultaneously
+        // PHASE 1: Scale down selected image only
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
-        setIsPostTransition(false) // This triggers UI change
         
-        // Force complete slider recreation immediately for smooth transition
-        setSliderKey(prev => prev + 1)
-        
-        // Reset all other states immediately
-        setHoveredProject(null)
-        setDisplayedProject(null)
-        setIsVisible(false)
-        setHighlightedProject(null)
-        setIsHighlightVisible(false)
-        
-        // Clean up states after animations complete
+        // PHASE 2: After scale-down completes, trigger slider expansion
         setTimeout(() => {
-            setIsScalingDownForReset(false)
-            setSelectedProject(null)
-        }, 2000) // Wait for expand animation to complete (2s)
+            setIsPostTransition(false) // This triggers UI change
+            setSliderKey(prev => prev + 1) // Force complete slider recreation
+            
+            // Reset hover states
+            setHoveredProject(null)
+            setDisplayedProject(null)
+            setIsVisible(false)
+            setHighlightedProject(null)
+            setIsHighlightVisible(false)
+            
+            // Clean up states after expand animation completes
+            setTimeout(() => {
+                setIsScalingDownForReset(false)
+                setSelectedProject(null)
+            }, 1500) // Wait for expand animation to complete (1.5s)
+        }, 600) // Wait for scale-down animation to complete (0.6s)
     }
 
     return (
