@@ -4,105 +4,53 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
   const hasAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
   
-  // Use same shader material but without velocity effect after transition complete
-  const material = transitionComplete 
-    ? new THREE.ShaderMaterial({
-        uniforms: {
-          uTexture: { value: texture },
-          uVelo: { value: 0 } // Always 0 after transition
-        },
-        vertexShader: `
-          precision mediump float;
-          uniform float uVelo;
-          varying vec2 vUv;
-          
-          void main(){
-            vec3 pos = position;
-            // No curve deformation after transition (uVelo is always 0)
-            
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          }
-        `,
-        fragmentShader: `
-          precision mediump float;
-          uniform sampler2D uTexture;
-          varying vec2 vUv;
-          
-          void main() {
-            // Keep same texture rendering as during slider
-            vec2 uv = vUv;
-            
-            // Calculate aspect ratios
-            vec2 textureSize = vec2(1.0, 1.0);
-            vec2 planeSize = vec2(1.0, 1.0);
-            
-            // Center the UV coordinates and scale to cover
-            vec2 ratio = vec2(
-              min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
-              max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
-            );
-            
-            uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
-            
-            vec4 texture = texture2D(uTexture, uv);
-            gl_FragColor = texture;
-          }
-        `,
-        side: THREE.DoubleSide
-      })
-    : new THREE.ShaderMaterial({
-        uniforms: {
-          uTexture: { value: texture },
-          uVelo: { value: 0 }
-        },
-        vertexShader: `
-          precision mediump float;
-          uniform float uVelo;
-          varying vec2 vUv;
-          
-          #define M_PI 3.1415926535897932384626433832795
-          
-          void main(){
-            vec3 pos = position;
-            pos.x = pos.x + ((sin(uv.y * M_PI) * uVelo) * 0.125);
-            
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          }
-        `,
-        fragmentShader: `
-          precision mediump float;
-          uniform sampler2D uTexture;
-          varying vec2 vUv;
-          
-          void main() {
-            // Center and crop the texture to maintain aspect ratio (cover behavior)
-            vec2 uv = vUv;
-            
-            // Calculate aspect ratios
-            vec2 textureSize = vec2(1.0, 1.0); // Assume square texture for now
-            vec2 planeSize = vec2(1.0, 1.0); // Our plane is now square
-            
-            // Center the UV coordinates and scale to cover
-            vec2 ratio = vec2(
-              min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
-              max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
-            );
-            
-            uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
-            
-            vec4 texture = texture2D(uTexture, uv);
-            gl_FragColor = texture;
-          }
-        `,
-        side: THREE.DoubleSide
-      })
+  // Simple shader material with curve deformation
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTexture: { value: texture },
+      uVelo: { value: 0 },
+      uIsMobile: { value: isMobile ? 1.0 : 0.0 }
+    },
+    vertexShader: `
+      precision mediump float;
+      uniform float uVelo;
+      uniform float uIsMobile;
+      varying vec2 vUv;
+      
+      #define M_PI 3.1415926535897932384626433832795
+      
+      void main(){
+        vec3 pos = position;
+        
+        if(uIsMobile > 0.5) {
+          // Vertical deformation for mobile
+          pos.y = pos.y + ((sin(uv.x * M_PI) * uVelo) * 0.125);
+        } else {
+          // Horizontal deformation for desktop
+          pos.x = pos.x + ((sin(uv.y * M_PI) * uVelo) * 0.125);
+        }
+        
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision mediump float;
+      uniform sampler2D uTexture;
+      varying vec2 vUv;
+      
+      void main() {
+        vec4 color = texture2D(uTexture, vUv);
+        gl_FragColor = color;
+      }
+    `,
+    side: THREE.DoubleSide
+  })
 
   // Update velocity uniform and position - disabled after transition complete
   useFrame(() => {
@@ -126,10 +74,11 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
     if (meshRef.current && isTransitioning && !hasAnimated.current) {
       hasAnimated.current = true
       
-      // Animate this slide to screen center (x = 0) - very subtle z difference
+      // Animate this slide to screen center - check if mobile for direction
+      const isMobile = window.innerWidth <= 768
       gsap.to(meshRef.current.position, {
-        x: 0,
-        y: position[1],
+        x: isMobile ? 0 : 0, // Always center x
+        y: isMobile ? 0 : 0, // Always center y
         z: position[2] + (isClicked ? 0.01 : -0.01), // Very minimal z difference
         duration: 2,
         ease: "power2.inOut"
@@ -166,9 +115,11 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
   // Handle scaling down for reset (when back button is clicked)
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
-      // Only move to center x, keep z-position high to maintain size
+      const isMobile = window.innerWidth <= 768
+      // Move to center for both mobile and desktop
       gsap.to(meshRef.current.position, {
-        x: 0, // Move to center x position
+        x: 0, // Always center x
+        y: 0, // Always center y
         // Keep z at +1 to maintain size during transition
         duration: 0.8,
         ease: "power2.inOut"
@@ -187,16 +138,22 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       // Selected project animates from +1 to subtle forward position, others to normal
       const finalZ = isSelectedProject ? position[2] + 0.01 : position[2]
       
+      // Debug log to see positions
+      if (isMobile) {
+        console.log('Mobile expand animation to:', position[0], position[1], 'for', projectData.name)
+      }
+      
       // Start animation immediately with no delay to prevent gaps
       gsap.to(meshRef.current.position, {
-        x: position[0],
+        x: position[0], // Should be 0 for mobile
+        y: position[1], // Should be the vertical offset for mobile
         z: finalZ, // Reset to normal positions after animation
         duration: 2,
         ease: "power2.inOut",
         delay: Math.random() * 0.2 // Small random delay for natural effect
       })
     }
-  }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown])
+  }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown, isMobile])
 
   // Calculate render position - if expanding, start at center
   const getRenderPosition = () => {
@@ -204,7 +161,8 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
       // Start selected image at same z as scale-down end position to prevent jump
       const zPosition = isSelectedProject ? position[2] + 1 : position[2]
-      return [0, position[1], zPosition]
+      // Always start from center (0,0) for both mobile and desktop
+      return [0, 0, zPosition]
     }
     return position
   }
@@ -217,6 +175,12 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       onPointerEnter={() => !transitionComplete && onHover && onHover(projectData)}
       onPointerLeave={() => !transitionComplete && onHover && onHover(null)}
       onClick={() => !transitionComplete && onClick && onClick(projectData)}
+      onPointerDown={(e) => {
+        // Stop propagation to prevent drag interference on click
+        if (!transitionComplete && onClick) {
+          e.stopPropagation()
+        }
+      }}
     >
       <planeGeometry args={[3, 3, 32, 32]} />
     </mesh>
@@ -228,12 +192,15 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
   const isDragging = useRef(false)
-  const dragStart = useRef({ x: 0, offset: 0 })
+  const hasDraggedEnough = useRef(false) // Track if drag distance is significant
+  const dragStart = useRef({ x: 0, y: 0, offset: 0 })
   const velocity = useRef(0)
   const targetOffset = useRef(initialOffset)
   const currentOffset = useRef(initialOffset) // Smooth interpolated value
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
+  const lastMouseY = useRef(0)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768) // Initialize correctly
   const [hoveredSlide, setHoveredSlide] = useState(null)
   const [clickedSlide, setClickedSlide] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -268,6 +235,16 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { name: 'project-7', description: 'Art installation with interactive elements' }
   ]
 
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   useEffect(() => {
     if (onHover) {
       onHover(hoveredSlide)
@@ -276,7 +253,10 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
 
   // Handle slide click - all slides move to screen center, then remove others
   const handleSlideClick = (projectData) => {
-    if (isDragging.current || isTransitioning) return
+    // Only block click if we've actually dragged a significant distance
+    if (hasDraggedEnough.current || isTransitioning) return
+    
+    console.log('Slide clicked:', projectData.name) // Debug log
     
     setClickedSlide(projectData)
     setIsTransitioning(true)
@@ -365,13 +345,17 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       e.preventDefault() // Prevent default touch behavior
       
       isDragging.current = true
+      hasDraggedEnough.current = false // Reset drag distance check
       velocity.current = 0
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
       dragStart.current = {
         x: clientX,
+        y: clientY,
         offset: targetOffset.current // Use target offset for smooth continuation
       }
       lastMouseX.current = clientX
+      lastMouseY.current = clientY
       lastMoveTime.current = Date.now()
       canvas.style.cursor = 'grabbing'
     }
@@ -383,17 +367,44 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const currentTime = Date.now()
       const deltaTime = currentTime - lastMoveTime.current
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
-      const deltaX = clientX - lastMouseX.current
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
-      if (deltaTime > 0) {
-        velocity.current = -deltaX * 0.05 // Calculate velocity for momentum
+      const minDragDistance = 10 // Minimum pixels to consider it a drag
+      
+      if (isMobile) {
+        // Vertical movement on mobile
+        const deltaY = clientY - lastMouseY.current
+        const totalDeltaY = clientY - dragStart.current.y
+        
+        // Check if dragged enough
+        if (Math.abs(totalDeltaY) > minDragDistance) {
+          hasDraggedEnough.current = true
+        }
+        
+        if (deltaTime > 0) {
+          velocity.current = -deltaY * 0.05 // Calculate velocity for momentum
+        }
+        const dragSpeed = 2
+        targetOffset.current = dragStart.current.offset - totalDeltaY * 0.01 * dragSpeed
+        lastMouseY.current = clientY
+      } else {
+        // Horizontal movement on desktop
+        const deltaX = clientX - lastMouseX.current
+        const totalDeltaX = clientX - dragStart.current.x
+        
+        // Check if dragged enough
+        if (Math.abs(totalDeltaX) > minDragDistance) {
+          hasDraggedEnough.current = true
+        }
+        
+        if (deltaTime > 0) {
+          velocity.current = -deltaX * 0.05 // Calculate velocity for momentum
+        }
+        const dragSpeed = 2
+        targetOffset.current = dragStart.current.offset - totalDeltaX * 0.01 * dragSpeed
+        lastMouseX.current = clientX
       }
       
-      const totalDeltaX = clientX - dragStart.current.x
-      const dragSpeed = 2 // Same as reference slider
-      targetOffset.current = dragStart.current.offset - totalDeltaX * 0.01 * dragSpeed
-      
-      lastMouseX.current = clientX
       lastMoveTime.current = currentTime
     }
 
@@ -414,7 +425,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }
 
     const handleWheel = (e) => {
-      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable scroll during expand
+      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown || isMobile) return // Disable scroll on mobile
       
       e.preventDefault()
       
@@ -467,17 +478,31 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
 
   for (let i = startIndex; i <= endIndex; i++) {
     const textureIndex = ((i % totalItems) + totalItems) % totalItems
-    const position = [cycleOffset + i * itemWidth - offset, 0, 0]
+    const position = isMobile 
+      ? [0, cycleOffset + i * itemWidth - offset, 0] // Vertical on mobile
+      : [cycleOffset + i * itemWidth - offset, 0, 0] // Horizontal on desktop
     
     // Only render slides that are within or close to viewport bounds
-    const slideLeftEdge = position[0] - itemWidth/2
-    const slideRightEdge = position[0] + itemWidth/2
-    const viewportLeft = -viewportWidth/2
-    const viewportRight = viewportWidth/2
-    
-    // Skip slides that are completely outside viewport bounds
-    if (slideRightEdge < viewportLeft - itemWidth || slideLeftEdge > viewportRight + itemWidth) {
-      continue
+    if (isMobile) {
+      // Vertical bounds check for mobile
+      const slideTopEdge = position[1] - itemWidth/2
+      const slideBottomEdge = position[1] + itemWidth/2
+      const viewportTop = -viewportWidth/2
+      const viewportBottom = viewportWidth/2
+      
+      if (slideBottomEdge < viewportTop - itemWidth || slideTopEdge > viewportBottom + itemWidth) {
+        continue
+      }
+    } else {
+      // Horizontal bounds check for desktop
+      const slideLeftEdge = position[0] - itemWidth/2
+      const slideRightEdge = position[0] + itemWidth/2
+      const viewportLeft = -viewportWidth/2
+      const viewportRight = viewportWidth/2
+      
+      if (slideRightEdge < viewportLeft - itemWidth || slideLeftEdge > viewportRight + itemWidth) {
+        continue
+      }
     }
     
     const isClicked = clickedSlide && clickedSlide.name === projects[textureIndex].name
@@ -502,6 +527,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           selectedProject={selectedProject}
           isScalingDown={isScalingDown}
           isScalingDownForReset={isScalingDownForReset}
+          isMobile={isMobile}
         />
       )
     }
