@@ -103,7 +103,8 @@ function App() {
     const handleBackToSlider = () => {
         // Calculate initial offset to center the selected project
         const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
-        const itemWidth = 3.5 // Same as in WebGLSlider
+        const isMobile = window.innerWidth <= 768
+        const itemWidth = isMobile ? 2.3 : 3.5 // Same as in WebGLSlider
         const calculatedOffset = selectedIndex * itemWidth
         setInitialOffset(calculatedOffset)
         

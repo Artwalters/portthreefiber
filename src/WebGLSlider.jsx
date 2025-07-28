@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
   const hasAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
@@ -45,6 +45,7 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       varying vec2 vUv;
       
       void main() {
+        // Use original UV coordinates since both texture and geometry are square
         vec4 color = texture2D(uTexture, vUv);
         gl_FragColor = color;
       }
@@ -181,8 +182,26 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
           e.stopPropagation()
         }
       }}
+      onTouchStart={(e) => {
+        // Ensure touch events work on mobile
+        if (!transitionComplete && onClick) {
+          e.stopPropagation()
+        }
+      }}
+      onTouchEnd={(e) => {
+        // Handle touch end for mobile clicks
+        if (onTouchEnd) {
+          onTouchEnd(projectData, e)
+        }
+      }}
+      onPointerUp={(e) => {
+        // Handle pointer up for cross-platform support
+        if (onPointerUp) {
+          onPointerUp(projectData, e)
+        }
+      }}
     >
-      <planeGeometry args={[3, 3, 32, 32]} />
+      <planeGeometry args={isMobile ? [2, 2, 32, 32] : [3, 3, 32, 32]} />
     </mesh>
   )
 }
@@ -220,7 +239,18 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     './img/project-7.png'
   ])
 
-  const itemWidth = 3.5
+  // Configure textures to maintain aspect ratio
+  useEffect(() => {
+    textures.forEach(texture => {
+      texture.generateMipmaps = false
+      texture.wrapS = THREE.ClampToEdgeWrap
+      texture.wrapT = THREE.ClampToEdgeWrap
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+    })
+  }, [textures])
+
+  const itemWidth = isMobile ? 2.3 : 3.5 // Smaller spacing for mobile to match smaller images
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
@@ -283,6 +313,28 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
       }, 100) // Small delay to let slides disappear
     }, 2000)
+  }
+
+  // Handle touch end specifically for mobile clicks
+  const handleTouchEnd = (projectData, e) => {
+    // Only trigger click if we haven't dragged significantly
+    if (!hasDraggedEnough.current && !isTransitioning && !transitionComplete) {
+      e.preventDefault()
+      e.stopPropagation()
+      console.log('Touch end triggered for:', projectData.name) // Debug log
+      handleSlideClick(projectData)
+    }
+  }
+
+  // Handle pointer events for better cross-platform support
+  const handlePointerUp = (projectData, e) => {
+    // Only trigger click if we haven't dragged significantly and it's not already transitioning
+    if (!hasDraggedEnough.current && !isTransitioning && !transitionComplete) {
+      e.preventDefault()
+      e.stopPropagation()
+      console.log('Pointer up triggered for:', projectData.name) // Debug log
+      handleSlideClick(projectData)
+    }
   }
 
   // Handle initial expand animation - slides start at center and expand out
@@ -352,7 +404,8 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       dragStart.current = {
         x: clientX,
         y: clientY,
-        offset: targetOffset.current // Use target offset for smooth continuation
+        offset: targetOffset.current, // Use target offset for smooth continuation
+        time: Date.now() // Track start time
       }
       lastMouseX.current = clientX
       lastMouseY.current = clientY
@@ -369,7 +422,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
-      const minDragDistance = 10 // Minimum pixels to consider it a drag
+      const minDragDistance = 15 // Minimum pixels to consider it a drag (increased for better touch detection)
       
       if (isMobile) {
         // Vertical movement on mobile
@@ -382,10 +435,10 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
         
         if (deltaTime > 0) {
-          velocity.current = -deltaY * 0.05 // Calculate velocity for momentum
+          velocity.current = deltaY * 0.05 // Fixed: removed negative sign for correct direction
         }
         const dragSpeed = 2
-        targetOffset.current = dragStart.current.offset - totalDeltaY * 0.01 * dragSpeed
+        targetOffset.current = dragStart.current.offset + totalDeltaY * 0.01 * dragSpeed // Fixed: changed minus to plus
         lastMouseY.current = clientY
       } else {
         // Horizontal movement on desktop
@@ -413,6 +466,13 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       
       isDragging.current = false
       canvas.style.cursor = 'grab'
+      
+      // Reset drag check after a short delay to allow for quick taps
+      setTimeout(() => {
+        if (!isDragging.current) {
+          hasDraggedEnough.current = false
+        }
+      }, 100)
       
       // Velocity is already being applied in the render loop
       // No need for additional animation
@@ -519,6 +579,8 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           projectData={projects[textureIndex]}
           onHover={setHoveredSlide}
           onClick={handleSlideClick}
+          onTouchEnd={handleTouchEnd}
+          onPointerUp={handlePointerUp}
           isClicked={isClicked}
           isTransitioning={isTransitioning}
           shouldHide={shouldHide}
