@@ -286,7 +286,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }
   }, [hoveredSlide, onHover])
 
-  // Handle slide click - all slides move to screen center, then remove others
+  // Handle slide click - all slides move to screen center, then remove others - TESTING: ignore drag
   const handleSlideClick = (projectData) => {
     console.log('handleSlideClick called for:', projectData.name, {
       hasDraggedEnough: hasDraggedEnough.current,
@@ -294,13 +294,13 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       transitionComplete
     })
     
-    // Only block click if we've actually dragged a significant distance
-    if (hasDraggedEnough.current || isTransitioning) {
-      console.log('Click blocked because:', { hasDraggedEnough: hasDraggedEnough.current, isTransitioning })
+    // TESTING: Only block if transitioning, ignore drag detection
+    if (isTransitioning) {
+      console.log('Click blocked because isTransitioning:', isTransitioning)
       return
     }
     
-    console.log('Slide clicked:', projectData.name) // Debug log
+    console.log('TESTING: Slide clicked:', projectData.name, '(ignoring drag detection)') // Debug log
     
     setClickedSlide(projectData)
     setIsTransitioning(true)
@@ -329,7 +329,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }, 2000)
   }
 
-  // Handle touch end specifically for mobile clicks
+  // Handle touch end specifically for mobile clicks - TESTING: ignore drag detection
   const handleTouchEnd = (projectData, e) => {
     console.log('Touch end called for:', projectData.name, {
       hasDraggedEnough: hasDraggedEnough.current,
@@ -338,30 +338,14 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       isDragging: isDragging.current
     })
     
-    // Less restrictive check - allow click if not currently transitioning
+    // TESTING: Completely ignore drag detection and allow all touches
     if (!isTransitioning && !transitionComplete) {
-      // Small delay to allow drag detection to settle
-      setTimeout(() => {
-        console.log('Delayed touch check:', {
-          hasDraggedEnough: hasDraggedEnough.current,
-          isDragging: isDragging.current
-        })
-        
-        // Force reset if not actively dragging - this fixes the stuck state
-        if (!isDragging.current) {
-          console.log('Force resetting hasDraggedEnough for touch')
-          hasDraggedEnough.current = false
-        }
-        
-        if (!hasDraggedEnough.current && !isDragging.current) {
-          console.log('Touch end triggered for:', projectData.name)
-          handleSlideClick(projectData)
-        }
-      }, 50) // Very small delay
+      console.log('TESTING: Touch end triggered for:', projectData.name, '(ignoring drag detection)')
+      handleSlideClick(projectData)
     }
   }
 
-  // Handle pointer events for better cross-platform support
+  // Handle pointer events for better cross-platform support - TESTING: ignore drag detection
   const handlePointerUp = (projectData, e) => {
     console.log('Pointer up called for:', projectData.name, {
       hasDraggedEnough: hasDraggedEnough.current,
@@ -370,11 +354,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       isDragging: isDragging.current
     })
     
-    // Only trigger click if we haven't dragged significantly and it's not already transitioning
-    if (!hasDraggedEnough.current && !isTransitioning && !transitionComplete) {
-      e.preventDefault()
-      e.stopPropagation()
-      console.log('Pointer up triggered for:', projectData.name) // Debug log
+    // TESTING: Completely ignore drag detection and allow all pointer ups
+    if (!isTransitioning && !transitionComplete) {
+      console.log('TESTING: Pointer up triggered for:', projectData.name, '(ignoring drag detection)')
       handleSlideClick(projectData)
     }
   }
