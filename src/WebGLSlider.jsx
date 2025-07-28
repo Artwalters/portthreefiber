@@ -347,6 +347,12 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           isDragging: isDragging.current
         })
         
+        // Force reset if not actively dragging - this fixes the stuck state
+        if (!isDragging.current) {
+          console.log('Force resetting hasDraggedEnough for touch')
+          hasDraggedEnough.current = false
+        }
+        
         if (!hasDraggedEnough.current && !isDragging.current) {
           console.log('Touch end triggered for:', projectData.name)
           handleSlideClick(projectData)
@@ -473,10 +479,10 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
         
         if (deltaTime > 0) {
-          velocity.current = -deltaY * 0.05 // Reversed: added negative sign back
+          velocity.current = deltaY * 0.05 // Fixed: swipe up should move cards up
         }
         const dragSpeed = 2
-        targetOffset.current = dragStart.current.offset - totalDeltaY * 0.01 * dragSpeed // Reversed: changed plus back to minus
+        targetOffset.current = dragStart.current.offset + totalDeltaY * 0.01 * dragSpeed // Fixed: swipe up moves cards up
         lastMouseY.current = clientY
       } else {
         // Horizontal movement on desktop
@@ -505,12 +511,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       isDragging.current = false
       canvas.style.cursor = 'grab'
       
-      // Reset drag check after a short delay to allow for quick taps
-      setTimeout(() => {
-        if (!isDragging.current) {
-          hasDraggedEnough.current = false
-        }
-      }, 100)
+      // Reset drag check immediately after drag ends
+      console.log('Mouse/Touch up - resetting hasDraggedEnough to false')
+      hasDraggedEnough.current = false
       
       // Velocity is already being applied in the render loop
       // No need for additional animation
