@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover }) => {
   const meshRef = useRef()
   
   // Create shader material with curve effect
@@ -49,13 +49,19 @@ const SlideItem = ({ texture, position, velocity }) => {
   })
 
   return (
-    <mesh ref={meshRef} position={position} material={shaderMaterial}>
+    <mesh 
+      ref={meshRef} 
+      position={position} 
+      material={shaderMaterial}
+      onPointerEnter={() => onHover && onHover(projectData)}
+      onPointerLeave={() => onHover && onHover(null)}
+    >
       <planeGeometry args={[2, 2.5, 32, 32]} />
     </mesh>
   )
 }
 
-export default function WebGLSlider() {
+export default function WebGLSlider({ onHover }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(0)
   const containerRef = useRef()
@@ -65,8 +71,9 @@ export default function WebGLSlider() {
   const targetOffset = useRef(0)
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
+  const [hoveredSlide, setHoveredSlide] = useState(null)
   
-  // Load textures
+  // Load textures with correct paths
   const textures = useTexture([
     '/img/project-1.png',
     '/img/project-2.png',
@@ -80,6 +87,23 @@ export default function WebGLSlider() {
   const itemWidth = 2.5
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
+
+  // Project data
+  const projects = [
+    { name: 'project-1', description: 'Interactive web experience with modern UI' },
+    { name: 'project-2', description: 'E-commerce platform with seamless checkout' },
+    { name: 'project-3', description: 'Creative portfolio showcasing visual identity' },
+    { name: 'project-4', description: 'Mobile app with intuitive user interface' },
+    { name: 'project-5', description: 'Brand identity and logo design system' },
+    { name: 'project-6', description: 'Digital marketing campaign visualization' },
+    { name: 'project-7', description: 'Art installation with interactive elements' }
+  ]
+
+  useEffect(() => {
+    if (onHover) {
+      onHover(hoveredSlide)
+    }
+  }, [hoveredSlide, onHover])
 
   // Smooth animation loop
   useFrame(() => {
@@ -202,6 +226,8 @@ export default function WebGLSlider() {
         texture={textures[textureIndex]}
         position={position}
         velocity={velocity.current}
+        projectData={projects[textureIndex]}
+        onHover={setHoveredSlide}
       />
     )
   }
