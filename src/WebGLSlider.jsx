@@ -4,67 +4,113 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide }) => {
+const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, isClicked, isTransitioning, shouldHide, transitionComplete }) => {
   const meshRef = useRef()
   const hasAnimated = useRef(false)
   
-  // Create shader material with curve effect
-  const shaderMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      uTexture: { value: texture },
-      uVelo: { value: 0 }
-    },
-    vertexShader: `
-      precision mediump float;
-      uniform float uVelo;
-      varying vec2 vUv;
-      
-      #define M_PI 3.1415926535897932384626433832795
-      
-      void main(){
-        vec3 pos = position;
-        pos.x = pos.x + ((sin(uv.y * M_PI) * uVelo) * 0.125);
-        
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-      }
-    `,
-    fragmentShader: `
-      precision mediump float;
-      uniform sampler2D uTexture;
-      varying vec2 vUv;
-      
-      void main() {
-        // Center and crop the texture to maintain aspect ratio (cover behavior)
-        vec2 uv = vUv;
-        
-        // Calculate aspect ratios
-        vec2 textureSize = vec2(1.0, 1.0); // Assume square texture for now
-        vec2 planeSize = vec2(1.0, 1.0); // Our plane is now square
-        
-        // Center the UV coordinates and scale to cover
-        vec2 ratio = vec2(
-          min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
-          max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
-        );
-        
-        uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
-        
-        vec4 texture = texture2D(uTexture, uv);
-        gl_FragColor = texture;
-      }
-    `,
-    side: THREE.DoubleSide
-  })
+  // Use same shader material but without velocity effect after transition complete
+  const material = transitionComplete 
+    ? new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture: { value: texture },
+          uVelo: { value: 0 } // Always 0 after transition
+        },
+        vertexShader: `
+          precision mediump float;
+          uniform float uVelo;
+          varying vec2 vUv;
+          
+          void main(){
+            vec3 pos = position;
+            // No curve deformation after transition (uVelo is always 0)
+            
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision mediump float;
+          uniform sampler2D uTexture;
+          varying vec2 vUv;
+          
+          void main() {
+            // Keep same texture rendering as during slider
+            vec2 uv = vUv;
+            
+            // Calculate aspect ratios
+            vec2 textureSize = vec2(1.0, 1.0);
+            vec2 planeSize = vec2(1.0, 1.0);
+            
+            // Center the UV coordinates and scale to cover
+            vec2 ratio = vec2(
+              min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
+              max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
+            );
+            
+            uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
+            
+            vec4 texture = texture2D(uTexture, uv);
+            gl_FragColor = texture;
+          }
+        `,
+        side: THREE.DoubleSide
+      })
+    : new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture: { value: texture },
+          uVelo: { value: 0 }
+        },
+        vertexShader: `
+          precision mediump float;
+          uniform float uVelo;
+          varying vec2 vUv;
+          
+          #define M_PI 3.1415926535897932384626433832795
+          
+          void main(){
+            vec3 pos = position;
+            pos.x = pos.x + ((sin(uv.y * M_PI) * uVelo) * 0.125);
+            
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision mediump float;
+          uniform sampler2D uTexture;
+          varying vec2 vUv;
+          
+          void main() {
+            // Center and crop the texture to maintain aspect ratio (cover behavior)
+            vec2 uv = vUv;
+            
+            // Calculate aspect ratios
+            vec2 textureSize = vec2(1.0, 1.0); // Assume square texture for now
+            vec2 planeSize = vec2(1.0, 1.0); // Our plane is now square
+            
+            // Center the UV coordinates and scale to cover
+            vec2 ratio = vec2(
+              min(planeSize.x / textureSize.x, planeSize.y / textureSize.y),
+              max(planeSize.x / textureSize.x, planeSize.y / textureSize.y)
+            );
+            
+            uv = (uv - 0.5) * (textureSize / planeSize) + 0.5;
+            
+            vec4 texture = texture2D(uTexture, uv);
+            gl_FragColor = texture;
+          }
+        `,
+        side: THREE.DoubleSide
+      })
 
-  // Update velocity uniform and position
+  // Update velocity uniform and position - disabled after transition complete
   useFrame(() => {
-    if (meshRef.current && shaderMaterial.uniforms.uVelo) {
-      shaderMaterial.uniforms.uVelo.value = velocity
+    if (!transitionComplete && meshRef.current && material.uniforms && material.uniforms.uVelo) {
+      material.uniforms.uVelo.value = velocity
     }
     
-    // Set normal position when not transitioning
-    if (meshRef.current && !isTransitioning) {
+    // Set normal position when not transitioning and not complete
+    if (meshRef.current && !isTransitioning && !transitionComplete) {
       meshRef.current.position.set(position[0], position[1], position[2])
       hasAnimated.current = false
     }
@@ -90,10 +136,10 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
     <mesh 
       ref={meshRef} 
       position={position} 
-      material={shaderMaterial}
-      onPointerEnter={() => onHover && onHover(projectData)}
-      onPointerLeave={() => onHover && onHover(null)}
-      onClick={() => onClick && onClick(projectData)}
+      material={material}
+      onPointerEnter={() => !transitionComplete && onHover && onHover(projectData)}
+      onPointerLeave={() => !transitionComplete && onHover && onHover(null)}
+      onClick={() => !transitionComplete && onClick && onClick(projectData)}
     >
       <planeGeometry args={[3, 3, 32, 32]} />
     </mesh>
@@ -114,6 +160,7 @@ export default function WebGLSlider({ onHover }) {
   const [clickedSlide, setClickedSlide] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
+  const [transitionComplete, setTransitionComplete] = useState(false)
   
   // Load textures with correct paths for GitHub Pages
   const textures = useTexture([
@@ -157,7 +204,7 @@ export default function WebGLSlider({ onHover }) {
     // Stop all slider movement
     velocity.current = 0
     
-    // After 2 seconds, hide all slides except the clicked one
+    // After 2 seconds, hide all slides except the clicked one and complete transition
     setTimeout(() => {
       const newHiddenSlides = new Set()
       projects.forEach(project => {
@@ -166,12 +213,17 @@ export default function WebGLSlider({ onHover }) {
         }
       })
       setHiddenSlides(newHiddenSlides)
+      
+      // Mark transition as complete to disable all slider effects
+      setTimeout(() => {
+        setTransitionComplete(true)
+      }, 100) // Small delay to let slides disappear
     }, 2000)
   }
 
-  // Smooth animation loop - disabled when transitioning
+  // Smooth animation loop - disabled when transitioning or complete
   useFrame(() => {
-    if (!isDragging.current && !isTransitioning) {
+    if (!isDragging.current && !isTransitioning && !transitionComplete) {
       // Apply momentum/inertia with smoother friction
       velocity.current *= 0.98 // less friction for longer momentum
       targetOffset.current += velocity.current
@@ -190,10 +242,12 @@ export default function WebGLSlider({ onHover }) {
   })
 
   useEffect(() => {
+    if (transitionComplete) return // Don't add event listeners after transition complete
+    
     const canvas = gl.domElement
 
     const handleMouseDown = (e) => {
-      if (isTransitioning) return // Disable drag when transitioning
+      if (isTransitioning || transitionComplete) return // Disable drag when transitioning or complete
       
       isDragging.current = true
       velocity.current = 0
@@ -246,7 +300,7 @@ export default function WebGLSlider({ onHover }) {
     }
 
     const handleWheel = (e) => {
-      if (isTransitioning) return // Disable scroll when transitioning
+      if (isTransitioning || transitionComplete) return // Disable scroll when transitioning or complete
       
       e.preventDefault()
       const scrollSensitivity = 0.0015 // smoother scroll sensitivity
@@ -273,7 +327,7 @@ export default function WebGLSlider({ onHover }) {
       window.removeEventListener('mouseup', handleMouseUp)
       canvas.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [offset, gl])
+  }, [offset, gl, transitionComplete])
 
   // Create infinite slides - only show slides within viewport
   const slides = []
@@ -317,6 +371,7 @@ export default function WebGLSlider({ onHover }) {
           isClicked={isClicked}
           isTransitioning={isTransitioning}
           shouldHide={shouldHide}
+          transitionComplete={transitionComplete}
         />
       )
     }
