@@ -28,11 +28,11 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
         vec3 pos = position;
         
         if(uIsMobile > 0.5) {
-          // Vertical deformation for mobile
-          pos.y = pos.y + ((sin(uv.x * M_PI) * uVelo) * 0.125);
+          // Vertical deformation for mobile - reversed direction
+          pos.y = pos.y - ((sin(uv.x * M_PI) * uVelo) * 0.125);
         } else {
-          // Horizontal deformation for desktop
-          pos.x = pos.x + ((sin(uv.y * M_PI) * uVelo) * 0.125);
+          // Horizontal deformation for desktop - reversed direction
+          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.125);
         }
         
         vUv = uv;
@@ -435,10 +435,10 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         }
         
         if (deltaTime > 0) {
-          velocity.current = deltaY * 0.05 // Fixed: removed negative sign for correct direction
+          velocity.current = -deltaY * 0.05 // Reversed: added negative sign back
         }
         const dragSpeed = 2
-        targetOffset.current = dragStart.current.offset + totalDeltaY * 0.01 * dragSpeed // Fixed: changed minus to plus
+        targetOffset.current = dragStart.current.offset - totalDeltaY * 0.01 * dragSpeed // Reversed: changed plus back to minus
         lastMouseY.current = clientY
       } else {
         // Horizontal movement on desktop
