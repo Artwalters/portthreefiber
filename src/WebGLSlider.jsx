@@ -361,13 +361,15 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     const handleMouseDown = (e) => {
       if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable drag during expand
       
+      e.preventDefault() // Prevent default touch behavior
       isDragging.current = true
       velocity.current = 0
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX
       dragStart.current = {
-        x: e.clientX,
+        x: clientX,
         offset: offset
       }
-      lastMouseX.current = e.clientX
+      lastMouseX.current = clientX
       lastMoveTime.current = Date.now()
       targetOffset.current = offset
       canvas.style.cursor = 'grabbing'
@@ -376,22 +378,24 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     const handleMouseMove = (e) => {
       if (!isDragging.current) return
       
+      e.preventDefault() // Prevent default touch behavior
       const currentTime = Date.now()
       const deltaTime = currentTime - lastMoveTime.current
-      const deltaX = e.clientX - lastMouseX.current
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const deltaX = clientX - lastMouseX.current
       
       if (deltaTime > 0) {
         velocity.current = -deltaX * 0.002 / deltaTime * 16 // more responsive velocity
       }
       
-      const totalDeltaX = e.clientX - dragStart.current.x
+      const totalDeltaX = clientX - dragStart.current.x
       const dragSensitivity = 0.008 // smoother drag sensitivity
       const newOffset = dragStart.current.offset - totalDeltaX * dragSensitivity
       
       setOffset(newOffset)
       targetOffset.current = newOffset
       
-      lastMouseX.current = e.clientX
+      lastMouseX.current = clientX
       lastMoveTime.current = currentTime
     }
 
@@ -426,18 +430,31 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }
 
     canvas.style.cursor = 'grab'
+    
+    // Mouse events
     canvas.addEventListener('mousedown', handleMouseDown)
     canvas.addEventListener('wheel', handleWheel, { passive: false })
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     canvas.addEventListener('mouseleave', handleMouseLeave)
+    
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', handleMouseDown, { passive: false })
+    window.addEventListener('touchmove', handleMouseMove, { passive: false })
+    window.addEventListener('touchend', handleMouseUp, { passive: false })
 
     return () => {
+      // Remove mouse events
       canvas.removeEventListener('mousedown', handleMouseDown)
       canvas.removeEventListener('wheel', handleWheel)
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
       canvas.removeEventListener('mouseleave', handleMouseLeave)
+      
+      // Remove touch events
+      canvas.removeEventListener('touchstart', handleMouseDown)
+      window.removeEventListener('touchmove', handleMouseMove)
+      window.removeEventListener('touchend', handleMouseUp)
     }
   }, [offset, gl, transitionComplete, isInitialExpanding, isScalingDown])
 

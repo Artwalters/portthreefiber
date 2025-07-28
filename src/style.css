@@ -18,6 +18,9 @@ body,
     font-family: 'PSTimesTrial', serif;
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Prevent scrolling */
+    touch-action: none; /* Prevent mobile scroll/zoom gestures */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 
