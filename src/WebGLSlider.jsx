@@ -73,15 +73,15 @@ export default function WebGLSlider({ onHover }) {
   const lastMouseX = useRef(0)
   const [hoveredSlide, setHoveredSlide] = useState(null)
   
-  // Load textures with correct paths
+  // Load textures with correct paths for GitHub Pages
   const textures = useTexture([
-    '/img/project-1.png',
-    '/img/project-2.png',
-    '/img/project-3.png',
-    '/img/project-4.png',
-    '/img/project-5.png',
-    '/img/project-6.png',
-    '/img/project-7.png'
+    './img/project-1.png',
+    './img/project-2.png',
+    './img/project-3.png',
+    './img/project-4.png',
+    './img/project-5.png',
+    './img/project-6.png',
+    './img/project-7.png'
   ])
 
   const itemWidth = 2.5
