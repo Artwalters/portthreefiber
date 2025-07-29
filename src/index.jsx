@@ -343,6 +343,9 @@ function App() {
         const calculatedOffset = selectedIndex * itemWidth
         setInitialOffset(calculatedOffset)
         
+        // Reset intro-specific UI fade state when returning from gallery
+        setUiFadingIn(undefined)
+        
         // PHASE 1: Start returning process and scale down selected image
         setIsReturningToSlider(true) // This triggers UI fade-out
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
