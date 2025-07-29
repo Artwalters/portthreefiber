@@ -1,16 +1,17 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
   const hasAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
+  const currentSpeed = useRef(0)
   
-  // Simple shader material with curve deformation
-  const material = new THREE.ShaderMaterial({
+  // Simple shader material with curve deformation - memoized to prevent recreation
+  const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTexture: { value: texture },
       uVelo: { value: 0 },
@@ -29,10 +30,10 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
         
         if(uIsMobile > 0.5) {
           // Vertical deformation for mobile - reversed direction
-          pos.y = pos.y - ((sin(uv.x * M_PI) * uVelo) * 0.125);
+          pos.y = pos.y - ((sin(uv.x * M_PI) * uVelo) * 0.065);
         } else {
           // Horizontal deformation for desktop - reversed direction
-          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.125);
+          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.065);
         }
         
         vUv = uv;
@@ -51,12 +52,50 @@ const SlideItem = ({ texture, position, velocity, projectData, onHover, onClick,
       }
     `,
     side: THREE.DoubleSide
-  })
+  }), [texture, isMobile]) // Only recreate if texture or isMobile changes
+  
+  // Update texture when it changes
+  useEffect(() => {
+    if (material.uniforms.uTexture) {
+      material.uniforms.uTexture.value = texture
+    }
+  }, [texture, material])
 
-  // Update velocity uniform and position - disabled after transition complete
+  // Update velocity uniform and position - continue smooth fade even during transition
   useFrame(() => {
-    if (!transitionComplete && meshRef.current && material.uniforms && material.uniforms.uVelo) {
-      material.uniforms.uVelo.value = velocity
+    if (meshRef.current && material.uniforms && material.uniforms.uVelo) {
+      // During transition, fade to 0, otherwise use slider speed
+      const targetSpeed = (isTransitioning || transitionComplete) ? 0 : (sliderSpeed || 0)
+      
+      // Safeguard against invalid values
+      if (isNaN(targetSpeed) || isNaN(currentSpeed.current)) {
+        currentSpeed.current = 0
+        material.uniforms.uVelo.value = 0
+        return
+      }
+      
+      // Extra smooth easing for direction changes
+      let ease
+      if (isTransitioning || transitionComplete) {
+        // During transition, use slow fade out
+        ease = 0.02
+      } else if (Math.sign(targetSpeed) !== Math.sign(currentSpeed.current) && Math.abs(currentSpeed.current) > 0.01) {
+        // Direction change - use very slow easing
+        ease = 0.015
+      } else if (Math.abs(targetSpeed) > Math.abs(currentSpeed.current)) {
+        // Speed increase - moderate easing
+        ease = 0.05
+      } else {
+        // Speed decrease - slow easing
+        ease = 0.008
+      }
+      
+      currentSpeed.current += (targetSpeed - currentSpeed.current) * ease
+      
+      // Clamp to reasonable values
+      currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
+      
+      material.uniforms.uVelo.value = currentSpeed.current * 0.4 // Reduce effect intensity by 60%
     }
     
     // Handle normal positioning only when not expanding and not transitioning
@@ -229,6 +268,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const velocity = useRef(0)
   const targetOffset = useRef(initialOffset)
   const currentOffset = useRef(initialOffset) // Smooth interpolated value
+  const sliderSpeed = useRef(0) // Track actual slider movement speed
+  const lastOffset = useRef(initialOffset) // Track last offset for speed calculation
+  const smoothedSpeed = useRef(0) // Extra smoothing layer for direction changes
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const lastMouseY = useRef(0)
@@ -315,6 +357,8 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     
     // Stop all slider movement
     velocity.current = 0
+    targetOffset.current = currentOffset.current // Stop the slider where it is
+    sliderSpeed.current = 0 // Immediately set speed to 0 for smooth shader fade
     
     // After 1.5 seconds, hide all slides except the clicked one and complete transition
     setTimeout(() => {
@@ -404,6 +448,22 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       // Smooth interpolation between current and target
       const ease = 0.05 // Reduced from 0.075 for smoother, more controlled movement
       currentOffset.current += (targetOffset.current - currentOffset.current) * ease
+      
+      // Calculate actual slider speed (difference between frames)
+      const speedDiff = currentOffset.current - lastOffset.current
+      const rawSpeed = speedDiff * 60 // Multiply by 60 for consistent speed regardless of framerate
+      
+      // Apply extra smoothing for direction changes
+      const speedEase = Math.sign(rawSpeed) !== Math.sign(smoothedSpeed.current) ? 0.02 : 0.1
+      smoothedSpeed.current += (rawSpeed - smoothedSpeed.current) * speedEase
+      
+      // Safeguard against NaN or extreme values
+      if (isNaN(smoothedSpeed.current) || Math.abs(smoothedSpeed.current) > 10) {
+        smoothedSpeed.current = 0
+      }
+      
+      sliderSpeed.current = smoothedSpeed.current
+      lastOffset.current = currentOffset.current
       
       // Apply velocity-based momentum
       if (!isDragging.current) {
@@ -607,6 +667,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           texture={textures[textureIndex]}
           position={position}
           velocity={velocity.current}
+          sliderSpeed={sliderSpeed.current}
           projectData={projects[textureIndex]}
           onHover={setHoveredSlide}
           onClick={handleSlideClick}
