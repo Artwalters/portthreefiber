@@ -75,8 +75,11 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         vec4 color2 = texture2D(uTexture2, vUv);
         
         // Mix textures based on progress (for gallery transitions)
+        // When uProgress is 0, show only texture1. When 1, show only texture2
         vec4 color = mix(color1, color2, uProgress);
-        color.a *= uOpacity;
+        
+        // Ensure alpha is properly handled
+        color.a = max(color1.a, color2.a) * uOpacity;
         gl_FragColor = color;
       }
     `,
@@ -167,14 +170,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
 
   // Handle post-transition scaling for selected image
   useEffect(() => {
-    console.log('POST-TRANSITION CHECK:', projectData.name, {
-      meshRef: !!meshRef.current,
-      transitionComplete,
-      isClicked,
-      position: position[2]
-    })
-    
-    if (meshRef.current && transitionComplete && isClicked) {
+    if (meshRef.current && transitionComplete && isClicked && !hasAnimated.current) {
+      hasAnimated.current = true
       console.log('POST-TRANSITION SCALING TRIGGERED:', projectData.name, 'z-position:', position[2] + 1.25)
       // After transition completes, make the clicked slide larger by moving it forward
       // This creates a 1.75x scale effect through perspective (25% bigger than before)
@@ -183,19 +180,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         duration: 0.6, // 25% faster (was 0.8s)
         ease: "power3.out", // Smoother easing
         delay: 0.15 // Slightly reduced delay for faster feel
-      })
-      
-      // Fade out the slide after scaling to make room for ProjectDetailView
-      gsap.to(opacity, {
-        current: 0,
-        duration: 0.3,
-        delay: 0.9, // Start fading after scaling is completely done
-        ease: "power2.out",
-        onUpdate: () => {
-          if (material.uniforms.uOpacity) {
-            material.uniforms.uOpacity.value = opacity.current
-          }
-        }
       })
     }
   }, [transitionComplete, isClicked, position, material])
@@ -219,25 +203,12 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   // Gallery navigation function
   const navigateGallery = (direction) => {
     if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning) {
-      console.log('Gallery navigation blocked:', {
-        transitionComplete,
-        galleryTextures: galleryTextures?.length,
-        isImageTransitioning
-      })
       return
     }
     
     const nextIndex = direction === 'next' 
       ? (currentImageIndex + 1) % galleryTextures.length
       : (currentImageIndex - 1 + galleryTextures.length) % galleryTextures.length
-    
-    console.log('Gallery navigation:', {
-      direction,
-      currentIndex: currentImageIndex,
-      nextIndex,
-      currentTexture: galleryTextures[currentImageIndex],
-      nextTexture: galleryTextures[nextIndex]
-    })
     
     // Set up transition
     if (material.uniforms.uTexture1 && material.uniforms.uTexture2) {
@@ -258,7 +229,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         }
       },
       onComplete: () => {
-        console.log('Gallery transition complete, setting to index:', nextIndex)
         setCurrentImageIndex(nextIndex)
         if (material.uniforms.uTexture1) {
           material.uniforms.uTexture1.value = galleryTextures[nextIndex]
@@ -400,14 +370,12 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       }}
       onTouchStart={(e) => {
         // Ensure touch events work on mobile - don't interfere with click detection
-        console.log('Touch start on slide:', projectData.name)
         if (!transitionComplete) {
           e.stopPropagation() // Prevent canvas drag from interfering
         }
       }}
       onTouchEnd={(e) => {
         // Handle touch end for mobile clicks
-        console.log('Touch end on slide:', projectData.name)
         if (onTouchEnd) {
           e.stopPropagation() // Prevent canvas drag from interfering
           onTouchEnd(projectData, e)
@@ -415,7 +383,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       }}
       onPointerUp={(e) => {
         // Handle pointer up for cross-platform support
-        console.log('Pointer up on slide:', projectData.name)
         if (onPointerUp) {
           e.stopPropagation() // Prevent canvas drag from interfering
           onPointerUp(projectData, e)
@@ -478,7 +445,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
-  // Project data with image galleries
+  // Project data with image galleries - using only existing cover images for now
   const projects = [
     { 
       name: 'project-1', 
@@ -486,11 +453,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-1.png',
       images: [
         './img/project-1.png', // Cover image first
-        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
-        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png'
+        './img/project-2.png', // Using existing images as placeholders
+        './img/project-3.png',
+        './img/project-4.png'
       ]
     },
     { 
@@ -499,10 +464,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-2.png',
       images: [
         './img/project-2.png', // Cover image first
-        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+        './img/project-1.png',
+        './img/project-3.png',
+        './img/project-5.png'
       ]
     },
     { 
@@ -511,9 +475,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-3.png',
       images: [
         './img/project-3.png', // Cover image first
-        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png'
+        './img/project-1.png',
+        './img/project-2.png',
+        './img/project-6.png'
       ]
     },
     { 
@@ -522,10 +486,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-4.png',
       images: [
         './img/project-4.png', // Cover image first
-        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png'
+        './img/project-2.png',
+        './img/project-3.png',
+        './img/project-7.png'
       ]
     },
     { 
@@ -534,9 +497,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-5.png',
       images: [
         './img/project-5.png', // Cover image first
-        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+        './img/project-1.png',
+        './img/project-4.png',
+        './img/project-6.png'
       ]
     },
     { 
@@ -545,10 +508,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-6.png',
       images: [
         './img/project-6.png', // Cover image first
-        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png'
+        './img/project-2.png',
+        './img/project-4.png',
+        './img/project-7.png'
       ]
     },
     { 
@@ -557,10 +519,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-7.png',
       images: [
         './img/project-7.png', // Cover image first
-        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+        './img/project-1.png',
+        './img/project-3.png',
+        './img/project-5.png'
       ]
     }
   ]
