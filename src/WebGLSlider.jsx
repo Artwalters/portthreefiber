@@ -86,8 +86,12 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   
   // Update texture when it changes
   useEffect(() => {
-    if (material.uniforms.uTexture1) {
+    if (material.uniforms.uTexture1 && galleryTextures && galleryTextures.length > 0) {
       material.uniforms.uTexture1.value = galleryTextures[currentImageIndex] || texture
+      // Also set uTexture2 to the same texture initially
+      if (material.uniforms.uTexture2) {
+        material.uniforms.uTexture2.value = galleryTextures[currentImageIndex] || texture
+      }
     }
   }, [texture, material, galleryTextures, currentImageIndex])
 
@@ -126,6 +130,11 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
       
       material.uniforms.uVelo.value = currentSpeed.current * 0.4 // Reduce effect intensity by 60%
+    }
+    
+    // Ensure uProgress is updated during image transitions
+    if (material.uniforms.uProgress && isImageTransitioning) {
+      material.uniforms.uProgress.value = transitionProgress.current
     }
     
     // Handle normal positioning only when not expanding and not transitioning
@@ -198,20 +207,43 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       if (material.uniforms.uOpacity) {
         material.uniforms.uOpacity.value = 1
       }
+      // Reset to first image when going back to slider
+      setCurrentImageIndex(0)
+      transitionProgress.current = 0
+      if (material.uniforms.uProgress) {
+        material.uniforms.uProgress.value = 0
+      }
     }
   }, [transitionComplete, isTransitioning, material])
   
   // Gallery navigation function
   const navigateGallery = (direction) => {
-    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning) return
+    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning) {
+      console.log('Gallery navigation blocked:', {
+        transitionComplete,
+        galleryTextures: galleryTextures?.length,
+        isImageTransitioning
+      })
+      return
+    }
     
     const nextIndex = direction === 'next' 
       ? (currentImageIndex + 1) % galleryTextures.length
       : (currentImageIndex - 1 + galleryTextures.length) % galleryTextures.length
     
+    console.log('Gallery navigation:', {
+      direction,
+      currentIndex: currentImageIndex,
+      nextIndex,
+      currentTexture: galleryTextures[currentImageIndex],
+      nextTexture: galleryTextures[nextIndex]
+    })
+    
     // Set up transition
-    material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
-    material.uniforms.uTexture2.value = galleryTextures[nextIndex]
+    if (material.uniforms.uTexture1 && material.uniforms.uTexture2) {
+      material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
+      material.uniforms.uTexture2.value = galleryTextures[nextIndex]
+    }
     
     setIsImageTransitioning(true)
     
@@ -226,9 +258,14 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         }
       },
       onComplete: () => {
+        console.log('Gallery transition complete, setting to index:', nextIndex)
         setCurrentImageIndex(nextIndex)
-        material.uniforms.uTexture1.value = galleryTextures[nextIndex]
-        material.uniforms.uProgress.value = 0
+        if (material.uniforms.uTexture1) {
+          material.uniforms.uTexture1.value = galleryTextures[nextIndex]
+        }
+        if (material.uniforms.uProgress) {
+          material.uniforms.uProgress.value = 0
+        }
         transitionProgress.current = 0
         setIsImageTransitioning(false)
       }
