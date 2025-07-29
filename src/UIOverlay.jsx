@@ -17,7 +17,7 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
               back
             </span>
           ) : (
-            'walters studio'
+            <span className="studio-button">walters studio</span>
           )}
         </div>
         <div className="ui-top-center">
@@ -42,7 +42,7 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
           )}
         </div>
         <div className="ui-top-right">
-          about
+          <span className="about-button">about</span>
         </div>
       </div>
 

@@ -163,6 +163,38 @@ body.gallery-mode {
 .back-button {
     cursor: pointer;
     pointer-events: auto;
+    position: relative;
+}
+
+.back-button::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -16px;
+    right: -16px;
+    bottom: -12px;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* Clickable text elements - larger touch targets */
+.studio-button,
+.about-button {
+    cursor: pointer;
+    pointer-events: auto;
+    position: relative;
+}
+
+.studio-button::before,
+.about-button::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -16px;
+    right: -16px;
+    bottom: -12px;
+    min-width: 44px;
+    min-height: 44px;
 }
 
 /* Mobile-specific styles */
@@ -175,6 +207,18 @@ body.gallery-mode {
     .ui-overlay.post-transition .ui-bottom-center {
         width: 100%;
         text-align: center;
+    }
+    
+    /* Ensure touch targets are appropriate for mobile */
+    .back-button::before,
+    .studio-button::before,
+    .about-button::before {
+        top: -16px;
+        left: -20px;
+        right: -20px;
+        bottom: -16px;
+        min-width: 48px;
+        min-height: 48px;
     }
     
     .ui-overlay.post-transition .image-description {
