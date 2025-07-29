@@ -24,6 +24,7 @@ function App() {
     const [currentImageIndex, setCurrentImageIndex] = useState(0)
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
+    const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
 
     // Load projects data from JSON
     useEffect(() => {
@@ -342,6 +343,7 @@ function App() {
         // PHASE 1: Start returning process and scale down selected image
         setIsReturningToSlider(true) // This triggers UI fade-out
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
+        setIsReturningFromGallery(true) // Mark that we're returning from gallery
         
         // PHASE 2: After scale-down completes, trigger slider expansion
         setTimeout(() => {
@@ -361,6 +363,7 @@ function App() {
                 setIsScalingDownForReset(false)
                 setSelectedProject(null)
                 setCurrentImageIndex(0) // Reset image index
+                setIsReturningFromGallery(false) // Reset the return flag
             }, 1500) // Wait for full expand animation to complete (1.5s as in original code)
         }, 600) // Wait for scale-down animation to complete (0.6s)
     }
@@ -395,6 +398,7 @@ function App() {
                     initialOffset={initialOffset}
                     currentImageIndex={currentImageIndex}
                     onImageIndexChange={setCurrentImageIndex}
+                    isReturningFromGallery={isReturningFromGallery}
                 />
             </Canvas>
             <UIOverlay 

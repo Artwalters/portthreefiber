@@ -470,7 +470,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange }) {
+export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
@@ -495,7 +495,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
   const [transitionComplete, setTransitionComplete] = useState(false)
-  const [isInitialExpanding, setIsInitialExpanding] = useState(true)
+  const [isInitialExpanding, setIsInitialExpanding] = useState(isReturningFromGallery)
   const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
   
   // Load cover textures from projects data
