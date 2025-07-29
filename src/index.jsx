@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
+import IntroScreen from './IntroScreen.jsx'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -25,6 +26,8 @@ function App() {
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
+    const [showIntro, setShowIntro] = useState(true)
+    const [uiFadingIn, setUiFadingIn] = useState(false)
 
     // Load projects data from JSON
     useEffect(() => {
@@ -368,6 +371,15 @@ function App() {
         }, 600) // Wait for scale-down animation to complete (0.6s)
     }
 
+    // Handle intro completion
+    const handleIntroComplete = () => {
+        setShowIntro(false)
+        // Start UI fade-in after a short delay
+        setTimeout(() => {
+            setUiFadingIn(true)
+        }, 100) // Small delay to ensure smooth transition
+    }
+
     // Don't render until projects are loaded
     if (!projectsLoaded) {
         return <div style={{ 
@@ -377,6 +389,11 @@ function App() {
             height: '100vh',
             fontFamily: 'PSTimesTrial, serif'
         }}>Loading...</div>
+    }
+
+    // Show intro screen first
+    if (showIntro) {
+        return <IntroScreen onComplete={handleIntroComplete} />
     }
 
     return (
@@ -413,6 +430,7 @@ function App() {
                 selectedProject={selectedProject}
                 currentImageIndex={currentImageIndex}
                 onBackToSlider={handleBackToSlider}
+                uiFadingIn={uiFadingIn}
             />
         </>
     )

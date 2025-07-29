@@ -54,6 +54,15 @@ body,
     opacity: 0;
 }
 
+.ui-overlay.initial-hidden {
+    opacity: 0;
+}
+
+.ui-overlay.fading-in {
+    opacity: 1;
+    transition: opacity 1.2s ease-in-out;
+}
+
 .ui-top {
     position: absolute;
     top: 0.5rem;
@@ -259,6 +268,172 @@ body.gallery-mode {
         height: 25px; /* 25% larger - was 20px */
         margin-left: -3px; /* Proportionally smaller negative margin for mobile */
         margin-top: 1px; /* Slightly less downward movement for mobile */
+    }
+}
+
+/* Intro Screen Styles */
+.intro-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    cursor: pointer;
+    transition: opacity 1s ease-in-out;
+    padding: 0.5rem 1rem;
+    box-sizing: border-box;
+}
+
+.intro-screen.background-fading {
+    opacity: 0;
+}
+
+.intro-logo {
+    position: absolute;
+    top: 0.5rem;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    text-align: center;
+}
+
+.intro-logo.visible {
+    opacity: 1;
+}
+
+.intro-logo.fading-out {
+    opacity: 0;
+}
+
+.intro-logo-img {
+    height: 64px;
+    width: auto;
+    filter: brightness(0);
+}
+
+.intro-content {
+    max-width: 600px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.intro-footer {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    text-align: center;
+}
+
+.intro-footer.visible {
+    opacity: 1;
+}
+
+.intro-footer.fading-out {
+    opacity: 0;
+}
+
+.intro-footer span {
+    font-family: 'PSTimesTrial', serif;
+    font-size: 12px;
+    color: black;
+}
+
+.intro-content.visible {
+    opacity: 1;
+}
+
+.intro-content.fading-out {
+    opacity: 0;
+}
+
+.intro-title {
+    font-family: 'PSTimesTrial', serif;
+    font-size: 32px;
+    font-weight: normal;
+    margin: 0 0 2rem 0;
+    color: black;
+    letter-spacing: 1px;
+}
+
+.intro-description {
+    font-family: 'PSTimesTrial', serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    color: black;
+    font-style: italic;
+}
+
+/* Mobile intro styles */
+@media (max-width: 768px) {
+    .intro-logo-img {
+        height: 25px; /* Same as mobile logo in UI overlay */
+    }
+    
+    .intro-content {
+        max-width: 90%;
+    }
+    
+    .intro-title {
+        font-size: 24px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .intro-description {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    
+    .intro-footer span {
+        font-size: 12px; /* Same as UI overlay font size */
+    }
+}
+
+/* Desktop intro styles */
+@media (min-width: 769px) {
+    .intro-screen {
+        padding: 0.75rem 1.5rem; /* Same as UI overlay padding */
+    }
+    
+    .intro-logo {
+        top: 0.75rem; /* Same as UI overlay top spacing */
+    }
+    
+    .intro-logo-img {
+        height: 64px; /* Same as desktop logo in UI overlay */
+    }
+    
+    .intro-title {
+        font-size: 40px;
+        margin-bottom: 2.5rem;
+    }
+    
+    .intro-description {
+        font-size: 18px;
+        line-height: 1.7;
+    }
+    
+    .intro-footer {
+        bottom: 0.75rem; /* Same as UI overlay bottom spacing */
+    }
+    
+    .intro-footer span {
+        font-size: 20px; /* Same as UI overlay desktop font size */
     }
 }
 
