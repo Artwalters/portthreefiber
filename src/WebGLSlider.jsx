@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
+import ProjectDetailView from './ProjectDetailView'
 
 const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
@@ -309,15 +310,78 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
-  // Project data
+  // Project data with image galleries
   const projects = [
-    { name: 'project-1', description: 'Interactive web experience with modern UI' },
-    { name: 'project-2', description: 'E-commerce platform with seamless checkout' },
-    { name: 'project-3', description: 'Creative portfolio showcasing visual identity' },
-    { name: 'project-4', description: 'Mobile app with intuitive user interface' },
-    { name: 'project-5', description: 'Brand identity and logo design system' },
-    { name: 'project-6', description: 'Digital marketing campaign visualization' },
-    { name: 'project-7', description: 'Art installation with interactive elements' }
+    { 
+      name: 'project-1', 
+      description: 'Interactive web experience with modern UI',
+      images: [
+        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
+        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png'
+      ]
+    },
+    { 
+      name: 'project-2', 
+      description: 'E-commerce platform with seamless checkout',
+      images: [
+        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+      ]
+    },
+    { 
+      name: 'project-3', 
+      description: 'Creative portfolio showcasing visual identity',
+      images: [
+        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png'
+      ]
+    },
+    { 
+      name: 'project-4', 
+      description: 'Mobile app with intuitive user interface',
+      // Voor nu gebruiken we dezelfde images voor alle projecten
+      images: [
+        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png'
+      ]
+    },
+    { 
+      name: 'project-5', 
+      description: 'Brand identity and logo design system',
+      images: [
+        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+      ]
+    },
+    { 
+      name: 'project-6', 
+      description: 'Digital marketing campaign visualization',
+      images: [
+        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png'
+      ]
+    },
+    { 
+      name: 'project-7', 
+      description: 'Art installation with interactive elements',
+      images: [
+        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
+        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+      ]
+    }
   ]
 
   // Check if mobile on mount and resize
@@ -691,7 +755,16 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     <group ref={containerRef}>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      {slides}
+      {transitionComplete && clickedSlide ? (
+        <ProjectDetailView
+          project={clickedSlide}
+          position={[0, 0, 1.5]} // Positioned where the selected slide scaled to
+          onNavigate={(index) => console.log('Navigated to image:', index)}
+          isMobile={isMobile}
+        />
+      ) : (
+        slides
+      )}
     </group>
   )
 }
