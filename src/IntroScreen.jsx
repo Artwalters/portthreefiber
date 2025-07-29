@@ -25,10 +25,9 @@ export default function IntroScreen({ onComplete }) {
     setTimeout(() => {
       setBackgroundFadingOut(true)
       
-      // Complete intro after background fades
-      setTimeout(() => {
-        onComplete()
-      }, 1000) // 1 second for background fade
+      // Start slider animation during background fade
+      onComplete()
+      
     }, 800) // 0.8 seconds for text fade-out
   }
 

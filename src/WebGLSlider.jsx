@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery, sliderOpacity = 1 }) => {
   const meshRef = useRef()
   const hasTransitionAnimated = useRef(false)
   const hasScaleUpAnimated = useRef(false)
@@ -148,6 +148,11 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
       
       material.uniforms.uVelo.value = currentSpeed.current * 0.4 // Reduce effect intensity by 60%
+    }
+    
+    // Update slider opacity
+    if (material.uniforms.uOpacity) {
+      material.uniforms.uOpacity.value = sliderOpacity
     }
     
     // Ensure uProgress is updated during image transitions
@@ -477,7 +482,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false }) {
+export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false, hasPlayedIntroAnimation = false }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
@@ -504,6 +509,9 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const [transitionComplete, setTransitionComplete] = useState(false)
   const [isInitialExpanding, setIsInitialExpanding] = useState(false)
   const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
+  const autoScrollStartTime = useRef(null)
+  const [sliderOpacity, setSliderOpacity] = useState(hasPlayedIntroAnimation ? 1 : 0)
   
   // Load cover textures from projects data
   const coverImages = projects.map(project => project.images[0].src)
@@ -542,6 +550,24 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       setIsInitialExpanding(true)
     }
   }, [isReturningFromGallery, isInitialExpanding])
+
+  // Start auto-scroll and fade-in only on first page load (not returning from gallery)
+  useEffect(() => {
+    if (!hasPlayedIntroAnimation && !isReturningFromGallery && !selectedProject && !isTransitioning && !transitionComplete) {
+      // Only do auto-scroll and fade-in on very first load
+      setIsAutoScrolling(true)
+      autoScrollStartTime.current = Date.now()
+      
+      // Start fade-in animation only on first load
+      setTimeout(() => {
+        setSliderOpacity(1)
+      }, 100) // Small delay for smooth start
+    } else {
+      // If returning from gallery or animation already played, show immediately without animation
+      setSliderOpacity(1)
+      setIsAutoScrolling(false) // Make sure auto-scroll is off
+    }
+  }, [hasPlayedIntroAnimation, isReturningFromGallery, selectedProject, isTransitioning, transitionComplete])
 
   useEffect(() => {
     if (onHover) {
@@ -641,6 +667,31 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
 
   // Smooth interpolation with easing - much smoother than direct animations
   useFrame(() => {
+    // Handle auto-scroll animation
+    if (isAutoScrolling && autoScrollStartTime.current) {
+      const elapsed = Date.now() - autoScrollStartTime.current
+      const duration = 8000 // 8 seconds total animation for longer, slower movement
+      
+      if (elapsed < duration) {
+        const progress = elapsed / duration
+        
+        // Slower start, much more gradual slowdown
+        const speed = Math.pow(1 - progress, 3) * 0.25 // Cubic slowdown, start slower
+        const direction = isMobile ? speed : -speed // Left to right (desktop) or top to bottom (mobile)
+        
+        // Apply the auto-scroll movement
+        targetOffset.current += direction
+        
+        // Add velocity for shader deformation
+        velocity.current = direction * 4
+      } else {
+        // Animation complete - stop auto-scrolling
+        setIsAutoScrolling(false)
+        autoScrollStartTime.current = null
+        velocity.current = 0
+      }
+    }
+    
     if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
       // Smooth interpolation between current and target
       const ease = 0.05 // Reduced from 0.075 for smoother, more controlled movement
@@ -686,6 +737,12 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable drag during expand
       
       e.preventDefault() // Prevent default touch behavior
+      
+      // Stop auto-scroll if user starts interacting
+      if (isAutoScrolling) {
+        setIsAutoScrolling(false)
+        autoScrollStartTime.current = null
+      }
       
       isDragging.current = true
       hasDraggedEnough.current = false // Reset drag distance check
@@ -795,6 +852,12 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       
       e.preventDefault()
       
+      // Stop auto-scroll if user starts scrolling
+      if (isAutoScrolling) {
+        setIsAutoScrolling(false)
+        autoScrollStartTime.current = null
+      }
+      
       // Direct target update for instant response
       const scrollSpeed = 0.0002 // Extremely reduced for very gentle scrolling
       targetOffset.current += e.deltaY * scrollSpeed
@@ -900,6 +963,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
           externalCurrentImageIndex={externalCurrentImageIndex}
           onImageIndexChange={onImageIndexChange}
           isReturningFromGallery={isReturningFromGallery}
+          sliderOpacity={sliderOpacity}
         />
       )
     }

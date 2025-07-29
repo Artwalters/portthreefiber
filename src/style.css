@@ -437,6 +437,11 @@ body.gallery-mode {
     }
 }
 
+/* Slider fade-in styles */
+canvas {
+    transition: opacity 2s ease-in-out;
+}
+
 /* Desktop-specific styles - 2x larger UI elements */
 @media (min-width: 769px) {
     .ui-overlay {
