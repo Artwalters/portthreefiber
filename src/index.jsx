@@ -1,7 +1,7 @@
 import './style.css'
 import ReactDOM from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 
@@ -111,6 +111,206 @@ function App() {
             // This shouldn't happen with new approach - we recreate slider instead
         }
     }
+
+    // Navigation throttling
+    const [isNavigating, setIsNavigating] = useState(false)
+    const navigationTimeout = useRef(null)
+
+    // Gallery navigation functions with throttling
+    const navigateGallery = (direction) => {
+        if (!selectedProject || !selectedProject.images || isNavigating) return
+        
+        // Set navigating state to prevent rapid navigation
+        setIsNavigating(true)
+        
+        const totalImages = selectedProject.images.length
+        if (direction === 'next') {
+            setCurrentImageIndex((prev) => (prev + 1) % totalImages)
+        } else {
+            setCurrentImageIndex((prev) => (prev - 1 + totalImages) % totalImages)
+        }
+        
+        // Clear existing timeout
+        if (navigationTimeout.current) {
+            clearTimeout(navigationTimeout.current)
+        }
+        
+        // Reset navigation lock after delay
+        navigationTimeout.current = setTimeout(() => {
+            setIsNavigating(false)
+        }, 600) // 600ms delay between navigations
+    }
+
+    // Handle full-screen gallery navigation
+    useEffect(() => {
+        if (!isPostTransition) return
+
+        // Add gallery mode class to body
+        document.body.classList.add('gallery-mode')
+
+        // Touch/swipe tracking
+        let touchStartX = 0
+        let touchStartY = 0
+        let touchStartTime = 0
+        let isSwiping = false
+        let lastWheelTime = 0
+
+        // Handle clicks (only for mouse, not touch)
+        const handleClick = (e) => {
+            // Ignore touch-triggered clicks
+            if (e.pointerType === 'touch') return
+            
+            // Ignore if clicking on UI elements
+            if (e.target.closest('.ui-overlay')) {
+                // Check if it's the back button
+                if (e.target.classList.contains('back-button')) {
+                    return // Let the back button handle its own click
+                }
+                return // Ignore other UI clicks
+            }
+
+            // Navigate based on click position
+            const clickX = e.clientX
+            const screenWidth = window.innerWidth
+            
+            if (clickX > screenWidth / 2) {
+                navigateGallery('next')
+            } else {
+                navigateGallery('previous')
+            }
+        }
+
+        // Handle keyboard
+        const handleKeyDown = (e) => {
+            if (e.key === 'ArrowLeft') {
+                navigateGallery('previous')
+            } else if (e.key === 'ArrowRight') {
+                navigateGallery('next')
+            } else if (e.key === 'ArrowUp') {
+                navigateGallery('previous')
+            } else if (e.key === 'ArrowDown') {
+                navigateGallery('next')
+            }
+        }
+
+        // Handle touch start
+        const handleTouchStart = (e) => {
+            touchStartX = e.touches[0].clientX
+            touchStartY = e.touches[0].clientY
+            touchStartTime = Date.now()
+            isSwiping = false
+        }
+
+        // Handle touch move to detect if it's a swipe
+        const handleTouchMove = (e) => {
+            if (!touchStartTime) return
+            
+            const currentX = e.touches[0].clientX
+            const currentY = e.touches[0].clientY
+            const deltaX = Math.abs(currentX - touchStartX)
+            const deltaY = Math.abs(currentY - touchStartY)
+            
+            // If moved more than 10px, it's a swipe not a tap
+            if (deltaX > 10 || deltaY > 10) {
+                isSwiping = true
+            }
+        }
+
+        // Handle touch end for swipe
+        const handleTouchEnd = (e) => {
+            if (!touchStartTime) return
+
+            const touchEndX = e.changedTouches[0].clientX
+            const touchEndY = e.changedTouches[0].clientY
+            const touchDuration = Date.now() - touchStartTime
+
+            const deltaX = touchEndX - touchStartX
+            const deltaY = touchEndY - touchStartY
+            const absDeltaX = Math.abs(deltaX)
+            const absDeltaY = Math.abs(deltaY)
+
+            // Quick tap - treat as click (only if not swiping)
+            if (!isSwiping && touchDuration < 300 && absDeltaX < 20 && absDeltaY < 20) {
+                // Check if tapping on UI
+                if (e.target.closest('.ui-overlay')) return
+                
+                if (touchEndX > window.innerWidth / 2) {
+                    navigateGallery('next')
+                } else {
+                    navigateGallery('previous')
+                }
+                return
+            }
+
+            // Swipe detection
+            const minSwipeDistance = 50
+
+            if (isSwiping && (absDeltaX > minSwipeDistance || absDeltaY > minSwipeDistance)) {
+                if (absDeltaX > absDeltaY) {
+                    // Horizontal swipe
+                    if (deltaX > 0) {
+                        navigateGallery('previous') // Swipe right = go back
+                    } else {
+                        navigateGallery('next') // Swipe left = go forward
+                    }
+                } else {
+                    // Vertical swipe
+                    if (deltaY > 0) {
+                        navigateGallery('previous') // Swipe down = go back
+                    } else {
+                        navigateGallery('next') // Swipe up = go forward
+                    }
+                }
+            }
+            
+            // Reset
+            touchStartTime = 0
+            isSwiping = false
+        }
+
+        // Handle mouse wheel/scroll with throttling
+        const handleWheel = (e) => {
+            e.preventDefault()
+            
+            const now = Date.now()
+            const timeSinceLastWheel = now - lastWheelTime
+            
+            // Throttle wheel events (min 400ms between navigations)
+            if (timeSinceLastWheel < 400) return
+            
+            lastWheelTime = now
+            
+            // Navigate based on scroll direction
+            if (e.deltaY > 0) {
+                navigateGallery('next')
+            } else if (e.deltaY < 0) {
+                navigateGallery('previous')
+            }
+        }
+
+        // Add event listeners
+        document.addEventListener('click', handleClick)
+        document.addEventListener('keydown', handleKeyDown)
+        document.addEventListener('touchstart', handleTouchStart)
+        document.addEventListener('touchmove', handleTouchMove, { passive: false })
+        document.addEventListener('touchend', handleTouchEnd)
+        document.addEventListener('wheel', handleWheel, { passive: false })
+
+        return () => {
+            document.removeEventListener('click', handleClick)
+            document.removeEventListener('keydown', handleKeyDown)
+            document.removeEventListener('touchstart', handleTouchStart)
+            document.removeEventListener('touchmove', handleTouchMove)
+            document.removeEventListener('touchend', handleTouchEnd)
+            document.removeEventListener('wheel', handleWheel)
+            document.body.classList.remove('gallery-mode')
+            
+            // Cleanup navigation timeout
+            if (navigationTimeout.current) {
+                clearTimeout(navigationTimeout.current)
+            }
+        }
+    }, [isPostTransition, selectedProject])
 
     // Handle transition start (triggered from WebGLSlider)
     const handleTransitionStart = () => {

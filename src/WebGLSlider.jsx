@@ -14,6 +14,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   const [isImageTransitioning, setIsImageTransitioning] = useState(false)
   const transitionProgress = useRef(0)
   
+  // Gallery touch/swipe tracking
+  const touchStart = useRef({ x: 0, y: 0, time: 0 })
+  const isDraggingGallery = useRef(false)
+  
   // Use external currentImageIndex or fallback to 0
   const currentImageIndex = externalCurrentImageIndex !== undefined ? externalCurrentImageIndex : 0
   
@@ -279,21 +283,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     })
   }
   
-  // Handle keyboard events for gallery navigation
-  useEffect(() => {
-    if (!transitionComplete || !isClicked) return
-    
-    const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft') {
-        navigateGallery('previous')
-      } else if (e.key === 'ArrowRight') {
-        navigateGallery('next')
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [transitionComplete, isClicked, currentImageIndex, galleryTextures])
+  // Keyboard navigation is now handled in the parent component (index.jsx)
 
   // Handle reverse scaling when back is clicked
   useEffect(() => {
@@ -425,11 +415,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       position={getRenderPosition()} 
       material={material}
       onPointerMove={(e) => {
-        if (transitionComplete && isClicked) {
-          // Show cursor feedback for gallery navigation
-          const hoverX = e.point.x
-          document.body.style.cursor = hoverX > 0 ? 'e-resize' : 'w-resize'
-        }
+        // Cursor feedback removed - navigation is now full-screen
       }}
       onPointerEnter={() => {
         if (!transitionComplete && onHover) {
@@ -445,13 +431,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       }}
       onClick={(e) => {
         if (transitionComplete && isClicked) {
-          // Gallery navigation: left half = previous, right half = next
-          const clickX = e.point.x
-          if (clickX > 0) {
-            navigateGallery('next')
-          } else {
-            navigateGallery('previous')
-          }
+          // Gallery navigation is now handled at document level
+          // This prevents mesh click from interfering
+          e.stopPropagation()
         } else if (!transitionComplete && onClick) {
           onClick(projectData)
         }

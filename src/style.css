@@ -155,6 +155,11 @@ body,
     color: black;
 }
 
+/* Gallery cursor styles */
+body.gallery-mode {
+    cursor: e-resize;
+}
+
 .back-button {
     cursor: pointer;
     pointer-events: auto;
