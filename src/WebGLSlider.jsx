@@ -17,8 +17,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   // Use external currentImageIndex or fallback to 0
   const currentImageIndex = externalCurrentImageIndex !== undefined ? externalCurrentImageIndex : 0
   
-  // Load all gallery images for this project
-  const galleryTextures = useTexture(projectData.images || [texture])
+  // Load all gallery images for this project - extract src strings from image objects
+  const imageSrcs = projectData.images ? projectData.images.map(img => img.src) : [texture]
+  const galleryTextures = useTexture(imageSrcs)
   
   // Configure gallery textures
   useEffect(() => {
@@ -487,7 +488,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange }) {
+export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
@@ -512,16 +513,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, onTransitio
   const [isInitialExpanding, setIsInitialExpanding] = useState(true)
   const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
   
-  // Load textures with correct paths for GitHub Pages
-  const textures = useTexture([
-    './img/project-1.png',
-    './img/project-2.png',
-    './img/project-3.png',
-    './img/project-4.png',
-    './img/project-5.png',
-    './img/project-6.png',
-    './img/project-7.png'
-  ])
+  // Load cover textures from projects data
+  const coverImages = projects.map(project => project.images[0].src)
+  const textures = useTexture(coverImages)
 
   // Configure textures to maintain aspect ratio
   useEffect(() => {
@@ -537,86 +531,6 @@ export default function WebGLSlider({ onHover, onTransitionComplete, onTransitio
   const itemWidth = isMobile ? 2.3 : 3.5 // Smaller spacing for mobile to match smaller images
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
-
-  // Project gallery images from the project folder - same for all projects for now
-  const projectGalleryImages = [
-    './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
-    './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
-    './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
-  ]
-
-  // Project data with image galleries - using project folder images
-  const projects = [
-    { 
-      name: 'project-1', 
-      description: 'Interactive web experience with modern UI',
-      coverImage: './img/project-1.png',
-      images: [
-        './img/project-1.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-2', 
-      description: 'E-commerce platform with seamless checkout',
-      coverImage: './img/project-2.png',
-      images: [
-        './img/project-2.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-3', 
-      description: 'Creative portfolio showcasing visual identity',
-      coverImage: './img/project-3.png',
-      images: [
-        './img/project-3.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-4', 
-      description: 'Mobile app with intuitive user interface',
-      coverImage: './img/project-4.png',
-      images: [
-        './img/project-4.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-5', 
-      description: 'Brand identity and logo design system',
-      coverImage: './img/project-5.png',
-      images: [
-        './img/project-5.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-6', 
-      description: 'Digital marketing campaign visualization',
-      coverImage: './img/project-6.png',
-      images: [
-        './img/project-6.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    },
-    { 
-      name: 'project-7', 
-      description: 'Art installation with interactive elements',
-      coverImage: './img/project-7.png',
-      images: [
-        './img/project-7.png', // Cover image first
-        ...projectGalleryImages // Then all project gallery images
-      ]
-    }
-  ]
 
   // Check if mobile on mount and resize
   useEffect(() => {

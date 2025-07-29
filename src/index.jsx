@@ -22,78 +22,24 @@ function App() {
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [isReturningToSlider, setIsReturningToSlider] = useState(false)
     const [currentImageIndex, setCurrentImageIndex] = useState(0)
+    const [projects, setProjects] = useState([])
+    const [projectsLoaded, setProjectsLoaded] = useState(false)
 
-    // Project gallery images - same for all projects for now
-    const projectGalleryImages = [
-        './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
-        './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
-        './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
-    ]
-
-    const projects = [
-        { 
-            name: 'project-1', 
-            description: 'Interactive web experience with modern UI',
-            images: [
-                './img/project-1.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-2', 
-            description: 'E-commerce platform with seamless checkout',
-            images: [
-                './img/project-2.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-3', 
-            description: 'Creative portfolio showcasing visual identity',
-            images: [
-                './img/project-3.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-4', 
-            description: 'Mobile app with intuitive user interface',
-            images: [
-                './img/project-4.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-5', 
-            description: 'Brand identity and logo design system',
-            images: [
-                './img/project-5.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-6', 
-            description: 'Digital marketing campaign visualization',
-            images: [
-                './img/project-6.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        },
-        { 
-            name: 'project-7', 
-            description: 'Art installation with interactive elements',
-            images: [
-                './img/project-7.png', // Cover image first
-                ...projectGalleryImages // Then all project gallery images
-            ]
-        }
-    ]
+    // Load projects data from JSON
+    useEffect(() => {
+        fetch('./data/projects.json')
+            .then(response => response.json())
+            .then(data => {
+                setProjects(data.projects)
+                setProjectsLoaded(true)
+            })
+            .catch(error => {
+                console.error('Error loading projects:', error)
+                // Fallback to empty array if loading fails
+                setProjects([])
+                setProjectsLoaded(true)
+            })
+    }, [])
 
     // Handle hover with synchronized fade animations for both description and index
     useEffect(() => {
@@ -206,6 +152,17 @@ function App() {
         }, 600) // Wait for scale-down animation to complete (0.6s)
     }
 
+    // Don't render until projects are loaded
+    if (!projectsLoaded) {
+        return <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            fontFamily: 'PSTimesTrial, serif'
+        }}>Loading...</div>
+    }
+
     return (
         <>
             <Canvas
@@ -216,6 +173,7 @@ function App() {
             >
                 <WebGLSlider 
                     key={sliderKey}
+                    projects={projects}
                     onHover={setHoveredProject}
                     onTransitionComplete={handleTransitionComplete}
                     onTransitionStart={handleTransitionStart}

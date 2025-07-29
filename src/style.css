@@ -141,6 +141,14 @@ body,
     opacity: 0.8;
 }
 
+.image-description {
+    opacity: 1;
+    font-style: italic;
+    max-width: 400px;
+    text-align: center;
+    transition: opacity 0.3s ease-in-out;
+}
+
 /* Post-transition styles */
 .photo-counter {
     font-size: 12px;
@@ -150,6 +158,23 @@ body,
 .back-button {
     cursor: pointer;
     pointer-events: auto;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+    .ui-overlay.post-transition .ui-bottom-left,
+    .ui-overlay.post-transition .ui-bottom-right {
+        display: none;
+    }
+    
+    .ui-overlay.post-transition .ui-bottom-center {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .ui-overlay.post-transition .image-description {
+        text-align: center;
+    }
 }
 
 /* Desktop-specific styles - 2x larger UI elements */
@@ -180,6 +205,10 @@ body,
     
     .ui-bottom-center .project-description {
         max-width: 600px; /* 2x larger max width */
+    }
+    
+    .image-description {
+        max-width: 700px; /* Larger max width for desktop */
     }
     
     .photo-counter {

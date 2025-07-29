@@ -1,0 +1,410 @@
+{
+  "projects": [
+    {
+      "id": "project-1",
+      "name": "project-1",
+      "title": "Interactive Web Experience",
+      "description": "Interactive web experience with modern UI",
+      "images": [
+        {
+          "src": "./img/project-1.png",
+          "title": "Homepage Design",
+          "description": "Modern homepage with intuitive navigation and dynamic hero section"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "User Interface",
+          "description": "Clean and minimal interface design focusing on user experience"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Dashboard View",
+          "description": "Interactive dashboard with real-time data visualization components"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "Mobile Responsive",
+          "description": "Fully responsive design optimized for all device sizes"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Component Library",
+          "description": "Modular component system for consistent design language"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Animation Framework",
+          "description": "Smooth animations and micro-interactions throughout the experience"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Dark Mode",
+          "description": "Elegant dark mode implementation with seamless theme switching"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Performance Metrics",
+          "description": "Optimized performance with lazy loading and code splitting"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Accessibility Features",
+          "description": "WCAG compliant with full keyboard navigation support"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Final Presentation",
+          "description": "Complete web experience ready for production deployment"
+        }
+      ]
+    },
+    {
+      "id": "project-2",
+      "name": "project-2",
+      "title": "E-commerce Platform",
+      "description": "E-commerce platform with seamless checkout",
+      "images": [
+        {
+          "src": "./img/project-2.png",
+          "title": "Shop Homepage",
+          "description": "Elegant e-commerce storefront with featured products showcase"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Product Gallery",
+          "description": "Advanced product filtering with instant search capabilities"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Product Details",
+          "description": "Rich product pages with zoom functionality and variant selection"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "Shopping Cart",
+          "description": "Intuitive cart management with real-time price calculations"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Checkout Process",
+          "description": "Streamlined multi-step checkout with progress indicators"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Payment Integration",
+          "description": "Secure payment processing with multiple gateway options"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Order Tracking",
+          "description": "Real-time order status updates and shipment tracking"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Customer Reviews",
+          "description": "Social proof integration with ratings and testimonials"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Admin Dashboard",
+          "description": "Comprehensive backend for inventory and order management"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Mobile Commerce",
+          "description": "Native-like mobile shopping experience with PWA features"
+        }
+      ]
+    },
+    {
+      "id": "project-3",
+      "name": "project-3",
+      "title": "Creative Portfolio",
+      "description": "Creative portfolio showcasing visual identity",
+      "images": [
+        {
+          "src": "./img/project-3.png",
+          "title": "Portfolio Landing",
+          "description": "Striking visual introduction with animated typography"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Work Gallery",
+          "description": "Curated selection of creative projects and case studies"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Project Showcase",
+          "description": "Detailed project presentations with process insights"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "About Section",
+          "description": "Personal brand story with creative philosophy"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Skills Matrix",
+          "description": "Visual representation of technical and creative capabilities"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Client Testimonials",
+          "description": "Featured client feedback and success stories"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Contact Form",
+          "description": "Elegant contact section with collaboration CTA"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Blog Integration",
+          "description": "Thoughts on design, creativity, and industry trends"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Awards & Recognition",
+          "description": "Industry accolades and featured publications"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Social Integration",
+          "description": "Connected creative ecosystem across platforms"
+        }
+      ]
+    },
+    {
+      "id": "project-4",
+      "name": "project-4",
+      "title": "Mobile App Design",
+      "description": "Mobile app with intuitive user interface",
+      "images": [
+        {
+          "src": "./img/project-4.png",
+          "title": "App Onboarding",
+          "description": "Engaging onboarding flow introducing key features"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Home Screen",
+          "description": "Intuitive home interface with personalized content"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Navigation Design",
+          "description": "Gesture-based navigation with haptic feedback"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "User Profile",
+          "description": "Customizable user profiles with social features"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Push Notifications",
+          "description": "Smart notification system with user preferences"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "In-App Messaging",
+          "description": "Real-time chat with rich media support"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Settings Panel",
+          "description": "Comprehensive settings with privacy controls"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Data Visualization",
+          "description": "Interactive charts and progress tracking"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Offline Mode",
+          "description": "Seamless offline functionality with sync"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "App Store Ready",
+          "description": "Polished final product optimized for iOS and Android"
+        }
+      ]
+    },
+    {
+      "id": "project-5",
+      "name": "project-5",
+      "title": "Brand Identity System",
+      "description": "Brand identity and logo design system",
+      "images": [
+        {
+          "src": "./img/project-5.png",
+          "title": "Logo Design",
+          "description": "Versatile logo system with multiple variations"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Color Palette",
+          "description": "Comprehensive color system with accessibility standards"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Typography Guide",
+          "description": "Custom typeface selection and hierarchy system"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "Brand Patterns",
+          "description": "Distinctive visual patterns and graphic elements"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Business Cards",
+          "description": "Premium stationery design with special finishes"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Brand Guidelines",
+          "description": "Comprehensive brand manual for consistent application"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Digital Assets",
+          "description": "Social media templates and digital brand kit"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Packaging Design",
+          "description": "Product packaging with cohesive brand expression"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Environmental Design",
+          "description": "Signage and spatial brand applications"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Brand Launch",
+          "description": "Complete brand rollout across all touchpoints"
+        }
+      ]
+    },
+    {
+      "id": "project-6",
+      "name": "project-6",
+      "title": "Digital Marketing Campaign",
+      "description": "Digital marketing campaign visualization",
+      "images": [
+        {
+          "src": "./img/project-6.png",
+          "title": "Campaign Overview",
+          "description": "Multi-channel digital marketing strategy visualization"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Social Media Strategy",
+          "description": "Cross-platform content calendar and engagement plan"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Email Campaign",
+          "description": "Responsive email templates with A/B testing results"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "Landing Pages",
+          "description": "Conversion-optimized landing pages with dynamic content"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Analytics Dashboard",
+          "description": "Real-time campaign performance metrics and KPIs"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Content Marketing",
+          "description": "SEO-optimized content strategy with viral potential"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Paid Advertising",
+          "description": "PPC campaigns across Google, Facebook, and LinkedIn"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Influencer Outreach",
+          "description": "Strategic partnerships with industry thought leaders"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "ROI Analysis",
+          "description": "Campaign performance analysis with attribution modeling"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Campaign Results",
+          "description": "Final results showing 300% increase in conversions"
+        }
+      ]
+    },
+    {
+      "id": "project-7",
+      "name": "project-7",
+      "title": "Art Installation",
+      "description": "Art installation with interactive elements",
+      "images": [
+        {
+          "src": "./img/project-7.png",
+          "title": "Installation Concept",
+          "description": "Immersive art experience blending physical and digital"
+        },
+        {
+          "src": "./img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png",
+          "title": "Interactive Elements",
+          "description": "Motion-activated projections responding to visitors"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-16 at 16.24.51 1.png",
+          "title": "Sound Design",
+          "description": "Spatial audio creating atmospheric environments"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.03.55 1.png",
+          "title": "Light Sculptures",
+          "description": "Dynamic LED installations with programmed sequences"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.29 1.png",
+          "title": "Visitor Journey",
+          "description": "Curated pathway through multi-sensory experiences"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.14.52 1.png",
+          "title": "Technology Integration",
+          "description": "AR layers adding digital dimensions to physical art"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.15.56 1.png",
+          "title": "Material Studies",
+          "description": "Innovative use of sustainable and recycled materials"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.31 1.png",
+          "title": "Community Engagement",
+          "description": "Participatory elements allowing visitor contributions"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.16.56 1.png",
+          "title": "Documentation",
+          "description": "Time-lapse and visitor reaction compilations"
+        },
+        {
+          "src": "./img/project/Screenshot 2025-06-17 at 00.52.22 1.png",
+          "title": "Exhibition Opening",
+          "description": "Successful launch with international media coverage"
+        }
+      ]
+    }
+  ]
+}

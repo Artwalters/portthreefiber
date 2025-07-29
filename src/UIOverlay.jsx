@@ -1,5 +1,8 @@
 export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
-  // Calculate total number of images for selected project
+  // Get current image data for selected project
+  const currentImage = selectedProject && selectedProject.images && selectedProject.images[currentImageIndex] 
+    ? selectedProject.images[currentImageIndex] 
+    : null
   const totalImages = selectedProject && selectedProject.images ? selectedProject.images.length : 0
   return (
     <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}>
@@ -49,10 +52,16 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
           creative studio
         </div>
         <div className="ui-bottom-center">
-          {displayedProject && (
-            <span className={`project-description ${isVisible ? 'visible' : ''}`}>
-              {displayedProject.description}
+          {isPostTransition && currentImage ? (
+            <span className="image-description">
+              {currentImage.description}
             </span>
+          ) : (
+            displayedProject && (
+              <span className={`project-description ${isVisible ? 'visible' : ''}`}>
+                {displayedProject.description}
+              </span>
+            )
           )}
         </div>
         <div className="ui-bottom-right">
