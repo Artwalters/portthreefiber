@@ -14,10 +14,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   const [isImageTransitioning, setIsImageTransitioning] = useState(false)
   const transitionProgress = useRef(0)
   
-  // Gallery touch/swipe tracking
-  const touchStart = useRef({ x: 0, y: 0, time: 0 })
-  const isDraggingGallery = useRef(false)
-  
   // Use external currentImageIndex or fallback to 0
   const currentImageIndex = externalCurrentImageIndex !== undefined ? externalCurrentImageIndex : 0
   
@@ -176,7 +172,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   useEffect(() => {
     if (meshRef.current && isTransitioning && !hasTransitionAnimated.current) {
       hasTransitionAnimated.current = true
-      console.log('Transition animation triggered for:', projectData.name)
       
       // Animate this slide to screen center - check if mobile for direction
       const isMobile = window.innerWidth <= 768
@@ -192,17 +187,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
 
   // Handle post-transition scaling for selected image
   useEffect(() => {
-    console.log('Scale up effect check:', {
-      meshRef: !!meshRef.current,
-      transitionComplete,
-      isClicked,
-      hasScaleUpAnimated: hasScaleUpAnimated.current,
-      isScalingDownForReset
-    })
     
     if (meshRef.current && transitionComplete && isClicked && !hasScaleUpAnimated.current) {
       hasScaleUpAnimated.current = true
-      console.log('Scale up animation triggered - using real scale for:', projectData.name)
       // After transition completes, make the clicked slide larger using actual scale
       gsap.to(meshRef.current.scale, {
         x: 1.75,
@@ -211,9 +198,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         duration: 0.6,
         ease: "power3.out",
         delay: 0.15,
-        onComplete: () => {
-          console.log('Scale up animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
-        }
+        onComplete: () => {}
       })
     }
   }, [transitionComplete, isClicked, position])
@@ -236,7 +221,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       // Reset scale to normal size
       if (meshRef.current) {
         meshRef.current.scale.set(1, 1, 1)
-        console.log('Scale reset to normal size when returning to slider')
       }
       // Reset animation flags
       hasTransitionAnimated.current = false
@@ -248,54 +232,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   // Reset scale up flag when scaling down for reset starts
   useEffect(() => {
     if (isScalingDownForReset && transitionComplete && isClicked) {
-      console.log('Resetting hasScaleUpAnimated flag for scale down')
       hasScaleUpAnimated.current = false
     }
   }, [isScalingDownForReset, transitionComplete, isClicked])
-  
-  // Gallery navigation function
-  const navigateGallery = (direction) => {
-    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning || !onImageIndexChange) {
-      return
-    }
-    
-    const nextIndex = direction === 'next' 
-      ? (currentImageIndex + 1) % galleryTextures.length
-      : (currentImageIndex - 1 + galleryTextures.length) % galleryTextures.length
-    
-    // Set up transition
-    if (material.uniforms.uTexture1 && material.uniforms.uTexture2) {
-      material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
-      material.uniforms.uTexture2.value = galleryTextures[nextIndex]
-    }
-    
-    setIsImageTransitioning(true)
-    
-    // Animate transition
-    gsap.to(transitionProgress, {
-      current: 1,
-      duration: 0.6,
-      ease: "power2.inOut",
-      onUpdate: () => {
-        if (material.uniforms.uProgress) {
-          material.uniforms.uProgress.value = transitionProgress.current
-        }
-      },
-      onComplete: () => {
-        onImageIndexChange(nextIndex) // Update external state
-        if (material.uniforms.uTexture1) {
-          material.uniforms.uTexture1.value = galleryTextures[nextIndex]
-        }
-        if (material.uniforms.uProgress) {
-          material.uniforms.uProgress.value = 0
-        }
-        transitionProgress.current = 0
-        setIsImageTransitioning(false)
-      }
-    })
-  }
-  
-  // Keyboard navigation is now handled in the parent component (index.jsx)
 
   // Handle reverse scaling when back is clicked
   useEffect(() => {
@@ -312,11 +251,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   // Handle scaling down for reset (when back button is clicked)
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
-      console.log('Scale down for reset triggered, currentImageIndex:', currentImageIndex)
       
       // First, reset to original image if not already there
       if (currentImageIndex !== 0) {
-        console.log('Resetting to cover image first')
         // Transition back to first image (cover image)
         if (material.uniforms.uTexture1 && material.uniforms.uTexture2 && galleryTextures) {
           material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
@@ -325,7 +262,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           setIsImageTransitioning(true)
           
           // Start scale down animation parallel with image reset for smooth transition
-          console.log('Starting scale down animation parallel with image reset')
           if (meshRef.current) {
             gsap.to(meshRef.current.scale, {
               x: 1,
@@ -333,9 +269,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
               z: 1,
               duration: 0.8, // Slightly longer for smoother feel
               ease: "back.out(1.2)", // Smooth bounce back effect
-              onComplete: () => {
-                console.log('Scale down animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
-              }
+              onComplete: () => {}
             })
           }
           
@@ -349,7 +283,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
               }
             },
             onComplete: () => {
-              console.log('Image reset complete')
               if (onImageIndexChange) {
                 onImageIndexChange(0)
               }
@@ -365,7 +298,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           })
         }
       } else {
-        console.log('Already on cover image, starting scale down directly - using real scale')
         // Already on first image, just do the scale down animation
         gsap.to(meshRef.current.scale, {
           x: 1,
@@ -373,9 +305,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           z: 1,
           duration: 0.6,
           ease: "power3.inOut",
-          onComplete: () => {
-            console.log('Direct scale down animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
-          }
+          onComplete: () => {}
         })
       }
     }
@@ -392,10 +322,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       // Selected project animates from scale-down position to subtle forward position, others to normal
       const finalZ = isSelectedProject ? position[2] + 0.01 : position[2]
       
-      // Debug log to see positions
-      if (isMobile) {
-        console.log('Mobile expand animation to:', position[0], position[1], 'for', projectData.name)
-      }
       
       // Start animation immediately with no delay to prevent gaps
       gsap.to(meshRef.current.position, {
@@ -426,9 +352,6 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       ref={meshRef} 
       position={getRenderPosition()} 
       material={material}
-      onPointerMove={(e) => {
-        // Cursor feedback removed - navigation is now full-screen
-      }}
       onPointerEnter={() => {
         if (!transitionComplete && onHover) {
           onHover(projectData)
@@ -509,8 +432,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const [transitionComplete, setTransitionComplete] = useState(false)
   const [isInitialExpanding, setIsInitialExpanding] = useState(false)
   const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
-  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
-  const autoScrollStartTime = useRef(null)
   const [sliderOpacity, setSliderOpacity] = useState(hasPlayedIntroAnimation ? 1 : 0)
   
   // Load cover textures from projects data
@@ -551,13 +472,9 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     }
   }, [isReturningFromGallery, isInitialExpanding])
 
-  // Start auto-scroll and fade-in only on first page load (not returning from gallery)
+  // Start fade-in only on first page load (not returning from gallery)
   useEffect(() => {
     if (!hasPlayedIntroAnimation && !isReturningFromGallery && !selectedProject && !isTransitioning && !transitionComplete) {
-      // Only do auto-scroll and fade-in on very first load
-      setIsAutoScrolling(true)
-      autoScrollStartTime.current = Date.now()
-      
       // Start fade-in animation only on first load
       setTimeout(() => {
         setSliderOpacity(1)
@@ -565,7 +482,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     } else {
       // If returning from gallery or animation already played, show immediately without animation
       setSliderOpacity(1)
-      setIsAutoScrolling(false) // Make sure auto-scroll is off
     }
   }, [hasPlayedIntroAnimation, isReturningFromGallery, selectedProject, isTransitioning, transitionComplete])
 
@@ -584,7 +500,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     
     // Refined drag detection: only block if significant drag occurred
     if (hasDraggedEnough.current) {
-      console.log('Click blocked due to drag detection for:', projectData.name)
       return
     }
     
@@ -639,11 +554,9 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   // Handle initial expand animation - slides start at center and expand out
   useEffect(() => {
     if (isInitialExpanding) {
-      console.log('Starting initial expand animation')
       
       // Simple timer - always 3 seconds total regardless of other states
       const timer = setTimeout(() => {
-        console.log('Setting isInitialExpanding to false - slider should be navigatable now')
         setIsInitialExpanding(false)
       }, 2250) // 25% faster (was 3000ms)
       
@@ -654,10 +567,8 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   // Handle scaling down completion
   useEffect(() => {
     if (isScalingDown) {
-      console.log('Starting scale down timer')
       // After scale-down animation completes, stop scaling down
       const timer = setTimeout(() => {
-        console.log('Scale down complete')
         setIsScalingDown(false)
       }, 600) // Match the scale-down animation duration (25% faster)
       
@@ -667,31 +578,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
 
   // Smooth interpolation with easing - much smoother than direct animations
   useFrame(() => {
-    // Handle auto-scroll animation
-    if (isAutoScrolling && autoScrollStartTime.current) {
-      const elapsed = Date.now() - autoScrollStartTime.current
-      const duration = 8000 // 8 seconds total animation for longer, slower movement
-      
-      if (elapsed < duration) {
-        const progress = elapsed / duration
-        
-        // Slower start, much more gradual slowdown
-        const speed = Math.pow(1 - progress, 3) * 0.25 // Cubic slowdown, start slower
-        const direction = isMobile ? speed : -speed // Left to right (desktop) or top to bottom (mobile)
-        
-        // Apply the auto-scroll movement
-        targetOffset.current += direction
-        
-        // Add velocity for shader deformation
-        velocity.current = direction * 4
-      } else {
-        // Animation complete - stop auto-scrolling
-        setIsAutoScrolling(false)
-        autoScrollStartTime.current = null
-        velocity.current = 0
-      }
-    }
-    
     if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
       // Smooth interpolation between current and target
       const ease = 0.05 // Reduced from 0.075 for smoother, more controlled movement
@@ -738,15 +624,8 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       
       e.preventDefault() // Prevent default touch behavior
       
-      // Stop auto-scroll if user starts interacting
-      if (isAutoScrolling) {
-        setIsAutoScrolling(false)
-        autoScrollStartTime.current = null
-      }
-      
       isDragging.current = true
       hasDraggedEnough.current = false // Reset drag distance check
-      console.log('Mouse/Touch down - reset hasDraggedEnough to false')
       velocity.current = 0
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
@@ -851,12 +730,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown || isMobile) return // Disable scroll on mobile
       
       e.preventDefault()
-      
-      // Stop auto-scroll if user starts scrolling
-      if (isAutoScrolling) {
-        setIsAutoScrolling(false)
-        autoScrollStartTime.current = null
-      }
       
       // Direct target update for instant response
       const scrollSpeed = 0.0002 // Extremely reduced for very gentle scrolling
@@ -971,8 +844,6 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
 
   return (
     <group ref={containerRef}>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
       {slides}
     </group>
   )
