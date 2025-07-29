@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery }) => {
   const meshRef = useRef()
   const hasTransitionAnimated = useRef(false)
   const hasScaleUpAnimated = useRef(false)
@@ -93,7 +93,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     `,
     transparent: true,
     side: THREE.DoubleSide
-  }), [texture, isMobile]) // Only recreate if texture or isMobile changes
+  }), [texture]) // Only recreate if texture changes
   
   // Update texture when it changes
   useEffect(() => {
@@ -105,6 +105,13 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       }
     }
   }, [texture, material, galleryTextures, currentImageIndex])
+
+  // Update isMobile uniform without recreating material
+  useEffect(() => {
+    if (material.uniforms && material.uniforms.uIsMobile) {
+      material.uniforms.uIsMobile.value = isMobile ? 1.0 : 0.0
+    }
+  }, [material, isMobile])
 
   // Update velocity uniform and position - continue smooth fade even during transition
   useFrame(() => {
@@ -148,8 +155,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       material.uniforms.uProgress.value = transitionProgress.current
     }
     
-    // Handle normal positioning only when not expanding and not transitioning
-    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
+    // Handle normal positioning only when not expanding, not transitioning, and not returning from gallery
+    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isReturningFromGallery && !isScalingDown) {
       // Check if this is the selected project for subtle z-positioning
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
       const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
@@ -397,9 +404,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
   }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown, isMobile])
 
-  // Calculate render position - if expanding, start at center
+  // Calculate render position - if expanding or returning from gallery, start at center
   const getRenderPosition = () => {
-    if (isInitialExpanding) {
+    if (isInitialExpanding || isReturningFromGallery) {
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
       // Start selected image at scale-down end position (slightly above normal) to prevent jump
       const zPosition = isSelectedProject ? position[2] + 0.02 : position[2]
@@ -495,7 +502,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
   const [transitionComplete, setTransitionComplete] = useState(false)
-  const [isInitialExpanding, setIsInitialExpanding] = useState(isReturningFromGallery)
+  const [isInitialExpanding, setIsInitialExpanding] = useState(false)
   const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
   
   // Load cover textures from projects data
@@ -528,6 +535,13 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [isMobile])
+
+  // Handle return from gallery - only activate animation when explicitly returning
+  useEffect(() => {
+    if (isReturningFromGallery && !isInitialExpanding) {
+      setIsInitialExpanding(true)
+    }
+  }, [isReturningFromGallery, isInitialExpanding])
 
   useEffect(() => {
     if (onHover) {
@@ -883,6 +897,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
           isMobile={isMobile}
           externalCurrentImageIndex={externalCurrentImageIndex}
           onImageIndexChange={onImageIndexChange}
+          isReturningFromGallery={isReturningFromGallery}
         />
       )
     }
