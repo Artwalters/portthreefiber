@@ -4,16 +4,18 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange }) => {
   const meshRef = useRef()
   const hasTransitionAnimated = useRef(false)
   const hasScaleUpAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
   const currentSpeed = useRef(0)
   const opacity = useRef(1)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isImageTransitioning, setIsImageTransitioning] = useState(false)
   const transitionProgress = useRef(0)
+  
+  // Use external currentImageIndex or fallback to 0
+  const currentImageIndex = externalCurrentImageIndex !== undefined ? externalCurrentImageIndex : 0
   
   // Load all gallery images for this project
   const galleryTextures = useTexture(projectData.images || [texture])
@@ -207,7 +209,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         material.uniforms.uOpacity.value = 1
       }
       // Reset to first image when going back to slider
-      setCurrentImageIndex(0)
+      if (onImageIndexChange) {
+        onImageIndexChange(0)
+      }
       transitionProgress.current = 0
       if (material.uniforms.uProgress) {
         material.uniforms.uProgress.value = 0
@@ -234,7 +238,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   
   // Gallery navigation function
   const navigateGallery = (direction) => {
-    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning) {
+    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning || !onImageIndexChange) {
       return
     }
     
@@ -261,7 +265,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         }
       },
       onComplete: () => {
-        setCurrentImageIndex(nextIndex)
+        onImageIndexChange(nextIndex) // Update external state
         if (material.uniforms.uTexture1) {
           material.uniforms.uTexture1.value = galleryTextures[nextIndex]
         }
@@ -343,7 +347,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
             },
             onComplete: () => {
               console.log('Image reset complete')
-              setCurrentImageIndex(0)
+              if (onImageIndexChange) {
+                onImageIndexChange(0)
+              }
               if (material.uniforms.uTexture1) {
                 material.uniforms.uTexture1.value = galleryTextures[0]
               }
@@ -481,7 +487,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ onHover, onTransitionComplete, selectedProject, isScalingDownForReset, initialOffset = 0 }) {
+export default function WebGLSlider({ onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
@@ -628,21 +634,23 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }
   }, [hoveredSlide, onHover])
 
-  // Handle slide click - all slides move to screen center, then remove others - TESTING: ignore drag
+  // Handle slide click - all slides move to screen center, then remove others
   const handleSlideClick = (projectData) => {
-    console.log('handleSlideClick called for:', projectData.name, {
-      hasDraggedEnough: hasDraggedEnough.current,
-      isTransitioning,
-      transitionComplete
-    })
-    
-    // TESTING: Only block if transitioning, ignore drag detection
+    // Block if transitioning
     if (isTransitioning) {
-      console.log('Click blocked because isTransitioning:', isTransitioning)
       return
     }
     
-    console.log('TESTING: Slide clicked:', projectData.name, '(ignoring drag detection)') // Debug log
+    // Refined drag detection: only block if significant drag occurred
+    if (hasDraggedEnough.current) {
+      console.log('Click blocked due to drag detection for:', projectData.name)
+      return
+    }
+    
+    // Trigger UI fade-out
+    if (onTransitionStart) {
+      onTransitionStart()
+    }
     
     setClickedSlide(projectData)
     setIsTransitioning(true)
@@ -673,34 +681,16 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     }, 1500) // 25% faster (was 2000ms)
   }
 
-  // Handle touch end specifically for mobile clicks - TESTING: ignore drag detection
+  // Handle touch end specifically for mobile clicks
   const handleTouchEnd = (projectData, e) => {
-    console.log('Touch end called for:', projectData.name, {
-      hasDraggedEnough: hasDraggedEnough.current,
-      isTransitioning,
-      transitionComplete,
-      isDragging: isDragging.current
-    })
-    
-    // TESTING: Completely ignore drag detection and allow all touches
     if (!isTransitioning && !transitionComplete) {
-      console.log('TESTING: Touch end triggered for:', projectData.name, '(ignoring drag detection)')
       handleSlideClick(projectData)
     }
   }
 
-  // Handle pointer events for better cross-platform support - TESTING: ignore drag detection
+  // Handle pointer events for better cross-platform support
   const handlePointerUp = (projectData, e) => {
-    console.log('Pointer up called for:', projectData.name, {
-      hasDraggedEnough: hasDraggedEnough.current,
-      isTransitioning,
-      transitionComplete,
-      isDragging: isDragging.current
-    })
-    
-    // TESTING: Completely ignore drag detection and allow all pointer ups
     if (!isTransitioning && !transitionComplete) {
-      console.log('TESTING: Pointer up triggered for:', projectData.name, '(ignoring drag detection)')
       handleSlideClick(projectData)
     }
   }
@@ -807,16 +797,18 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
-      const minDragDistance = 15 // Minimum pixels to consider it a drag (increased for better touch detection)
+      const minDragDistance = isMobile ? 20 : 10 // Higher threshold for mobile, lower for desktop
       
       if (isMobile) {
         // Vertical movement on mobile
         const deltaY = clientY - lastMouseY.current
         const totalDeltaY = clientY - dragStart.current.y
         
-        // Check if dragged enough
-        if (Math.abs(totalDeltaY) > minDragDistance) {
-          console.log('Mobile drag detected:', Math.abs(totalDeltaY), 'px > threshold:', minDragDistance)
+        // Check if dragged enough in the correct direction (vertical for mobile)
+        const totalDeltaX = clientX - dragStart.current.x
+        const isDragIntentional = Math.abs(totalDeltaY) > Math.abs(totalDeltaX) * 0.7 // Mostly vertical movement
+        
+        if (Math.abs(totalDeltaY) > minDragDistance && isDragIntentional) {
           hasDraggedEnough.current = true
         }
         
@@ -831,8 +823,11 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
         const deltaX = clientX - lastMouseX.current
         const totalDeltaX = clientX - dragStart.current.x
         
-        // Check if dragged enough
-        if (Math.abs(totalDeltaX) > minDragDistance) {
+        // Check if dragged enough in the correct direction (horizontal for desktop)
+        const totalDeltaY = clientY - dragStart.current.y
+        const isDragIntentional = Math.abs(totalDeltaX) > Math.abs(totalDeltaY) * 0.7 // Mostly horizontal movement
+        
+        if (Math.abs(totalDeltaX) > minDragDistance && isDragIntentional) {
           hasDraggedEnough.current = true
         }
         
@@ -853,9 +848,20 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       isDragging.current = false
       canvas.style.cursor = 'grab'
       
-      // Reset drag check immediately after drag ends
-      console.log('Mouse/Touch up - resetting hasDraggedEnough to false')
-      hasDraggedEnough.current = false
+      // Time-based check: if interaction was very short, likely a tap/click
+      const interactionTime = Date.now() - dragStart.current.time
+      const wasQuickTap = interactionTime < 200 // Less than 200ms
+      
+      // Reset drag check with timing consideration
+      if (wasQuickTap && !hasDraggedEnough.current) {
+        // Quick tap without drag - definitely allow click
+        hasDraggedEnough.current = false
+      } else {
+        // Longer interaction or with drag - use normal reset timing
+        setTimeout(() => {
+          hasDraggedEnough.current = false
+        }, 50) // Short delay to prevent immediate clicks after drag
+      }
       
       // Velocity is already being applied in the render loop
       // No need for additional animation
@@ -974,6 +980,8 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           isScalingDown={isScalingDown}
           isScalingDownForReset={isScalingDownForReset}
           isMobile={isMobile}
+          externalCurrentImageIndex={externalCurrentImageIndex}
+          onImageIndexChange={onImageIndexChange}
         />
       )
     }

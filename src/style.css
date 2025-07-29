@@ -38,6 +38,20 @@ body,
     color: black;
     padding: 0.5rem 1rem;
     box-sizing: border-box;
+    opacity: 1;
+    transition: opacity 0.6s ease-in-out;
+}
+
+.ui-overlay.transitioning {
+    opacity: 0;
+}
+
+.ui-overlay.post-transition {
+    opacity: 1;
+}
+
+.ui-overlay.returning-to-slider {
+    opacity: 0;
 }
 
 .ui-top {
@@ -85,7 +99,7 @@ body,
 
 /* Index Section Styles */
 .index-section {
-    display: flex;
+    display: none; /* Hidden on mobile by default */
     align-items: flex-start;
     gap: 1rem;
 }
@@ -109,31 +123,26 @@ body,
     opacity: 1;
 }
 
-/* Description positioned next to creative studio */
+/* Bottom sections */
 .ui-bottom-left {
     text-align: left;
 }
 
-.creative-section {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
-}
-
-.project-description {
+.ui-bottom-center .project-description {
     opacity: 0;
     font-style: italic;
     max-width: 300px;
     transition: opacity 0.4s ease-in-out;
     transform: translateY(0);
+    text-align: center;
 }
 
-.project-description.visible {
+.ui-bottom-center .project-description.visible {
     opacity: 0.8;
 }
 
 /* Post-transition styles */
-.project-number {
+.photo-counter {
     font-size: 12px;
     color: black;
 }
@@ -161,6 +170,7 @@ body,
     }
     
     .index-section {
+        display: flex; /* Show on desktop */
         gap: 2rem; /* 2x larger gap */
     }
     
@@ -168,15 +178,11 @@ body,
         gap: 0.2rem; /* 2x larger gap */
     }
     
-    .creative-section {
-        gap: 2rem; /* 2x larger gap */
-    }
-    
-    .project-description {
+    .ui-bottom-center .project-description {
         max-width: 600px; /* 2x larger max width */
     }
     
-    .project-number {
+    .photo-counter {
         font-size: 20px; /* Adjusted desktop size */
     }
 }

@@ -1,6 +1,8 @@
-export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, selectedProject, onBackToSlider }) {
+export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
+  // Calculate total number of images for selected project
+  const totalImages = selectedProject && selectedProject.images ? selectedProject.images.length : 0
   return (
-    <div className="ui-overlay">
+    <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}>
       {/* Top Section */}
       <div className="ui-top">
         <div className="ui-top-left">
@@ -17,8 +19,8 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
         </div>
         <div className="ui-top-center">
           {isPostTransition ? (
-            <div className="project-number">
-              {selectedProject ? projects.findIndex(p => p.name === selectedProject.name) + 1 : '1'}
+            <div className="photo-counter">
+              {totalImages > 0 ? `${currentImageIndex + 1}/${totalImages}` : '1/1'}
             </div>
           ) : (
             <div className="index-section">
@@ -37,24 +39,21 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
           )}
         </div>
         <div className="ui-top-right">
-          2025
+          about
         </div>
       </div>
 
       {/* Bottom Section */}
       <div className="ui-bottom">
         <div className="ui-bottom-left">
-          <div className="creative-section">
-            <span>creative studio</span>
-            {displayedProject && (
-              <span className={`project-description ${isVisible ? 'visible' : ''}`}>
-                {displayedProject.description}
-              </span>
-            )}
-          </div>
+          creative studio
         </div>
         <div className="ui-bottom-center">
-          about
+          {displayedProject && (
+            <span className={`project-description ${isVisible ? 'visible' : ''}`}>
+              {displayedProject.description}
+            </span>
+          )}
         </div>
         <div className="ui-bottom-right">
           all rights reserved
