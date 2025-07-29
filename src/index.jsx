@@ -154,11 +154,15 @@ function App() {
         let touchStartTime = 0
         let isSwiping = false
         let lastWheelTime = 0
+        let touchHandled = false // Flag to prevent double handling
 
         // Handle clicks (only for mouse, not touch)
         const handleClick = (e) => {
-            // Ignore touch-triggered clicks
-            if (e.pointerType === 'touch') return
+            // Ignore touch-triggered clicks - use multiple checks for reliability
+            if (e.pointerType === 'touch' || touchHandled) return
+            
+            // Additional check for touch events that might not have pointerType
+            if (e.type === 'touchend' || e.type === 'touchstart') return
             
             // Ignore if clicking on UI elements
             if (e.target.closest('.ui-overlay')) {
@@ -199,6 +203,7 @@ function App() {
             touchStartY = e.touches[0].clientY
             touchStartTime = Date.now()
             isSwiping = false
+            touchHandled = false // Reset flag on new touch
         }
 
         // Handle touch move to detect if it's a swipe
@@ -234,11 +239,19 @@ function App() {
                 // Check if tapping on UI
                 if (e.target.closest('.ui-overlay')) return
                 
+                // Set flag to prevent duplicate click event
+                touchHandled = true
+                
                 if (touchEndX > window.innerWidth / 2) {
                     navigateGallery('next')
                 } else {
                     navigateGallery('previous')
                 }
+                
+                // Reset flag after a short delay to allow for the next interaction
+                setTimeout(() => {
+                    touchHandled = false
+                }, 100)
                 return
             }
 
