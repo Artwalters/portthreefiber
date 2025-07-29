@@ -486,7 +486,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const lastMouseY = useRef(0)
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768) // Initialize correctly
+  const [isMobile, setIsMobile] = useState(() => {
+    // Initialize correctly on first render to prevent double flash
+    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  })
   const [hoveredSlide, setHoveredSlide] = useState(null)
   const [clickedSlide, setClickedSlide] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -514,15 +517,17 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
-  // Check if mobile on mount and resize
+  // Check if mobile only on resize (not on mount to prevent double flash)
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768)
+      const newIsMobile = window.innerWidth <= 768
+      if (newIsMobile !== isMobile) {
+        setIsMobile(newIsMobile)
+      }
     }
-    checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+  }, [isMobile])
 
   useEffect(() => {
     if (onHover) {
