@@ -10,13 +10,15 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   const hasAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
   const currentSpeed = useRef(0)
+  const opacity = useRef(1)
   
   // Simple shader material with curve deformation - memoized to prevent recreation
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTexture: { value: texture },
       uVelo: { value: 0 },
-      uIsMobile: { value: isMobile ? 1.0 : 0.0 }
+      uIsMobile: { value: isMobile ? 1.0 : 0.0 },
+      uOpacity: { value: 1.0 }
     },
     vertexShader: `
       precision mediump float;
@@ -44,14 +46,17 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     fragmentShader: `
       precision mediump float;
       uniform sampler2D uTexture;
+      uniform float uOpacity;
       varying vec2 vUv;
       
       void main() {
         // Use original UV coordinates since both texture and geometry are square
         vec4 color = texture2D(uTexture, vUv);
+        color.a *= uOpacity;
         gl_FragColor = color;
       }
     `,
+    transparent: true,
     side: THREE.DoubleSide
   }), [texture, isMobile]) // Only recreate if texture or isMobile changes
   
@@ -146,8 +151,21 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         ease: "power3.out", // Smoother easing
         delay: 0.15 // Slightly reduced delay for faster feel
       })
+      
+      // Fade out the slide after scaling to make room for ProjectDetailView
+      gsap.to(opacity, {
+        current: 0,
+        duration: 0.5,
+        delay: 0.8, // Start fading after scaling is mostly done
+        ease: "power2.out",
+        onUpdate: () => {
+          if (material.uniforms.uOpacity) {
+            material.uniforms.uOpacity.value = opacity.current
+          }
+        }
+      })
     }
-  }, [transitionComplete, isClicked, position])
+  }, [transitionComplete, isClicked, position, material])
 
   // Handle reverse scaling when back is clicked
   useEffect(() => {
@@ -315,7 +333,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-1', 
       description: 'Interactive web experience with modern UI',
+      coverImage: './img/project-1.png',
       images: [
+        './img/project-1.png', // Cover image first
         './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
         './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
         './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
@@ -326,7 +346,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-2', 
       description: 'E-commerce platform with seamless checkout',
+      coverImage: './img/project-2.png',
       images: [
+        './img/project-2.png', // Cover image first
         './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
         './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
         './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
@@ -336,7 +358,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-3', 
       description: 'Creative portfolio showcasing visual identity',
+      coverImage: './img/project-3.png',
       images: [
+        './img/project-3.png', // Cover image first
         './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
         './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
         './img/project/Screenshot 2025-06-17 at 00.16.56 1.png'
@@ -345,8 +369,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-4', 
       description: 'Mobile app with intuitive user interface',
-      // Voor nu gebruiken we dezelfde images voor alle projecten
+      coverImage: './img/project-4.png',
       images: [
+        './img/project-4.png', // Cover image first
         './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
         './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
         './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
@@ -356,7 +381,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-5', 
       description: 'Brand identity and logo design system',
+      coverImage: './img/project-5.png',
       images: [
+        './img/project-5.png', // Cover image first
         './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
         './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
         './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
@@ -365,7 +392,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-6', 
       description: 'Digital marketing campaign visualization',
+      coverImage: './img/project-6.png',
       images: [
+        './img/project-6.png', // Cover image first
         './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
         './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
         './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
@@ -375,7 +404,9 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     { 
       name: 'project-7', 
       description: 'Art installation with interactive elements',
+      coverImage: './img/project-7.png',
       images: [
+        './img/project-7.png', // Cover image first
         './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
         './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
         './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
@@ -755,15 +786,14 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
     <group ref={containerRef}>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
-      {transitionComplete && clickedSlide ? (
+      {slides}
+      {transitionComplete && clickedSlide && (
         <ProjectDetailView
           project={clickedSlide}
-          position={[0, 0, 1.5]} // Positioned where the selected slide scaled to
+          position={[0, 0, 1.25]} // Same z-position as scaled slide
           onNavigate={(index) => console.log('Navigated to image:', index)}
           isMobile={isMobile}
         />
-      ) : (
-        slides
       )}
     </group>
   )

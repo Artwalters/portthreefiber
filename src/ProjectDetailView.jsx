@@ -35,7 +35,8 @@ const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
       uTexture1: { value: textures[0] },
       uTexture2: { value: textures[0] },
       uProgress: { value: 0 },
-      uDirection: { value: 1 } // 1 for next, -1 for previous
+      uDirection: { value: 1 }, // 1 for next, -1 for previous
+      uOpacity: { value: 0 } // Start with 0 opacity for fade in
     },
     vertexShader: `
       precision mediump float;
@@ -52,6 +53,7 @@ const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
       uniform sampler2D uTexture2;
       uniform float uProgress;
       uniform float uDirection;
+      uniform float uOpacity;
       varying vec2 vUv;
       
       void main() {
@@ -68,9 +70,13 @@ const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
         float fade = smoothstep(0.3, 0.7, uProgress);
         vec4 color = mix(tex1, tex2, fade);
         
+        // Apply overall opacity
+        color.a *= uOpacity;
+        
         gl_FragColor = color;
       }
     `,
+    transparent: true,
     side: THREE.DoubleSide
   }), [textures])
   
@@ -80,6 +86,17 @@ const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
       material.uniforms.uProgress.value = transitionProgress.current
     }
   })
+  
+  // Fade in when component mounts
+  useEffect(() => {
+    if (material.uniforms.uOpacity) {
+      gsap.to(material.uniforms.uOpacity, {
+        value: 1,
+        duration: 0.5,
+        ease: "power2.out"
+      })
+    }
+  }, [material])
   
   // Handle navigation
   const navigate = (direction) => {
