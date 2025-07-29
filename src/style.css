@@ -97,6 +97,34 @@ body,
     text-align: right;
 }
 
+/* Walters Logo Styles */
+.walters-logo {
+    height: 24px; /* 2x larger - was 12px */
+    width: auto;
+    opacity: 1;
+    filter: brightness(0); /* Make SVG black to match UI text color */
+    margin-left: -4px; /* Move closer to edge, matching text baseline */
+    margin-top: 2px; /* Move slightly down for better alignment */
+    position: relative;
+    transition: opacity 0.2s ease;
+}
+
+.walters-logo:hover {
+    opacity: 0.7;
+}
+
+/* Touch target for logo - same pattern as other buttons */
+.walters-logo::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -16px;
+    right: -16px;
+    bottom: -12px;
+    min-width: 44px;
+    min-height: 44px;
+}
+
 /* Index Section Styles */
 .index-section {
     display: none; /* Hidden on mobile by default */
@@ -212,7 +240,8 @@ body.gallery-mode {
     /* Ensure touch targets are appropriate for mobile */
     .back-button::before,
     .studio-button::before,
-    .about-button::before {
+    .about-button::before,
+    .walters-logo::before {
         top: -16px;
         left: -20px;
         right: -20px;
@@ -223,6 +252,13 @@ body.gallery-mode {
     
     .ui-overlay.post-transition .image-description {
         text-align: center;
+    }
+    
+    /* Mobile logo sizing */
+    .walters-logo {
+        height: 25px; /* 25% larger - was 20px */
+        margin-left: -3px; /* Proportionally smaller negative margin for mobile */
+        margin-top: 1px; /* Slightly less downward movement for mobile */
     }
 }
 
@@ -246,6 +282,13 @@ body.gallery-mode {
     .index-section {
         display: flex; /* Show on desktop */
         gap: 2rem; /* 2x larger gap */
+    }
+    
+    /* Desktop logo sizing - larger for better visibility */
+    .walters-logo {
+        height: 64px; /* 2x larger again - was 32px */
+        margin-left: -6px; /* Larger negative margin for desktop */
+        margin-top: 4px; /* More downward movement for desktop */
     }
     
     .project-list {

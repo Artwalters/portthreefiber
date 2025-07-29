@@ -49,7 +49,13 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
       {/* Bottom Section */}
       <div className="ui-bottom">
         <div className="ui-bottom-left">
-          creative studio
+          <img 
+            src="./img/logo/walters_logo.svg" 
+            alt="Walters Studio" 
+            className="walters-logo" 
+            onClick={isPostTransition ? onBackToSlider : undefined}
+            style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
+          />
         </div>
         <div className="ui-bottom-center">
           {isPostTransition && currentImage ? (
