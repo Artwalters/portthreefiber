@@ -651,7 +651,9 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       const rawSpeed = speedDiff * 60 // Multiply by 60 for consistent speed regardless of framerate
       
       // Apply extra smoothing for direction changes
-      const speedEase = Math.sign(rawSpeed) !== Math.sign(smoothedSpeed.current) ? 0.02 : 0.1
+      // Only treat as direction change if both values are non-zero and have different signs
+      const hasDirectionChange = smoothedSpeed.current !== 0 && rawSpeed !== 0 && Math.sign(rawSpeed) !== Math.sign(smoothedSpeed.current)
+      const speedEase = hasDirectionChange ? 0.02 : 0.1
       smoothedSpeed.current += (rawSpeed - smoothedSpeed.current) * speedEase
       
       // Safeguard against NaN or extreme values
