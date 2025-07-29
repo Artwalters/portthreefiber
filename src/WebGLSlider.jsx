@@ -6,7 +6,8 @@ import gsap from 'gsap'
 
 const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
-  const hasAnimated = useRef(false)
+  const hasTransitionAnimated = useRef(false)
+  const hasScaleUpAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
   const currentSpeed = useRef(0)
   const opacity = useRef(1)
@@ -147,14 +148,16 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
       
       meshRef.current.position.set(position[0], position[1], zPosition)
-      hasAnimated.current = false
+      hasTransitionAnimated.current = false
+      hasScaleUpAnimated.current = false
     }
   })
 
   // Handle transition animation (only once when transition starts)
   useEffect(() => {
-    if (meshRef.current && isTransitioning && !hasAnimated.current) {
-      hasAnimated.current = true
+    if (meshRef.current && isTransitioning && !hasTransitionAnimated.current) {
+      hasTransitionAnimated.current = true
+      console.log('Transition animation triggered for:', projectData.name)
       
       // Animate this slide to screen center - check if mobile for direction
       const isMobile = window.innerWidth <= 768
@@ -170,19 +173,31 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
 
   // Handle post-transition scaling for selected image
   useEffect(() => {
-    if (meshRef.current && transitionComplete && isClicked && !hasAnimated.current) {
-      hasAnimated.current = true
-      console.log('POST-TRANSITION SCALING TRIGGERED:', projectData.name, 'z-position:', position[2] + 1.25)
-      // After transition completes, make the clicked slide larger by moving it forward
-      // This creates a 1.75x scale effect through perspective (25% bigger than before)
-      gsap.to(meshRef.current.position, {
-        z: position[2] + 1.25, // Move further forward for 1.75x effect (25% bigger)
-        duration: 0.6, // 25% faster (was 0.8s)
-        ease: "power3.out", // Smoother easing
-        delay: 0.15 // Slightly reduced delay for faster feel
+    console.log('Scale up effect check:', {
+      meshRef: !!meshRef.current,
+      transitionComplete,
+      isClicked,
+      hasScaleUpAnimated: hasScaleUpAnimated.current,
+      isScalingDownForReset
+    })
+    
+    if (meshRef.current && transitionComplete && isClicked && !hasScaleUpAnimated.current) {
+      hasScaleUpAnimated.current = true
+      console.log('Scale up animation triggered - using real scale for:', projectData.name)
+      // After transition completes, make the clicked slide larger using actual scale
+      gsap.to(meshRef.current.scale, {
+        x: 1.75,
+        y: 1.75, 
+        z: 1.75,
+        duration: 0.6,
+        ease: "power3.out",
+        delay: 0.15,
+        onComplete: () => {
+          console.log('Scale up animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
+        }
       })
     }
-  }, [transitionComplete, isClicked, position, material])
+  }, [transitionComplete, isClicked, position])
   
   // Reset opacity when transitioning back to slider
   useEffect(() => {
@@ -197,8 +212,25 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       if (material.uniforms.uProgress) {
         material.uniforms.uProgress.value = 0
       }
+      // Reset scale to normal size
+      if (meshRef.current) {
+        meshRef.current.scale.set(1, 1, 1)
+        console.log('Scale reset to normal size when returning to slider')
+      }
+      // Reset animation flags
+      hasTransitionAnimated.current = false
+      hasScaleUpAnimated.current = false
+      hasInitialExpanded.current = false
     }
   }, [transitionComplete, isTransitioning, material])
+  
+  // Reset scale up flag when scaling down for reset starts
+  useEffect(() => {
+    if (isScalingDownForReset && transitionComplete && isClicked) {
+      console.log('Resetting hasScaleUpAnimated flag for scale down')
+      hasScaleUpAnimated.current = false
+    }
+  }, [isScalingDownForReset, transitionComplete, isClicked])
   
   // Gallery navigation function
   const navigateGallery = (direction) => {
@@ -273,17 +305,72 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   // Handle scaling down for reset (when back button is clicked)
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
-      const isMobile = window.innerWidth <= 768
-      // Scale down from +1.25 to normal position, keeping it on top
-      gsap.to(meshRef.current.position, {
-        x: 0, // Always center x
-        y: 0, // Always center y
-        z: position[2] + 0.02, // Scale down to slightly above normal position
-        duration: 0.6, // 25% faster (was 0.8s)
-        ease: "power3.inOut" // Smoother easing
-      })
+      console.log('Scale down for reset triggered, currentImageIndex:', currentImageIndex)
+      
+      // First, reset to original image if not already there
+      if (currentImageIndex !== 0) {
+        console.log('Resetting to cover image first')
+        // Transition back to first image (cover image)
+        if (material.uniforms.uTexture1 && material.uniforms.uTexture2 && galleryTextures) {
+          material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
+          material.uniforms.uTexture2.value = galleryTextures[0] // Cover image
+          
+          setIsImageTransitioning(true)
+          
+          // Start scale down animation parallel with image reset for smooth transition
+          console.log('Starting scale down animation parallel with image reset')
+          if (meshRef.current) {
+            gsap.to(meshRef.current.scale, {
+              x: 1,
+              y: 1,
+              z: 1,
+              duration: 0.8, // Slightly longer for smoother feel
+              ease: "back.out(1.2)", // Smooth bounce back effect
+              onComplete: () => {
+                console.log('Scale down animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
+              }
+            })
+          }
+          
+          gsap.to(transitionProgress, {
+            current: 1,
+            duration: 0.4,
+            ease: "power2.inOut",
+            onUpdate: () => {
+              if (material.uniforms.uProgress) {
+                material.uniforms.uProgress.value = transitionProgress.current
+              }
+            },
+            onComplete: () => {
+              console.log('Image reset complete')
+              setCurrentImageIndex(0)
+              if (material.uniforms.uTexture1) {
+                material.uniforms.uTexture1.value = galleryTextures[0]
+              }
+              if (material.uniforms.uProgress) {
+                material.uniforms.uProgress.value = 0
+              }
+              transitionProgress.current = 0
+              setIsImageTransitioning(false)
+            }
+          })
+        }
+      } else {
+        console.log('Already on cover image, starting scale down directly - using real scale')
+        // Already on first image, just do the scale down animation
+        gsap.to(meshRef.current.scale, {
+          x: 1,
+          y: 1,
+          z: 1,
+          duration: 0.6,
+          ease: "power3.inOut",
+          onComplete: () => {
+            console.log('Direct scale down animation complete - scale:', meshRef.current ? meshRef.current.scale : 'null')
+          }
+        })
+      }
     }
-  }, [isScalingDownForReset, transitionComplete, isClicked, position])
+  }, [isScalingDownForReset, transitionComplete, isClicked, position, currentImageIndex, material, galleryTextures])
 
 
   // Handle initial expand animation (from center to normal positions)
@@ -445,7 +532,20 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
-  // Project data with image galleries - using only existing cover images for now
+  // Project gallery images from the project folder - same for all projects for now
+  const projectGalleryImages = [
+    './img/project/51793e_4a8ef5a46faa413c808664a56e668ffc~mv2 1.png',
+    './img/project/Screenshot 2025-06-16 at 16.24.51 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.03.55 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.14.29 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.14.52 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.15.56 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.16.31 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.16.56 1.png',
+    './img/project/Screenshot 2025-06-17 at 00.52.22 1.png'
+  ]
+
+  // Project data with image galleries - using project folder images
   const projects = [
     { 
       name: 'project-1', 
@@ -453,9 +553,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-1.png',
       images: [
         './img/project-1.png', // Cover image first
-        './img/project-2.png', // Using existing images as placeholders
-        './img/project-3.png',
-        './img/project-4.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -464,9 +562,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-2.png',
       images: [
         './img/project-2.png', // Cover image first
-        './img/project-1.png',
-        './img/project-3.png',
-        './img/project-5.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -475,9 +571,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-3.png',
       images: [
         './img/project-3.png', // Cover image first
-        './img/project-1.png',
-        './img/project-2.png',
-        './img/project-6.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -486,9 +580,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-4.png',
       images: [
         './img/project-4.png', // Cover image first
-        './img/project-2.png',
-        './img/project-3.png',
-        './img/project-7.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -497,9 +589,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-5.png',
       images: [
         './img/project-5.png', // Cover image first
-        './img/project-1.png',
-        './img/project-4.png',
-        './img/project-6.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -508,9 +598,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-6.png',
       images: [
         './img/project-6.png', // Cover image first
-        './img/project-2.png',
-        './img/project-4.png',
-        './img/project-7.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     },
     { 
@@ -519,9 +607,7 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       coverImage: './img/project-7.png',
       images: [
         './img/project-7.png', // Cover image first
-        './img/project-1.png',
-        './img/project-3.png',
-        './img/project-5.png'
+        ...projectGalleryImages // Then all project gallery images
       ]
     }
   ]
