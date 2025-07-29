@@ -3,7 +3,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
-import ProjectDetailView from './ProjectDetailView'
 
 const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile }) => {
   const meshRef = useRef()
@@ -11,14 +10,33 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   const hasInitialExpanded = useRef(false)
   const currentSpeed = useRef(0)
   const opacity = useRef(1)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isImageTransitioning, setIsImageTransitioning] = useState(false)
+  const transitionProgress = useRef(0)
+  
+  // Load all gallery images for this project
+  const galleryTextures = useTexture(projectData.images || [texture])
+  
+  // Configure gallery textures
+  useEffect(() => {
+    galleryTextures.forEach(tex => {
+      tex.generateMipmaps = false
+      tex.wrapS = THREE.ClampToEdgeWrap
+      tex.wrapT = THREE.ClampToEdgeWrap
+      tex.minFilter = THREE.LinearFilter
+      tex.magFilter = THREE.LinearFilter
+    })
+  }, [galleryTextures])
   
   // Simple shader material with curve deformation - memoized to prevent recreation
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
-      uTexture: { value: texture },
+      uTexture1: { value: texture }, // Main texture (cover)
+      uTexture2: { value: texture }, // Second texture for transitions
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
-      uOpacity: { value: 1.0 }
+      uOpacity: { value: 1.0 },
+      uProgress: { value: 0.0 } // For image transitions
     },
     vertexShader: `
       precision mediump float;
@@ -45,13 +63,19 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     `,
     fragmentShader: `
       precision mediump float;
-      uniform sampler2D uTexture;
+      uniform sampler2D uTexture1;
+      uniform sampler2D uTexture2;
       uniform float uOpacity;
+      uniform float uProgress;
       varying vec2 vUv;
       
       void main() {
         // Use original UV coordinates since both texture and geometry are square
-        vec4 color = texture2D(uTexture, vUv);
+        vec4 color1 = texture2D(uTexture1, vUv);
+        vec4 color2 = texture2D(uTexture2, vUv);
+        
+        // Mix textures based on progress (for gallery transitions)
+        vec4 color = mix(color1, color2, uProgress);
         color.a *= uOpacity;
         gl_FragColor = color;
       }
@@ -62,10 +86,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   
   // Update texture when it changes
   useEffect(() => {
-    if (material.uniforms.uTexture) {
-      material.uniforms.uTexture.value = texture
+    if (material.uniforms.uTexture1) {
+      material.uniforms.uTexture1.value = galleryTextures[currentImageIndex] || texture
     }
-  }, [texture, material])
+  }, [texture, material, galleryTextures, currentImageIndex])
 
   // Update velocity uniform and position - continue smooth fade even during transition
   useFrame(() => {
@@ -176,6 +200,56 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       }
     }
   }, [transitionComplete, isTransitioning, material])
+  
+  // Gallery navigation function
+  const navigateGallery = (direction) => {
+    if (!transitionComplete || !galleryTextures || galleryTextures.length <= 1 || isImageTransitioning) return
+    
+    const nextIndex = direction === 'next' 
+      ? (currentImageIndex + 1) % galleryTextures.length
+      : (currentImageIndex - 1 + galleryTextures.length) % galleryTextures.length
+    
+    // Set up transition
+    material.uniforms.uTexture1.value = galleryTextures[currentImageIndex]
+    material.uniforms.uTexture2.value = galleryTextures[nextIndex]
+    
+    setIsImageTransitioning(true)
+    
+    // Animate transition
+    gsap.to(transitionProgress, {
+      current: 1,
+      duration: 0.6,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        if (material.uniforms.uProgress) {
+          material.uniforms.uProgress.value = transitionProgress.current
+        }
+      },
+      onComplete: () => {
+        setCurrentImageIndex(nextIndex)
+        material.uniforms.uTexture1.value = galleryTextures[nextIndex]
+        material.uniforms.uProgress.value = 0
+        transitionProgress.current = 0
+        setIsImageTransitioning(false)
+      }
+    })
+  }
+  
+  // Handle keyboard events for gallery navigation
+  useEffect(() => {
+    if (!transitionComplete || !isClicked) return
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') {
+        navigateGallery('previous')
+      } else if (e.key === 'ArrowRight') {
+        navigateGallery('next')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [transitionComplete, isClicked, currentImageIndex, galleryTextures])
 
   // Handle reverse scaling when back is clicked
   useEffect(() => {
@@ -249,12 +323,41 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       ref={meshRef} 
       position={getRenderPosition()} 
       material={material}
-      onPointerEnter={() => !transitionComplete && onHover && onHover(projectData)}
-      onPointerLeave={() => !transitionComplete && onHover && onHover(null)}
-      onClick={() => !transitionComplete && onClick && onClick(projectData)}
+      onPointerMove={(e) => {
+        if (transitionComplete && isClicked) {
+          // Show cursor feedback for gallery navigation
+          const hoverX = e.point.x
+          document.body.style.cursor = hoverX > 0 ? 'e-resize' : 'w-resize'
+        }
+      }}
+      onPointerEnter={() => {
+        if (!transitionComplete && onHover) {
+          onHover(projectData)
+        }
+      }}
+      onPointerLeave={() => {
+        if (!transitionComplete && onHover) {
+          onHover(null)
+        }
+        // Reset cursor
+        document.body.style.cursor = 'auto'
+      }}
+      onClick={(e) => {
+        if (transitionComplete && isClicked) {
+          // Gallery navigation: left half = previous, right half = next
+          const clickX = e.point.x
+          if (clickX > 0) {
+            navigateGallery('next')
+          } else {
+            navigateGallery('previous')
+          }
+        } else if (!transitionComplete && onClick) {
+          onClick(projectData)
+        }
+      }}
       onPointerDown={(e) => {
         // Stop propagation to prevent drag interference on click
-        if (!transitionComplete && onClick) {
+        if (!transitionComplete && onClick || (transitionComplete && isClicked)) {
           e.stopPropagation()
         }
       }}
@@ -797,24 +900,6 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
       {slides}
-      {transitionComplete && clickedSlide && (
-        <ProjectDetailView
-          project={clickedSlide}
-          position={[0, 0, 1.25]} // Same z-position as scaled slide
-          onNavigate={(index) => console.log('Navigated to image:', index)}
-          onBack={() => {
-            // Reset to first image when back is clicked
-            setTransitionComplete(false)
-            setIsTransitioning(false)
-            setClickedSlide(null)
-            setHiddenSlides(new Set())
-            setIsInitialExpanding(true)
-            // Reset all slide opacities to 1 
-            // This will be handled by the SlideItem useEffect
-          }}
-          isMobile={isMobile}
-        />
-      )}
     </group>
   )
 }
