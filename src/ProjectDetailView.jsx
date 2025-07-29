@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
+const ProjectDetailView = ({ project, position, onNavigate, onBack, isMobile }) => {
   const meshRef = useRef()
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -87,16 +87,62 @@ const ProjectDetailView = ({ project, position, onNavigate, isMobile }) => {
     }
   })
   
-  // Fade in when component mounts
+  // Fade in when component mounts - delayed to sync with SlideItem fade out
   useEffect(() => {
     if (material.uniforms.uOpacity) {
       gsap.to(material.uniforms.uOpacity, {
         value: 1,
-        duration: 0.5,
+        duration: 0.4,
+        delay: 0.2, // Small delay to let SlideItem fade out first
         ease: "power2.out"
       })
     }
   }, [material])
+  
+  // Handle keyboard events
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onBack) {
+        resetToFirst()
+        setTimeout(() => {
+          onBack()
+        }, 100) // Small delay to let reset animation start
+      } else if (e.key === 'ArrowLeft') {
+        navigate('previous')
+      } else if (e.key === 'ArrowRight') {
+        navigate('next')
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onBack, currentImageIndex])
+  
+  // Reset to first image
+  const resetToFirst = () => {
+    if (currentImageIndex === 0 || isTransitioning) return
+    
+    // Set up transition back to first image
+    material.uniforms.uTexture1.value = textures[currentImageIndex]
+    material.uniforms.uTexture2.value = textures[0]
+    material.uniforms.uDirection.value = -1 // Go backwards
+    
+    setIsTransitioning(true)
+    
+    // Animate transition
+    gsap.to(transitionProgress, {
+      current: 1,
+      duration: 0.8,
+      ease: "power2.inOut",
+      onComplete: () => {
+        setCurrentImageIndex(0)
+        material.uniforms.uTexture1.value = textures[0]
+        material.uniforms.uProgress.value = 0
+        transitionProgress.current = 0
+        setIsTransitioning(false)
+      }
+    })
+  }
   
   // Handle navigation
   const navigate = (direction) => {

@@ -155,8 +155,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       // Fade out the slide after scaling to make room for ProjectDetailView
       gsap.to(opacity, {
         current: 0,
-        duration: 0.5,
-        delay: 0.8, // Start fading after scaling is mostly done
+        duration: 0.3,
+        delay: 0.9, // Start fading after scaling is completely done
         ease: "power2.out",
         onUpdate: () => {
           if (material.uniforms.uOpacity) {
@@ -166,6 +166,16 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       })
     }
   }, [transitionComplete, isClicked, position, material])
+  
+  // Reset opacity when transitioning back to slider
+  useEffect(() => {
+    if (!transitionComplete && !isTransitioning && opacity.current < 1) {
+      opacity.current = 1
+      if (material.uniforms.uOpacity) {
+        material.uniforms.uOpacity.value = 1
+      }
+    }
+  }, [transitionComplete, isTransitioning, material])
 
   // Handle reverse scaling when back is clicked
   useEffect(() => {
@@ -792,6 +802,16 @@ export default function WebGLSlider({ onHover, onTransitionComplete, selectedPro
           project={clickedSlide}
           position={[0, 0, 1.25]} // Same z-position as scaled slide
           onNavigate={(index) => console.log('Navigated to image:', index)}
+          onBack={() => {
+            // Reset to first image when back is clicked
+            setTransitionComplete(false)
+            setIsTransitioning(false)
+            setClickedSlide(null)
+            setHiddenSlides(new Set())
+            setIsInitialExpanding(true)
+            // Reset all slide opacities to 1 
+            // This will be handled by the SlideItem useEffect
+          }}
           isMobile={isMobile}
         />
       )}
