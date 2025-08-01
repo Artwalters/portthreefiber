@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 import IntroScreen from './IntroScreen.jsx'
+import SimpleWater from './SimpleWater.jsx'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -424,6 +425,7 @@ function App() {
                     isReturningFromGallery={isReturningFromGallery}
                     hasPlayedIntroAnimation={hasPlayedIntroAnimation.current}
                 />
+                <SimpleWater />
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}

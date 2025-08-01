@@ -87,7 +87,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         gl_FragColor = color;
       }
     `,
-    transparent: true,
+    transparent: false,
     side: THREE.DoubleSide
   }), [texture]) // Only recreate if texture changes
   
@@ -352,6 +352,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       ref={meshRef} 
       position={getRenderPosition()} 
       material={material}
+      renderOrder={-9999}
+      visible={true}
       onPointerEnter={() => {
         if (!transitionComplete && onHover) {
           onHover(projectData)

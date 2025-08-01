@@ -1,0 +1,297 @@
+import { useRef, useMemo, useEffect } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import * as THREE from 'three'
+
+export default function SimpleWater() {
+    const { gl, size, scene, camera } = useThree()
+    const meshRef = useRef()
+    const mouse = useRef(new THREE.Vector2(0.5, 0.5))
+    const mouseDown = useRef(false)
+    
+    // Create simple ping-pong buffers for water simulation + scene capture
+    const buffers = useMemo(() => {
+        const options = {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            format: THREE.RGBAFormat,
+            type: THREE.FloatType
+        }
+        return {
+            read: new THREE.WebGLRenderTarget(256, 256, options),
+            write: new THREE.WebGLRenderTarget(256, 256, options),
+            scene: new THREE.WebGLRenderTarget(size.width, size.height, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat
+            })
+        }
+    }, []) // Remove size dependency to prevent buffer recreation
+    
+    // Water simulation material
+    const simMaterial = useMemo(() => {
+        return new THREE.ShaderMaterial({
+            uniforms: {
+                uPrevious: { value: null },
+                uTime: { value: 0 },
+                uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+                uMouseDown: { value: 0 },
+                uDelta: { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position.xy, 0.0, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uPrevious;
+                uniform float uTime;
+                uniform vec2 uMouse;
+                uniform float uMouseDown;
+                uniform float uDelta;
+                varying vec2 vUv;
+                
+                void main() {
+                    vec2 texel = 1.0 / vec2(256.0);
+                    
+                    // Get previous state
+                    vec4 prev = texture2D(uPrevious, vUv);
+                    float pressure = prev.x;
+                    float velocity = prev.y;
+                    
+                    // Sample neighbors
+                    float left = texture2D(uPrevious, vUv - vec2(texel.x, 0.0)).x;
+                    float right = texture2D(uPrevious, vUv + vec2(texel.x, 0.0)).x;
+                    float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
+                    float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
+                    
+                    // Wave equation
+                    float delta = min(uDelta, 1.0);
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.25;
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
+                    
+                    pressure += delta * velocity;
+                    
+                    // Damping
+                    velocity *= 0.995;
+                    pressure *= 0.998;
+                    
+                    // Mouse interaction
+                    if (uMouseDown > 0.5) {
+                        float dist = distance(vUv, uMouse);
+                        if (dist < 0.1) {
+                            pressure += (1.0 - dist / 0.1) * 0.5;
+                        }
+                    }
+                    
+                    // Calculate gradients for normals
+                    float gradX = (right - left) * 0.5;
+                    float gradY = (up - down) * 0.5;
+                    
+                    gl_FragColor = vec4(pressure, velocity, gradX, gradY);
+                }
+            `
+        })
+    }, [])
+    
+    // Display material
+    const material = useMemo(() => {
+        return new THREE.ShaderMaterial({
+            uniforms: {
+                uWaterTexture: { value: null },
+                uSceneTexture: { value: null },
+                uTime: { value: 0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position.xy, 0.0, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uWaterTexture;
+                uniform sampler2D uSceneTexture;
+                uniform float uTime;
+                varying vec2 vUv;
+                
+                void main() {
+                    // Sample water simulation
+                    vec4 water = texture2D(uWaterTexture, vUv);
+                    float pressure = water.x;
+                    float gradX = water.z;
+                    float gradY = water.w;
+                    
+                    // Create distortion from gradients
+                    vec2 distortion = vec2(gradX, gradY) * 0.025;
+                    vec2 distortedUv = vUv + distortion;
+                    
+                    // Sample the scene with distortion
+                    vec4 sceneColor = texture2D(uSceneTexture, distortedUv);
+                    
+                    // If distorted UV goes out of bounds, use original
+                    if (distortedUv.x < 0.0 || distortedUv.x > 1.0 || distortedUv.y < 0.0 || distortedUv.y > 1.0) {
+                        sceneColor = texture2D(uSceneTexture, vUv);
+                    }
+                    
+                    // Water color tint
+                    vec3 waterColor = vec3(0.85, 0.92, 1.0);
+                    
+                    // Calculate normal from gradients for lighting
+                    vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
+                    vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
+                    
+                    // Specular highlight
+                    float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
+                    
+                    // Combine scene with water effects
+                    vec3 finalColor = sceneColor.rgb * waterColor;
+                    finalColor += vec3(spec) * 0.8;
+                    finalColor += pressure * 0.1;
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `,
+            transparent: false,
+            depthTest: false,
+            depthWrite: false
+        })
+    }, [size])
+    
+    // Simple mouse tracking
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            mouse.current.x = e.clientX / window.innerWidth
+            mouse.current.y = 1.0 - (e.clientY / window.innerHeight)
+        }
+        
+        const handleMouseDown = () => {
+            mouseDown.current = true
+        }
+        
+        const handleMouseUp = () => {
+            mouseDown.current = false
+        }
+        
+        const handleTouchMove = (e) => {
+            if (e.touches.length > 0) {
+                mouse.current.x = e.touches[0].clientX / window.innerWidth
+                mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
+            }
+        }
+        
+        const handleTouchStart = (e) => {
+            if (e.touches.length > 0) {
+                mouse.current.x = e.touches[0].clientX / window.innerWidth
+                mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
+                mouseDown.current = true
+            }
+        }
+        
+        const handleTouchEnd = () => {
+            mouseDown.current = false
+        }
+        
+        window.addEventListener('mousemove', handleMouseMove, { passive: true })
+        window.addEventListener('mousedown', handleMouseDown, { passive: true })
+        window.addEventListener('mouseup', handleMouseUp, { passive: true })
+        window.addEventListener('touchmove', handleTouchMove, { passive: true })
+        window.addEventListener('touchstart', handleTouchStart, { passive: true })
+        window.addEventListener('touchend', handleTouchEnd, { passive: true })
+        
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove)
+            window.removeEventListener('mousedown', handleMouseDown)
+            window.removeEventListener('mouseup', handleMouseUp)
+            window.removeEventListener('touchmove', handleTouchMove)
+            window.removeEventListener('touchstart', handleTouchStart)
+            window.removeEventListener('touchend', handleTouchEnd)
+        }
+    }, [])
+    
+    useFrame((state, delta) => {
+        // Clamp delta to prevent simulation instability
+        const clampedDelta = Math.min(delta * 60, 1.4)
+        
+        const currentTarget = gl.getRenderTarget()
+        
+        // 1. ALWAYS update water simulation - this MUST never stop
+        try {
+            if (simMaterial.uniforms && buffers.read && buffers.write) {
+                simMaterial.uniforms.uPrevious.value = buffers.read.texture
+                simMaterial.uniforms.uTime.value = state.clock.elapsedTime
+                simMaterial.uniforms.uMouse.value.copy(mouse.current)
+                simMaterial.uniforms.uMouseDown.value = mouseDown.current ? 1.0 : 0.0
+                simMaterial.uniforms.uDelta.value = clampedDelta
+                
+                // Render simulation to write buffer - this MUST always happen
+                gl.setRenderTarget(buffers.write)
+                gl.clear()
+                gl.render(simScene, simCamera)
+                
+                // Swap buffers - this MUST always happen
+                const temp = buffers.read
+                buffers.read = buffers.write
+                buffers.write = temp
+            }
+        } catch (error) {
+            console.warn('Water simulation error, continuing...', error)
+        }
+        
+        // 2. Scene capture (safe fallback if it fails)
+        try {
+            if (meshRef.current && buffers.scene) {
+                meshRef.current.visible = false
+                
+                gl.setRenderTarget(buffers.scene)
+                gl.clear(new THREE.Color(1, 1, 1))
+                gl.render(scene, camera)
+                
+                meshRef.current.visible = true
+            }
+        } catch (error) {
+            console.warn('Scene capture error, continuing...', error)
+            if (meshRef.current) meshRef.current.visible = true
+        }
+        
+        // 3. Update display material (safe fallback)
+        try {
+            if (material.uniforms && buffers.read && buffers.scene) {
+                material.uniforms.uWaterTexture.value = buffers.read.texture
+                material.uniforms.uSceneTexture.value = buffers.scene.texture
+                material.uniforms.uTime.value = state.clock.elapsedTime
+            }
+        } catch (error) {
+            console.warn('Display material error, continuing...', error)
+        }
+        
+        gl.setRenderTarget(currentTarget)
+    })
+    
+    // Create simulation scene
+    const simScene = useMemo(() => {
+        const scene = new THREE.Scene()
+        const geometry = new THREE.PlaneGeometry(2, 2)
+        const mesh = new THREE.Mesh(geometry, simMaterial)
+        scene.add(mesh)
+        return scene
+    }, [simMaterial])
+    
+    const simCamera = useMemo(() => {
+        return new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+    }, [])
+    
+    return (
+        <mesh 
+            ref={meshRef}
+            position={[0, 0, 10]}
+            frustumCulled={false}
+            renderOrder={9999}
+            raycast={() => null}
+        >
+            <planeGeometry args={[2, 2]} />
+            <primitive object={material} />
+        </mesh>
+    )
+}
