@@ -98,6 +98,18 @@ const SimpleWater = forwardRef((props, ref) => {
                         }
                     }
                     
+                    // Stronger idle deformation for better plane movement
+                    float idleWaveStrength = 0.06; // Higher for more noticeable deformation
+                    float idleSpeed = 0.3; // Keep slow, calmer movement
+                    
+                    // Multiple sine waves at different frequencies for natural movement
+                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
+                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
+                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                    
+                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                    pressure += idleDisturbance;
+                    
                     // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
                     float gradY = (up - down) * 0.5;
@@ -170,9 +182,9 @@ const SimpleWater = forwardRef((props, ref) => {
                     // Combine scene with water effects - stronger on mobile
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
-                    // Same effect strength for all devices
-                    float effectStrength = 0.8;
-                    float pressureStrength = 0.1;
+                    // Reduced visual effect strength - keep deformation but less visible water effects
+                    float effectStrength = 0.3; // Reduced from 0.8 for less specular highlights
+                    float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
