@@ -6,6 +6,8 @@ import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 import IntroScreen from './IntroScreen.jsx'
 import SimpleWater from './SimpleWater.jsx'
+import KoiFish from './KoiFish.jsx'
+import FishParticleSystem from './FishParticleSystem.jsx'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -416,6 +418,11 @@ function App() {
                     alpha: false
                 }}
             >
+                {/* Layer 1: Fish (bottom) */}
+                {/* <KoiFish /> */}
+                <FishParticleSystem />
+                
+                {/* Layer 2: Slider (middle) */}
                 <WebGLSlider 
                     key={sliderKey}
                     projects={projects}
@@ -431,6 +438,8 @@ function App() {
                     hasPlayedIntroAnimation={hasPlayedIntroAnimation.current}
                     waterRef={waterRef}
                 />
+                
+                {/* Layer 3: Water (top) */}
                 <SimpleWater ref={waterRef} />
             </Canvas>
             <UIOverlay 

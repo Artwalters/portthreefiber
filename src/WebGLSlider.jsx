@@ -377,7 +377,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       ref={meshRef} 
       position={getRenderPosition()} 
       material={material}
-      renderOrder={-9999}
+      renderOrder={-1}
       visible={true}
       onPointerEnter={() => {
         if (!transitionComplete && onHover) {
