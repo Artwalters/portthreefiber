@@ -1,12 +1,21 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef, useMemo, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-export default function SimpleWater() {
+const SimpleWater = forwardRef((props, ref) => {
     const { gl, size, scene, camera } = useThree()
     const meshRef = useRef()
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
     const mouseDown = useRef(false)
+    
+    // Expose update function for external components (like slider)
+    useImperativeHandle(ref, () => ({
+        updateMouse: (x, y, isDown) => {
+            mouse.current.x = x / window.innerWidth
+            mouse.current.y = 1.0 - (y / window.innerHeight)
+            mouseDown.current = isDown
+        }
+    }))
     
     // Create simple ping-pong buffers for water simulation + scene capture
     const buffers = useMemo(() => {
@@ -314,4 +323,6 @@ export default function SimpleWater() {
             <primitive object={material} />
         </mesh>
     )
-}
+})
+
+export default SimpleWater

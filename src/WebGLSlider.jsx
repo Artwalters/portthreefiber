@@ -432,7 +432,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false, hasPlayedIntroAnimation = false }) {
+export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false, hasPlayedIntroAnimation = false, waterRef }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
   const containerRef = useRef()
@@ -656,6 +656,12 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       velocity.current = 0
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      
+      // Start water effect interaction
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(clientX, clientY, true)
+      }
+      
       dragStart.current = {
         x: clientX,
         y: clientY,
@@ -676,6 +682,11 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       const deltaTime = currentTime - lastMoveTime.current
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      
+      // Update water effect with touch/mouse position
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(clientX, clientY, true)
+      }
       
       const minDragDistance = isMobile ? 20 : 10 // Higher threshold for mobile, lower for desktop
       
@@ -727,6 +738,11 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       
       isDragging.current = false
       canvas.style.cursor = 'grab'
+      
+      // Stop water effect interaction
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(0, 0, false)
+      }
       
       // Time-based check: if interaction was very short, likely a tap/click
       const interactionTime = Date.now() - dragStart.current.time

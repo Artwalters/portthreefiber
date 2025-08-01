@@ -30,6 +30,7 @@ function App() {
     const [showIntro, setShowIntro] = useState(true)
     const [uiFadingIn, setUiFadingIn] = useState(false)
     const hasPlayedIntroAnimation = useRef(false)
+    const waterRef = useRef()
 
     // Load projects data from JSON
     useEffect(() => {
@@ -428,8 +429,9 @@ function App() {
                     onImageIndexChange={setCurrentImageIndex}
                     isReturningFromGallery={isReturningFromGallery}
                     hasPlayedIntroAnimation={hasPlayedIntroAnimation.current}
+                    waterRef={waterRef}
                 />
-                <SimpleWater />
+                <SimpleWater ref={waterRef} />
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}
