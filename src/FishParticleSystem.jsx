@@ -4,9 +4,14 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 // Fish with animation - using SkinnedMesh approach for proper animation
-function FishWithAnimation({ scene, animations, fishIndex }) {
+function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }) {
   const group = useRef()
   const mixer = useRef()
+  const actions = useRef([])
+  const currentAnimationSpeed = useRef(1.5)
+  const targetAnimationSpeed = useRef(1.5)
+  const speedVariation = useRef(Math.random() * 0.4 + 0.8) // 0.8 to 1.2 multiplier for natural variation
+  const lastSpeedChangeTime = useRef(0)
   
   // Clone the scene and setup animation mixer
   const clonedScene = useMemo(() => {
@@ -28,11 +33,6 @@ function FishWithAnimation({ scene, animations, fishIndex }) {
         if (child.isSkinnedMesh && child.skeleton) {
           child.skeleton = child.skeleton.clone()
         }
-        
-        // Check for morph targets
-        if (child.morphTargetInfluences) {
-          console.log(`Fish ${fishIndex} has ${child.morphTargetInfluences.length} morph targets`)
-        }
       }
     })
     
@@ -42,17 +42,15 @@ function FishWithAnimation({ scene, animations, fishIndex }) {
   useEffect(() => {
     if (!clonedScene || animations.length === 0) return
     
-    console.log(`Setting up animation for fish ${fishIndex}`)
-    
     // Create animation mixer for this specific cloned scene
     mixer.current = new THREE.AnimationMixer(clonedScene)
     
-    // Play all animations
-    animations.forEach((clip) => {
+    // Play all animations and store actions
+    actions.current = animations.map((clip) => {
       const action = mixer.current.clipAction(clip)
       action.play()
-      action.timeScale = 1.5
-      console.log(`Playing animation: ${clip.name} on fish ${fishIndex}`)
+      action.timeScale = 1.5 // Base animation speed
+      return action
     })
     
     return () => {
@@ -62,10 +60,63 @@ function FishWithAnimation({ scene, animations, fishIndex }) {
     }
   }, [clonedScene, animations, fishIndex])
   
-  // Update animation mixer every frame
+  // Smooth easing function for natural transitions
+  const easeInOutCubic = (t) => {
+    if (t < 0.5) {
+      return 4 * t * t * t
+    }
+    return 1 - Math.pow(-2 * t + 2, 3) / 2
+  }
+
+  // Update animation mixer every frame with ultra-smooth transitions and natural variation
   useFrame((state, delta) => {
     if (mixer.current) {
-      mixer.current.update(delta)
+      // Calculate target animation speed based on velocity
+      const speed = velocity ? velocity.length() : 0.3
+      
+      // Map velocity to animation speed with natural variation
+      const baseSpeed = 0.3
+      const baseAnimationMultiplier = Math.max(1.0, (speed / baseSpeed) * 1.5)
+      
+      // Add subtle speed variation that changes over time
+      const time = state.clock.elapsedTime
+      if (time - lastSpeedChangeTime.current > 3 + Math.random() * 4) { // Change variation every 3-7 seconds
+        speedVariation.current = Math.random() * 0.4 + 0.8 // 0.8 to 1.2 multiplier (more subtle)
+        lastSpeedChangeTime.current = time
+      }
+      
+      // Apply variation and add subtle sine wave for natural breathing rhythm
+      const breathingVariation = Math.sin(time * 1.5 + fishIndex * 0.5) * 0.08 + 1 // Slower, more subtle breathing
+      targetAnimationSpeed.current = baseAnimationMultiplier * speedVariation.current * breathingVariation
+      
+      // Ultra-smooth ease transition with cubic easing
+      const transitionSpeed = fleeState ? 4.0 : 1.5 // Slower, more gradual transitions
+      const speedDifference = targetAnimationSpeed.current - currentAnimationSpeed.current
+      
+      // Apply cubic easing for smoother transitions
+      const normalizedDiff = Math.abs(speedDifference) / 5.0 // Normalize difference
+      const easedTransition = easeInOutCubic(Math.min(normalizedDiff, 1.0))
+      const smoothTransition = speedDifference * delta * transitionSpeed * (0.3 + easedTransition * 0.7)
+      
+      currentAnimationSpeed.current += smoothTransition
+      
+      // Clamp to reasonable bounds
+      currentAnimationSpeed.current = Math.max(0.8, Math.min(6.0, currentAnimationSpeed.current))
+      
+      // Apply ultra-smooth animation speed with additional smoothing
+      actions.current.forEach(action => {
+        if (action) {
+          // Add slight smoothing to prevent micro-stutters
+          const currentTimeScale = action.timeScale || 1.5
+          const targetTimeScale = currentAnimationSpeed.current
+          const smoothedTimeScale = currentTimeScale + (targetTimeScale - currentTimeScale) * delta * 8.0
+          
+          action.timeScale = smoothedTimeScale
+        }
+      })
+      
+      // Update mixer with clamped delta to prevent large jumps
+      mixer.current.update(Math.min(delta, 1/30)) // Max 30fps delta to prevent stutters
     }
   })
   
@@ -73,7 +124,7 @@ function FishWithAnimation({ scene, animations, fishIndex }) {
     <group ref={group}>
       <primitive 
         object={clonedScene} 
-        scale={0.16}
+        scale={0.192}
         rotation={[-Math.PI / 2, 0, Math.PI]}
       />
     </group>
@@ -120,7 +171,7 @@ export default function FishParticleSystem() {
   // Initialize fish data
   const fishData = useMemo(() => {
     const fish = []
-    for (let i = 0; i < 6; i++) { // 6 fish as requested
+    for (let i = 0; i < 12; i++) { // 12 fish as requested
       // Generate random edge spawn position
       const spawnFromEdge = () => {
         const edge = Math.floor(Math.random() * 4) // 0=top, 1=right, 2=bottom, 3=left
@@ -173,7 +224,9 @@ export default function FishParticleSystem() {
     return fish
   }, [])
   
-  // Track mouse position
+  // Track mouse position and interaction state
+  const mouseDown = useRef(false)
+  
   useEffect(() => {
     const handleMouseMove = (event) => {
       // Convert mouse position to world coordinates
@@ -181,8 +234,49 @@ export default function FishParticleSystem() {
       mousePosition.current.y = -(event.clientY / window.innerHeight) * 2 + 1
     }
     
+    const handleMouseDown = () => {
+      mouseDown.current = true
+    }
+    
+    const handleMouseUp = () => {
+      mouseDown.current = false
+    }
+    
+    // Touch events for mobile
+    const handleTouchStart = (event) => {
+      mouseDown.current = true
+      if (event.touches.length > 0) {
+        mousePosition.current.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1
+        mousePosition.current.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1
+      }
+    }
+    
+    const handleTouchMove = (event) => {
+      if (event.touches.length > 0) {
+        mousePosition.current.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1
+        mousePosition.current.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1
+      }
+    }
+    
+    const handleTouchEnd = () => {
+      mouseDown.current = false
+    }
+    
     window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('touchstart', handleTouchStart)
+    window.addEventListener('touchmove', handleTouchMove)
+    window.addEventListener('touchend', handleTouchEnd)
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
   }, [])
   
   useFrame((state, delta) => {
@@ -202,57 +296,38 @@ export default function FishParticleSystem() {
         fishRef.visible = true
       }
       
-      // Phase management
-      if (fish.phase === 'entering') {
-        // Swimming towards target position in center
-        const distanceToTarget = fish.position.distanceTo(fish.targetPosition)
+      // Calculate distance to mouse for flee behavior (applies to all phases)
+      const distanceToMouse = Math.sqrt(
+        Math.pow(fish.position.x - worldMouseX, 2) + 
+        Math.pow(fish.position.y - worldMouseY, 2)
+      )
+      
+      // Flee behavior - works in any phase when mouse is down (clicking/dragging)
+      const fleeRadius = 5
+      if (mouseDown.current && distanceToMouse < fleeRadius && !fish.fleeState) {
+        fish.fleeState = true
+        fish.fleeTimer = 3 // Longer flee time
         
-        if (distanceToTarget < 1) {
-          fish.hasReachedTarget = true
-          fish.phase = 'swimming'
-          // Start gentle random swimming in center area
-          const angle = Math.random() * Math.PI * 2
-          fish.velocity.set(
-            Math.cos(angle) * 0.15,
-            Math.sin(angle) * 0.1,
-            0
-          )
-        } else {
-          // Continue towards target
-          const direction = fish.targetPosition.clone().sub(fish.position).normalize()
-          fish.velocity.copy(direction.multiplyScalar(0.3))
-        }
+        const fleeDirection = new THREE.Vector3(
+          fish.position.x - worldMouseX,
+          fish.position.y - worldMouseY,
+          0
+        ).normalize()
         
-      } else if (fish.phase === 'swimming') {
-        // Gentle swimming in center area
-        fish.phaseTimer -= delta
-        
-        // Calculate distance to mouse for flee behavior
-        const distanceToMouse = Math.sqrt(
-          Math.pow(fish.position.x - worldMouseX, 2) + 
-          Math.pow(fish.position.y - worldMouseY, 2)
-        )
-        
-        // Flee behavior
-        const fleeRadius = 4
-        if (distanceToMouse < fleeRadius && !fish.fleeState) {
-          fish.fleeState = true
-          fish.fleeTimer = 2
-          
-          const fleeDirection = new THREE.Vector3(
-            fish.position.x - worldMouseX,
-            fish.position.y - worldMouseY,
-            0
-          ).normalize()
-          
-          fish.velocity.copy(fleeDirection.multiplyScalar(1.0))
-        }
-        
-        if (fish.fleeState) {
-          fish.fleeTimer -= delta
-          if (fish.fleeTimer <= 0) {
-            fish.fleeState = false
-            // Return to gentle swimming
+        // Much faster flee speed
+        fish.velocity.copy(fleeDirection.multiplyScalar(2.0))
+      }
+      
+      // Handle flee state across all phases
+      if (fish.fleeState) {
+        fish.fleeTimer -= delta
+        if (fish.fleeTimer <= 0) {
+          fish.fleeState = false
+          // Return to normal behavior based on current phase
+          if (fish.phase === 'entering') {
+            const direction = fish.targetPosition.clone().sub(fish.position).normalize()
+            fish.velocity.copy(direction.multiplyScalar(0.3))
+          } else if (fish.phase === 'swimming') {
             const angle = Math.random() * Math.PI * 2
             fish.velocity.set(
               Math.cos(angle) * 0.15,
@@ -260,8 +335,35 @@ export default function FishParticleSystem() {
               0
             )
           }
-        } else {
-          // Gentle direction changes
+          // exiting phase keeps its velocity
+        }
+      } else {
+        // Normal phase behavior (only when not fleeing)
+        if (fish.phase === 'entering') {
+          // Swimming towards target position in center
+          const distanceToTarget = fish.position.distanceTo(fish.targetPosition)
+          
+          if (distanceToTarget < 1) {
+            fish.hasReachedTarget = true
+            fish.phase = 'swimming'
+            // Start gentle random swimming in center area
+            const angle = Math.random() * Math.PI * 2
+            fish.velocity.set(
+              Math.cos(angle) * 0.15,
+              Math.sin(angle) * 0.1,
+              0
+            )
+          } else {
+            // Continue towards target
+            const direction = fish.targetPosition.clone().sub(fish.position).normalize()
+            fish.velocity.copy(direction.multiplyScalar(0.3))
+          }
+          
+        } else if (fish.phase === 'swimming') {
+          // Gentle swimming in center area
+          fish.phaseTimer -= delta
+          
+          // Gentle direction changes (only when not fleeing)
           if (Math.random() < delta * 0.3) { // 30% chance per second
             const angle = Math.random() * Math.PI * 2
             fish.velocity.set(
@@ -270,67 +372,67 @@ export default function FishParticleSystem() {
               0
             )
           }
-        }
-        
-        // Time to exit?
-        if (fish.phaseTimer <= 0) {
-          fish.phase = 'exiting'
-          // Pick random exit edge
-          const edge = Math.floor(Math.random() * 4)
-          let exitTarget
-          switch(edge) {
-            case 0: exitTarget = new THREE.Vector3(fish.position.x, 10, fish.position.z); break
-            case 1: exitTarget = new THREE.Vector3(25, fish.position.y, fish.position.z); break
-            case 2: exitTarget = new THREE.Vector3(fish.position.x, -10, fish.position.z); break
-            case 3: exitTarget = new THREE.Vector3(-25, fish.position.y, fish.position.z); break
-          }
-          const exitDirection = exitTarget.sub(fish.position).normalize()
-          fish.velocity.copy(exitDirection.multiplyScalar(0.4))
-        }
-        
-      } else if (fish.phase === 'exiting') {
-        // Swimming towards edge
-        // Check if fish is far enough off screen to respawn
-        if (fish.position.x > 25 || fish.position.x < -25 || 
-            fish.position.y > 10 || fish.position.y < -10) {
-          // Respawn fish
-          fish.spawnDelay = 5 + Math.random() * 15 // Wait 5-20 seconds before respawning
           
-          // Generate new spawn data
-          const spawnFromEdge = () => {
+          // Time to exit?
+          if (fish.phaseTimer <= 0) {
+            fish.phase = 'exiting'
+            // Pick random exit edge
             const edge = Math.floor(Math.random() * 4)
-            let startPos, targetPos
-            
+            let exitTarget
             switch(edge) {
-              case 0: // Top
-                startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, -2 - Math.random() * 2)
-                targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
-                break
-              case 1: // Right
-                startPos = new THREE.Vector3(20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-                targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
-                break
-              case 2: // Bottom
-                startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, -2 - Math.random() * 2)
-                targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
-                break
-              case 3: // Left
-                startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-                targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
-                break
+              case 0: exitTarget = new THREE.Vector3(fish.position.x, 10, fish.position.z); break
+              case 1: exitTarget = new THREE.Vector3(25, fish.position.y, fish.position.z); break
+              case 2: exitTarget = new THREE.Vector3(fish.position.x, -10, fish.position.z); break
+              case 3: exitTarget = new THREE.Vector3(-25, fish.position.y, fish.position.z); break
             }
-            return { startPos, targetPos }
+            const exitDirection = exitTarget.sub(fish.position).normalize()
+            fish.velocity.copy(exitDirection.multiplyScalar(0.4))
           }
           
-          const newSpawn = spawnFromEdge()
-          fish.position.copy(newSpawn.startPos)
-          fish.targetPosition.copy(newSpawn.targetPos)
-          fish.phase = 'entering'
-          fish.phaseTimer = 5 + Math.random() * 10
-          fish.hasReachedTarget = false
-          
-          const direction = fish.targetPosition.clone().sub(fish.position).normalize()
-          fish.velocity.copy(direction.multiplyScalar(0.3))
+        } else if (fish.phase === 'exiting') {
+          // Swimming towards edge
+          // Check if fish is far enough off screen to respawn
+          if (fish.position.x > 25 || fish.position.x < -25 || 
+              fish.position.y > 10 || fish.position.y < -10) {
+            // Respawn fish
+            fish.spawnDelay = 5 + Math.random() * 15 // Wait 5-20 seconds before respawning
+            
+            // Generate new spawn data
+            const spawnFromEdge = () => {
+              const edge = Math.floor(Math.random() * 4)
+              let startPos, targetPos
+              
+              switch(edge) {
+                case 0: // Top
+                  startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, -2 - Math.random() * 2)
+                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+                  break
+                case 1: // Right
+                  startPos = new THREE.Vector3(20, Math.random() * 10 - 5, -2 - Math.random() * 2)
+                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+                  break
+                case 2: // Bottom
+                  startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, -2 - Math.random() * 2)
+                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+                  break
+                case 3: // Left
+                  startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, -2 - Math.random() * 2)
+                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+                  break
+              }
+              return { startPos, targetPos }
+            }
+            
+            const newSpawn = spawnFromEdge()
+            fish.position.copy(newSpawn.startPos)
+            fish.targetPosition.copy(newSpawn.targetPos)
+            fish.phase = 'entering'
+            fish.phaseTimer = 5 + Math.random() * 10
+            fish.hasReachedTarget = false
+            
+            const direction = fish.targetPosition.clone().sub(fish.position).normalize()
+            fish.velocity.copy(direction.multiplyScalar(0.3))
+          }
         }
       }
       
@@ -376,7 +478,13 @@ export default function FishParticleSystem() {
       {/* Render fish instances */}
       {fishData.map((fish, index) => (
         <group key={fish.id} ref={el => fishRefs.current[index] = el} renderOrder={-2}>
-          <FishWithAnimation scene={scene} animations={animations} fishIndex={index} />
+          <FishWithAnimation 
+            scene={scene} 
+            animations={animations} 
+            fishIndex={index} 
+            fleeState={fish.fleeState}
+            velocity={fish.velocity}
+          />
         </group>
       ))}
     </>
