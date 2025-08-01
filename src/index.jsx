@@ -410,6 +410,10 @@ function App() {
                     position: [0, 0, 5],
                     fov: 75
                 }}
+                gl={{ 
+                    clearColor: 'white',
+                    alpha: false
+                }}
             >
                 <WebGLSlider 
                     key={sliderKey}

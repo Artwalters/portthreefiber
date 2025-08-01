@@ -16,9 +16,10 @@ export default function SimpleWater() {
             format: THREE.RGBAFormat,
             type: THREE.FloatType
         }
+        const resolution = 256
         return {
-            read: new THREE.WebGLRenderTarget(256, 256, options),
-            write: new THREE.WebGLRenderTarget(256, 256, options),
+            read: new THREE.WebGLRenderTarget(resolution, resolution, options),
+            write: new THREE.WebGLRenderTarget(resolution, resolution, options),
             scene: new THREE.WebGLRenderTarget(size.width, size.height, {
                 minFilter: THREE.LinearFilter,
                 magFilter: THREE.LinearFilter,
@@ -68,8 +69,8 @@ export default function SimpleWater() {
                     
                     // Wave equation
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.25;
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // 0.25 * 0.75 = 0.1875
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
                     
                     pressure += delta * velocity;
                     
@@ -77,11 +78,11 @@ export default function SimpleWater() {
                     velocity *= 0.995;
                     pressure *= 0.998;
                     
-                    // Mouse interaction - stronger on mobile
+                    // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.8;
-                        float rippleRadius = 0.12;
+                        float rippleStrength = 0.5;
+                        float rippleRadius = 0.075; // 25% smaller
                         
                         if (dist < rippleRadius) {
                             pressure += (1.0 - dist / rippleRadius) * rippleStrength;
@@ -128,8 +129,8 @@ export default function SimpleWater() {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Create distortion from gradients - stronger on mobile
-                    float distortionStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 0.045 : 0.025;
+                    // Stronger distortion so images react more
+                    float distortionStrength = 0.04;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
@@ -142,8 +143,13 @@ export default function SimpleWater() {
                         sceneColor = texture2D(uSceneTexture, vUv);
                     }
                     
-                    // Water color tint
-                    vec3 waterColor = vec3(0.85, 0.92, 1.0);
+                    // If scene is black/empty, force white background
+                    if (length(sceneColor.rgb) < 0.01) {
+                        sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
+                    }
+                    
+                    // Much more subtle water color - almost white
+                    vec3 waterColor = vec3(0.98, 0.99, 1.0);
                     
                     // Calculate normal from gradients for lighting
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
@@ -155,8 +161,9 @@ export default function SimpleWater() {
                     // Combine scene with water effects - stronger on mobile
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
-                    float effectStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 1.2 : 0.8;
-                    float pressureStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 0.15 : 0.1;
+                    // Same effect strength for all devices
+                    float effectStrength = 0.8;
+                    float pressureStrength = 0.1;
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
@@ -256,7 +263,8 @@ export default function SimpleWater() {
                 meshRef.current.visible = false
                 
                 gl.setRenderTarget(buffers.scene)
-                gl.clear(new THREE.Color(1, 1, 1))
+                gl.setClearColor(new THREE.Color(1, 1, 1), 1.0)
+                gl.clear(gl.COLOR_BUFFER_BIT)
                 gl.render(scene, camera)
                 
                 meshRef.current.visible = true
