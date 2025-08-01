@@ -143,8 +143,8 @@ export default function SimpleWater() {
                         sceneColor = texture2D(uSceneTexture, vUv);
                     }
                     
-                    // If scene is black/empty, force white background
-                    if (length(sceneColor.rgb) < 0.01) {
+                    // Only use white fallback for completely empty pixels
+                    if (sceneColor.a < 0.1) {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
                     
