@@ -54,11 +54,11 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         vec3 pos = position;
         
         if(uIsMobile > 0.5) {
-          // Vertical deformation for mobile - reversed direction
-          pos.y = pos.y - ((sin(uv.x * M_PI) * uVelo) * 0.065);
+          // Vertical deformation for mobile - stronger effect
+          pos.y = pos.y - ((sin(uv.x * M_PI) * uVelo) * 0.085);
         } else {
-          // Horizontal deformation for desktop - reversed direction
-          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.065);
+          // Horizontal deformation for desktop - stronger effect
+          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.085);
         }
         
         vUv = uv;
@@ -69,17 +69,42 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       precision mediump float;
       uniform sampler2D uTexture1;
       uniform sampler2D uTexture2;
+      uniform float uVelo;
       uniform float uOpacity;
       uniform float uProgress;
       varying vec2 vUv;
       
       void main() {
-        // Use original UV coordinates since both texture and geometry are square
-        vec4 color1 = texture2D(uTexture1, vUv);
-        vec4 color2 = texture2D(uTexture2, vUv);
+        // Calculate chromatic aberration based on velocity - more visible
+        float aberrationStrength = abs(uVelo) * 0.005; // More visible effect
+        aberrationStrength = min(aberrationStrength, 0.015); // Higher maximum for better visibility
+        
+        vec2 redOffset = vec2(aberrationStrength, 0.0);
+        vec2 blueOffset = vec2(-aberrationStrength, 0.0);
+        
+        // Sample textures with RGB shift for both texture1 and texture2
+        vec4 color1, color2;
+        
+        if (aberrationStrength > 0.0001) {
+          // Apply chromatic aberration when moving
+          float r1 = texture2D(uTexture1, vUv + redOffset).r;
+          float g1 = texture2D(uTexture1, vUv).g;
+          float b1 = texture2D(uTexture1, vUv + blueOffset).b;
+          float a1 = texture2D(uTexture1, vUv).a;
+          color1 = vec4(r1, g1, b1, a1);
+          
+          float r2 = texture2D(uTexture2, vUv + redOffset).r;
+          float g2 = texture2D(uTexture2, vUv).g;
+          float b2 = texture2D(uTexture2, vUv + blueOffset).b;
+          float a2 = texture2D(uTexture2, vUv).a;
+          color2 = vec4(r2, g2, b2, a2);
+        } else {
+          // No effect when stationary
+          color1 = texture2D(uTexture1, vUv);
+          color2 = texture2D(uTexture2, vUv);
+        }
         
         // Mix textures based on progress (for gallery transitions)
-        // When uProgress is 0, show only texture1. When 1, show only texture2
         vec4 color = mix(color1, color2, uProgress);
         
         // Ensure alpha is properly handled
@@ -128,14 +153,14 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         // During transition, use slow fade out
         ease = 0.02
       } else if (Math.sign(targetSpeed) !== Math.sign(currentSpeed.current) && Math.abs(currentSpeed.current) > 0.01) {
-        // Direction change - use very slow easing
-        ease = 0.015
+        // Direction change - faster easing for more responsive feel
+        ease = 0.04
       } else if (Math.abs(targetSpeed) > Math.abs(currentSpeed.current)) {
         // Speed increase - moderate easing
         ease = 0.05
       } else {
-        // Speed decrease - slow easing
-        ease = 0.008
+        // Speed decrease - faster easing for quicker recovery
+        ease = 0.025
       }
       
       currentSpeed.current += (targetSpeed - currentSpeed.current) * ease
@@ -143,7 +168,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       // Clamp to reasonable values
       currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
       
-      material.uniforms.uVelo.value = currentSpeed.current * 0.4 // Reduce effect intensity by 60%
+      material.uniforms.uVelo.value = currentSpeed.current * 0.5 // Reduce effect intensity by 50%
     }
     
     // Update slider opacity
@@ -592,7 +617,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       // Apply extra smoothing for direction changes
       // Only treat as direction change if both values are non-zero and have different signs
       const hasDirectionChange = smoothedSpeed.current !== 0 && rawSpeed !== 0 && Math.sign(rawSpeed) !== Math.sign(smoothedSpeed.current)
-      const speedEase = hasDirectionChange ? 0.02 : 0.1
+      const speedEase = hasDirectionChange ? 0.06 : 0.1
       smoothedSpeed.current += (rawSpeed - smoothedSpeed.current) * speedEase
       
       // Safeguard against NaN or extreme values
