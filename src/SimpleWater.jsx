@@ -77,11 +77,14 @@ export default function SimpleWater() {
                     velocity *= 0.995;
                     pressure *= 0.998;
                     
-                    // Mouse interaction
+                    // Mouse interaction - stronger on mobile
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        if (dist < 0.1) {
-                            pressure += (1.0 - dist / 0.1) * 0.5;
+                        float rippleStrength = 0.8;
+                        float rippleRadius = 0.12;
+                        
+                        if (dist < rippleRadius) {
+                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
                         }
                     }
                     
@@ -101,7 +104,8 @@ export default function SimpleWater() {
             uniforms: {
                 uWaterTexture: { value: null },
                 uSceneTexture: { value: null },
-                uTime: { value: 0 }
+                uTime: { value: 0 },
+                uResolution: { value: new THREE.Vector2(size.width, size.height) }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -114,6 +118,7 @@ export default function SimpleWater() {
                 uniform sampler2D uWaterTexture;
                 uniform sampler2D uSceneTexture;
                 uniform float uTime;
+                uniform vec2 uResolution;
                 varying vec2 vUv;
                 
                 void main() {
@@ -123,8 +128,10 @@ export default function SimpleWater() {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Create distortion from gradients
-                    vec2 distortion = vec2(gradX, gradY) * 0.025;
+                    // Create distortion from gradients - stronger on mobile
+                    float distortionStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 0.045 : 0.025;
+                    
+                    vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
                     
                     // Sample the scene with distortion
@@ -145,10 +152,14 @@ export default function SimpleWater() {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Combine scene with water effects
+                    // Combine scene with water effects - stronger on mobile
                     vec3 finalColor = sceneColor.rgb * waterColor;
-                    finalColor += vec3(spec) * 0.8;
-                    finalColor += pressure * 0.1;
+                    
+                    float effectStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 1.2 : 0.8;
+                    float pressureStrength = (uResolution.x < 800.0 || uResolution.y < 800.0) ? 0.15 : 0.1;
+                    
+                    finalColor += vec3(spec) * effectStrength;
+                    finalColor += pressure * pressureStrength;
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
@@ -261,6 +272,7 @@ export default function SimpleWater() {
                 material.uniforms.uWaterTexture.value = buffers.read.texture
                 material.uniforms.uSceneTexture.value = buffers.scene.texture
                 material.uniforms.uTime.value = state.clock.elapsedTime
+                material.uniforms.uResolution.value.set(size.width, size.height)
             }
         } catch (error) {
             console.warn('Display material error, continuing...', error)
