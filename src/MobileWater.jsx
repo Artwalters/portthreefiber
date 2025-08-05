@@ -39,8 +39,8 @@ const MobileWater = forwardRef((props, ref) => {
             type: textureType
         }
         
-        // Higher resolution for better quality while keeping strong effects
-        const resolution = 512
+        // Match shader resolution
+        const resolution = 256
         
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
@@ -80,27 +80,29 @@ const MobileWater = forwardRef((props, ref) => {
                 varying vec2 vUv;
                 
                 void main() {
-                    vec2 texel = 1.0 / vec2(512.0);
+                    vec2 texel = 1.0 / vec2(256.0);
                     
                     // Get previous state
                     vec4 prev = texture2D(uPrevious, vUv);
-                    float pressure = prev.x;
-                    float velocity = prev.y;
+                    float pressure = prev.x * 2.0 - 1.0; // Map from [0,1] to [-1,1] for more range
+                    float velocity = prev.y * 2.0 - 1.0;
                     
                     // Sample neighbors
-                    float left = texture2D(uPrevious, vUv - vec2(texel.x, 0.0)).x;
-                    float right = texture2D(uPrevious, vUv + vec2(texel.x, 0.0)).x;
-                    float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
-                    float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
+                    float left = texture2D(uPrevious, vUv - vec2(texel.x, 0.0)).x * 2.0 - 1.0;
+                    float right = texture2D(uPrevious, vUv + vec2(texel.x, 0.0)).x * 2.0 - 1.0;
+                    float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x * 2.0 - 1.0;
+                    float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x * 2.0 - 1.0;
                     
-                    // Proper wave equation with good recovery
+                    // SimpleWater wave equation
                     float delta = min(uDelta, 1.0);
-                    float average = (left + right + up + down) * 0.25;
-                    velocity += (average - pressure) * 0.5; // Stronger propagation
-                    velocity *= 0.96; // More damping for recovery
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875;
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
                     
-                    pressure += velocity * delta;
-                    pressure *= 0.98; // More damping to prevent drawing effect
+                    pressure += delta * velocity;
+                    
+                    // SimpleWater damping
+                    velocity *= 0.995;
+                    pressure *= 0.998;
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
@@ -115,11 +117,15 @@ const MobileWater = forwardRef((props, ref) => {
                         }
                     }
                     
-                    // No idle waves - only mouse/touch interaction
-                    
                     // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
                     float gradY = (up - down) * 0.5;
+                    
+                    // Map back to [0,1] range for storage
+                    pressure = (pressure + 1.0) * 0.5;
+                    velocity = (velocity + 1.0) * 0.5;
+                    gradX = (gradX + 1.0) * 0.5;
+                    gradY = (gradY + 1.0) * 0.5;
                     
                     gl_FragColor = vec4(pressure, velocity, gradX, gradY);
                 }
@@ -149,11 +155,11 @@ const MobileWater = forwardRef((props, ref) => {
                 varying vec2 vUv;
                 
                 void main() {
-                    // Sample water simulation
+                    // Sample water simulation and map back from [0,1] to [-1,1]
                     vec4 water = texture2D(uWaterTexture, vUv);
-                    float pressure = water.x;
-                    float gradX = water.z;
-                    float gradY = water.w;
+                    float pressure = water.x * 2.0 - 1.0;
+                    float gradX = water.z * 2.0 - 1.0;
+                    float gradY = water.w * 2.0 - 1.0;
                     
                     // Good water distortion - visible but not extreme  
                     float distortionStrength = 0.1;
