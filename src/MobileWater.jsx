@@ -100,15 +100,15 @@ const MobileWater = forwardRef((props, ref) => {
                     
                     pressure += delta * velocity;
                     
-                    // Less damping for stronger effects on mobile
-                    velocity *= 0.992; // Reduced damping
-                    pressure *= 0.995; // Reduced damping
+                    // Much less damping - waves travel much further
+                    velocity *= 0.988; // Even less damping for longer waves
+                    pressure *= 0.992; // Even less damping for longer waves
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.5;
-                        float rippleRadius = 0.075; // 25% smaller
+                        float rippleStrength = 0.8; // Stronger ripples
+                        float rippleRadius = 0.12; // Larger radius for broader waves
                         
                         if (dist < rippleRadius) {
                             pressure += (1.0 - dist / rippleRadius) * rippleStrength;
@@ -155,8 +155,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Much stronger distortion for better layer deformation  
-                    float distortionStrength = 0.12;
+                    // Extreme distortion for maximum layer deformation  
+                    float distortionStrength = 0.18;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
