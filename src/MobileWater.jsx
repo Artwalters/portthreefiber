@@ -93,29 +93,39 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x * 2.0 - 1.0;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x * 2.0 - 1.0;
                     
-                    // Stronger wave equation for longer lasting effect
+                    // Wave equation - matching SimpleWater's coefficients
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.25;
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // Match SimpleWater
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
                     
                     pressure += delta * velocity;
                     
-                    // Much less damping for longer lasting waves
-                    velocity *= 0.999; // Almost no velocity damping
-                    pressure *= 0.9995; // Almost no pressure damping
+                    // Match SimpleWater's damping for longer lasting waves
+                    velocity *= 0.995; // Same as SimpleWater
+                    pressure *= 0.998; // Same as SimpleWater
                     
-                    // Mouse interaction - smaller ripples on mobile for better visibility
+                    // Mouse interaction - matching SimpleWater
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.8; // Much stronger initial impact
-                        float rippleRadius = 0.08; // Larger for better wave spread
+                        float rippleStrength = 0.5; // Match SimpleWater
+                        float rippleRadius = 0.075; // Match SimpleWater
                         
                         if (dist < rippleRadius) {
-                            float drop = 1.0 - (dist / rippleRadius);
-                            drop = sin(drop * 3.14159 * 0.5); // Smooth sine dropoff
-                            pressure += drop * rippleStrength;
+                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
                         }
                     }
+                    
+                    // Add idle waves like SimpleWater for continuous movement
+                    float idleWaveStrength = 0.06;
+                    float idleSpeed = 0.3;
+                    
+                    // Multiple sine waves at different frequencies
+                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
+                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
+                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                    
+                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                    pressure += idleDisturbance;
                     
                     // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
@@ -161,8 +171,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z * 2.0 - 1.0;
                     float gradY = water.w * 2.0 - 1.0;
                     
-                    // Stronger water distortion for better visibility  
-                    float distortionStrength = 0.15;
+                    // Match SimpleWater's distortion strength
+                    float distortionStrength = 0.04;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
@@ -180,8 +190,8 @@ const MobileWater = forwardRef((props, ref) => {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
                     
-                    // Create subtle color variations to make water visible on white background
-                    vec3 waterColor = vec3(0.96, 0.98, 1.0); // Slightly more blue tint
+                    // Match SimpleWater's subtle water color
+                    vec3 waterColor = vec3(0.98, 0.99, 1.0);
                     
                     // Calculate normal from gradients for lighting
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
@@ -190,33 +200,15 @@ const MobileWater = forwardRef((props, ref) => {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Create dramatic depth-based color variation
-                    float depthVariation = pressure * 0.25; // Much more pronounced depth effect
+                    // Combine scene with water effects - match SimpleWater
+                    vec3 finalColor = sceneColor.rgb * waterColor;
                     
-                    // Dramatic gradient from light to dark based on water movement
-                    float gradientIntensity = length(vec2(gradX, gradY)) * 3.0;
-                    
-                    // Create subtle shadows and highlights
-                    vec3 shadowColor = vec3(0.92, 0.94, 0.98); // Slightly darker blue-gray
-                    vec3 highlightColor = vec3(0.98, 0.99, 1.0); // Brighter white
-                    
-                    // Mix colors based on water movement and depth
-                    vec3 waterTint = mix(shadowColor, highlightColor, 0.5 + depthVariation);
-                    waterTint = mix(waterTint, waterColor, 0.7); // Blend with base water color
-                    
-                    // Apply water color modulation to scene
-                    vec3 finalColor = sceneColor.rgb * waterTint;
-                    
-                    // Dramatic visual effects for maximum water impact
-                    float effectStrength = 0.8; // Much stronger specular highlights
-                    float pressureStrength = 0.12; // Much stronger pressure visualization
+                    // Match SimpleWater's reduced visual effect strength
+                    float effectStrength = 0.3; // Same as SimpleWater
+                    float pressureStrength = 0.03; // Same as SimpleWater
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
-                    
-                    // Add strong gradient overlay for dramatic water perception
-                    float gradientOverlay = gradientIntensity * 0.05;
-                    finalColor = mix(finalColor, shadowColor, gradientOverlay);
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
