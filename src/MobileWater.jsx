@@ -108,7 +108,7 @@ const MobileWater = forwardRef((props, ref) => {
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
                         float rippleStrength = 1.0; // Strong but stable initial impact
-                        float rippleRadius = 0.15; // Larger initial area for better propagation
+                        float rippleRadius = 0.05; // Much smaller, focused ripple area
                         
                         if (dist < rippleRadius) {
                             float falloff = 1.0 - dist / rippleRadius;
