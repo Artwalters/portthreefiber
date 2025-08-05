@@ -93,21 +93,21 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - extreme propagation to reach screen edges
+                    // Wave equation - balanced for edge propagation without instability
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.5; // Extreme propagation
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.5;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.3; // Strong but stable
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.3;
                     
-                    pressure += delta * velocity * 1.2; // Amplify pressure changes
+                    pressure += delta * velocity; // Normal pressure update
                     
-                    // Extreme minimal damping for full screen propagation
-                    velocity *= 0.994; // Super minimal velocity damping
-                    pressure *= 0.996; // Super minimal pressure damping
+                    // Balanced damping - waves reach edges but stay stable
+                    velocity *= 0.99; // Light damping for long waves
+                    pressure *= 0.993; // Light damping but stable
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 2.0; // Extreme initial impact for full-screen waves
+                        float rippleStrength = 1.0; // Strong but stable initial impact
                         float rippleRadius = 0.15; // Larger initial area for better propagation
                         
                         if (dist < rippleRadius) {
