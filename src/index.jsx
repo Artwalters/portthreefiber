@@ -6,8 +6,10 @@ import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 import IntroScreen from './IntroScreen.jsx'
 import SimpleWater from './SimpleWater.jsx'
+import MobileWater from './MobileWater.jsx'
 import KoiFish from './KoiFish.jsx'
 import FishParticleSystem from './FishParticleSystem.jsx'
+import { getDeviceCapabilities } from './utils/deviceDetection.js'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -33,6 +35,16 @@ function App() {
     const [uiFadingIn, setUiFadingIn] = useState(false)
     const hasPlayedIntroAnimation = useRef(false)
     const waterRef = useRef()
+    
+    // Device capabilities detection
+    const [deviceCapabilities, setDeviceCapabilities] = useState(null)
+
+    // Detect device capabilities on mount
+    useEffect(() => {
+        const capabilities = getDeviceCapabilities()
+        setDeviceCapabilities(capabilities)
+        console.log('Device capabilities:', capabilities)
+    }, [])
 
     // Load projects data from JSON
     useEffect(() => {
@@ -439,8 +451,12 @@ function App() {
                     waterRef={waterRef}
                 />
                 
-                {/* Layer 3: Water (top) */}
-                <SimpleWater ref={waterRef} />
+                {/* Layer 3: Water (top) - Conditional rendering based on device */}
+                {deviceCapabilities?.shouldUseMobileWater ? (
+                    <MobileWater ref={waterRef} />
+                ) : (
+                    <SimpleWater ref={waterRef} />
+                )}
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}
