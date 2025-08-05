@@ -93,22 +93,22 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - much stronger for dramatic effects  
+                    // Wave equation - extreme propagation to reach screen edges
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.35; // Much stronger propagation
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.35;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.5; // Extreme propagation
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.5;
                     
-                    pressure += delta * velocity;
+                    pressure += delta * velocity * 1.2; // Amplify pressure changes
                     
-                    // Minimal damping - waves travel across entire screen
-                    velocity *= 0.982; // Drastically reduced damping
-                    pressure *= 0.987; // Drastically reduced damping
+                    // Extreme minimal damping for full screen propagation
+                    velocity *= 0.994; // Super minimal velocity damping
+                    pressure *= 0.996; // Super minimal pressure damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 1.2; // Much stronger initial impact
-                        float rippleRadius = 0.08; // Smaller, more focused ripples
+                        float rippleStrength = 2.0; // Extreme initial impact for full-screen waves
+                        float rippleRadius = 0.15; // Larger initial area for better propagation
                         
                         if (dist < rippleRadius) {
                             float falloff = 1.0 - dist / rippleRadius;
