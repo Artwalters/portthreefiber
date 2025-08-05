@@ -17,52 +17,88 @@ const MobileWater = forwardRef((props, ref) => {
         }
     }))
     
-    // Mobile-safe buffers with strong effects - keep 256 resolution but use compatible types
+    // Mobile-safe buffers with proper WebGL extension checking
     const buffers = useMemo(() => {
-        // Try HalfFloat first, fallback to UnsignedByte if needed
-        let textureType = THREE.HalfFloatType
         const glContext = gl.getContext()
+        let textureType = THREE.UnsignedByteType
+        let hasFloatSupport = false
         
-        // Check for HalfFloat support
-        const halfFloatExt = glContext.getExtension('OES_texture_half_float')
-        if (!halfFloatExt) {
-            textureType = THREE.UnsignedByteType
-            console.log('MobileWater: Using UnsignedByte (mobile fallback)')
+        // Check for WebGL 2 first
+        if (glContext instanceof WebGL2RenderingContext) {
+            // WebGL 2 - check for EXT_color_buffer_float
+            const floatExt = glContext.getExtension('EXT_color_buffer_float')
+            if (floatExt) {
+                textureType = THREE.FloatType
+                hasFloatSupport = true
+                console.log('MobileWater: Using FloatType (WebGL2 + EXT_color_buffer_float)')
+            } else {
+                // Try half float on WebGL 2
+                textureType = THREE.HalfFloatType
+                console.log('MobileWater: Using HalfFloatType (WebGL2 fallback)')
+            }
         } else {
-            console.log('MobileWater: Using HalfFloat')
+            // WebGL 1 - check for half float support
+            const halfFloatExt = glContext.getExtension('OES_texture_half_float')
+            const halfFloatLinearExt = glContext.getExtension('OES_texture_half_float_linear')
+            
+            if (halfFloatExt && halfFloatLinearExt) {
+                textureType = THREE.HalfFloatType
+                console.log('MobileWater: Using HalfFloatType (WebGL1)')
+            } else {
+                console.log('MobileWater: Using UnsignedByteType (mobile safe fallback)')
+            }
         }
+        
+        // Adjust filtering based on texture type for mobile compatibility
+        const filtering = textureType === THREE.UnsignedByteType ? THREE.LinearFilter : THREE.NearestFilter
         
         const options = {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
+            minFilter: filtering,
+            magFilter: filtering,
             format: THREE.RGBAFormat,
-            type: textureType
+            type: textureType,
+            generateMipmaps: false // Disable mipmaps for performance
         }
         
-        // Match shader resolution
-        const resolution = 256
+        // Adaptive resolution based on device pixel ratio and performance
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2) // Cap at 2x for performance
+        const baseResolution = hasFloatSupport ? 512 : 256 // Higher res if we have float support
+        const resolution = Math.floor(baseResolution / pixelRatio) // Scale down for high DPI
+        
+        // Scene buffer should match actual screen resolution for proper reflection/refraction
+        const sceneWidth = Math.floor(size.width * pixelRatio)
+        const sceneHeight = Math.floor(size.height * pixelRatio)
+        
+        console.log(`MobileWater: Resolution ${resolution}x${resolution}, Scene ${sceneWidth}x${sceneHeight}, PixelRatio ${pixelRatio}`)
         
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),
-            scene: new THREE.WebGLRenderTarget(size.width, size.height, {
+            scene: new THREE.WebGLRenderTarget(sceneWidth, sceneHeight, {
                 minFilter: THREE.LinearFilter,
                 magFilter: THREE.LinearFilter,
                 format: THREE.RGBAFormat,
-                type: THREE.UnsignedByteType // Always safe for scene capture
-            })
+                type: THREE.UnsignedByteType, // Always safe for scene capture
+                generateMipmaps: false
+            }),
+            hasFloatSupport: hasFloatSupport,
+            textureType: textureType
         }
     }, [])
     
-    // SimpleWater shader implementation - proper wave equation with idle waves
+    // Adaptive shader based on texture support
     const simMaterial = useMemo(() => {
+        const hasFloatSupport = buffers.hasFloatSupport
+        const useValueMapping = !hasFloatSupport
+        
         return new THREE.ShaderMaterial({
             uniforms: {
                 uPrevious: { value: null },
                 uTime: { value: 0 },
                 uMouse: { value: new THREE.Vector2(0.5, 0.5) },
                 uMouseDown: { value: 0 },
-                uDelta: { value: 1.0 }
+                uDelta: { value: 1.0 },
+                uHasFloatSupport: { value: hasFloatSupport ? 1.0 : 0.0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -77,21 +113,44 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform vec2 uMouse;
                 uniform float uMouseDown;
                 uniform float uDelta;
+                uniform float uHasFloatSupport;
                 varying vec2 vUv;
                 
                 void main() {
-                    vec2 texel = 1.0 / vec2(256.0);
+                    vec2 texel = 1.0 / vec2(${Math.floor(buffers.read.width)}.0);
                     
-                    // Get previous state
+                    // Get previous state - adaptive based on texture support
                     vec4 prev = texture2D(uPrevious, vUv);
-                    float pressure = prev.x * 2.0 - 1.0; // Map from [0,1] to [-1,1] for more range
-                    float velocity = prev.y * 2.0 - 1.0;
+                    float pressure, velocity;
                     
-                    // Sample neighbors
-                    float left = texture2D(uPrevious, vUv - vec2(texel.x, 0.0)).x * 2.0 - 1.0;
-                    float right = texture2D(uPrevious, vUv + vec2(texel.x, 0.0)).x * 2.0 - 1.0;
-                    float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x * 2.0 - 1.0;
-                    float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x * 2.0 - 1.0;
+                    if (uHasFloatSupport > 0.5) {
+                        // Float textures - use values directly
+                        pressure = prev.x;
+                        velocity = prev.y;
+                    } else {
+                        // Byte textures - map from [0,1] to [-1,1] for more range
+                        pressure = prev.x * 2.0 - 1.0;
+                        velocity = prev.y * 2.0 - 1.0;
+                    }
+                    
+                    // Sample neighbors - adaptive based on texture support
+                    vec4 leftSample = texture2D(uPrevious, vUv - vec2(texel.x, 0.0));
+                    vec4 rightSample = texture2D(uPrevious, vUv + vec2(texel.x, 0.0));
+                    vec4 upSample = texture2D(uPrevious, vUv + vec2(0.0, texel.y));
+                    vec4 downSample = texture2D(uPrevious, vUv - vec2(0.0, texel.y));
+                    
+                    float left, right, up, down;
+                    if (uHasFloatSupport > 0.5) {
+                        left = leftSample.x;
+                        right = rightSample.x;
+                        up = upSample.x;
+                        down = downSample.x;
+                    } else {
+                        left = leftSample.x * 2.0 - 1.0;
+                        right = rightSample.x * 2.0 - 1.0;
+                        up = upSample.x * 2.0 - 1.0;
+                        down = downSample.x * 2.0 - 1.0;
+                    }
                     
                     // Wave equation - matching SimpleWater's coefficients
                     float delta = min(uDelta, 1.0);
@@ -131,25 +190,31 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = (right - left) * 0.5;
                     float gradY = (up - down) * 0.5;
                     
-                    // Map back to [0,1] range for storage
-                    pressure = (pressure + 1.0) * 0.5;
-                    velocity = (velocity + 1.0) * 0.5;
-                    gradX = (gradX + 1.0) * 0.5;
-                    gradY = (gradY + 1.0) * 0.5;
-                    
-                    gl_FragColor = vec4(pressure, velocity, gradX, gradY);
+                    // Output format depends on texture support
+                    if (uHasFloatSupport > 0.5) {
+                        // Float textures - output values directly
+                        gl_FragColor = vec4(pressure, velocity, gradX, gradY);
+                    } else {
+                        // Byte textures - map back to [0,1] range for storage
+                        pressure = (pressure + 1.0) * 0.5;
+                        velocity = (velocity + 1.0) * 0.5;
+                        gradX = (gradX + 1.0) * 0.5;
+                        gradY = (gradY + 1.0) * 0.5;
+                        gl_FragColor = vec4(pressure, velocity, gradX, gradY);
+                    }
                 }
             `
         })
     }, [])
     
-    // Simple display material - webflow style
+    // Adaptive display material
     const material = useMemo(() => {
         return new THREE.ShaderMaterial({
             uniforms: {
                 uWaterTexture: { value: null },
                 uSceneTexture: { value: null },
-                uTime: { value: 0 }
+                uTime: { value: 0 },
+                uHasFloatSupport: { value: buffers.hasFloatSupport ? 1.0 : 0.0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -162,14 +227,25 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform sampler2D uWaterTexture;
                 uniform sampler2D uSceneTexture;
                 uniform float uTime;
+                uniform float uHasFloatSupport;
                 varying vec2 vUv;
                 
                 void main() {
-                    // Sample water simulation and map back from [0,1] to [-1,1]
+                    // Sample water simulation - adaptive based on texture support
                     vec4 water = texture2D(uWaterTexture, vUv);
-                    float pressure = water.x * 2.0 - 1.0;
-                    float gradX = water.z * 2.0 - 1.0;
-                    float gradY = water.w * 2.0 - 1.0;
+                    float pressure, gradX, gradY;
+                    
+                    if (uHasFloatSupport > 0.5) {
+                        // Float textures - use values directly
+                        pressure = water.x;
+                        gradX = water.z;
+                        gradY = water.w;
+                    } else {
+                        // Byte textures - map back from [0,1] to [-1,1]
+                        pressure = water.x * 2.0 - 1.0;
+                        gradX = water.z * 2.0 - 1.0;
+                        gradY = water.w * 2.0 - 1.0;
+                    }
                     
                     // Match SimpleWater's distortion strength
                     float distortionStrength = 0.04;
