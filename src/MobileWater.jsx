@@ -17,25 +17,42 @@ const MobileWater = forwardRef((props, ref) => {
         }
     }))
     
-    // Create simple ping-pong buffers for water simulation + scene capture
+    // Mobile-safe buffers with strong effects - keep 256 resolution but use compatible types
     const buffers = useMemo(() => {
+        // Try HalfFloat first, fallback to UnsignedByte if needed
+        let textureType = THREE.HalfFloatType
+        const glContext = gl.getContext()
+        
+        // Check for HalfFloat support
+        const halfFloatExt = glContext.getExtension('OES_texture_half_float')
+        if (!halfFloatExt) {
+            textureType = THREE.UnsignedByteType
+            console.log('MobileWater: Using UnsignedByte (mobile fallback)')
+        } else {
+            console.log('MobileWater: Using HalfFloat')
+        }
+        
         const options = {
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
             format: THREE.RGBAFormat,
-            type: THREE.FloatType
+            type: textureType
         }
+        
+        // Keep 256 resolution for strong effects
         const resolution = 256
+        
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),
             scene: new THREE.WebGLRenderTarget(size.width, size.height, {
                 minFilter: THREE.LinearFilter,
                 magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat
+                format: THREE.RGBAFormat,
+                type: THREE.UnsignedByteType // Always safe for scene capture
             })
         }
-    }, []) // Remove size dependency to prevent buffer recreation
+    }, [])
     
     // SimpleWater shader implementation - proper wave equation with idle waves
     const simMaterial = useMemo(() => {
@@ -76,16 +93,16 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation
+                    // Wave equation - stronger for mobile compatibility
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // 0.25 * 0.75 = 0.1875
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.25; // Increased from 0.1875 for stronger waves
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
                     
                     pressure += delta * velocity;
                     
-                    // Damping
-                    velocity *= 0.995;
-                    pressure *= 0.998;
+                    // Less damping for stronger effects on mobile
+                    velocity *= 0.992; // Reduced damping
+                    pressure *= 0.995; // Reduced damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
@@ -98,8 +115,8 @@ const MobileWater = forwardRef((props, ref) => {
                         }
                     }
                     
-                    // Stronger idle deformation for better plane movement
-                    float idleWaveStrength = 0.06; // Higher for more noticeable deformation
+                    // Stronger idle deformation for mobile compatibility
+                    float idleWaveStrength = 0.08; // Even higher for mobile
                     float idleSpeed = 0.3; // Keep slow, calmer movement
                     
                     // Multiple sine waves at different frequencies for natural movement
@@ -148,8 +165,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Stronger distortion so images react more
-                    float distortionStrength = 0.04;
+                    // Stronger distortion for mobile compatibility  
+                    float distortionStrength = 0.06;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
@@ -180,9 +197,9 @@ const MobileWater = forwardRef((props, ref) => {
                     // Combine scene with water effects - stronger on mobile
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
-                    // Reduced visual effect strength - keep deformation but less visible water effects
-                    float effectStrength = 0.3; // Reduced from 0.8 for less specular highlights
-                    float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
+                    // Enhanced visual effects for mobile compatibility
+                    float effectStrength = 0.4; // Increased for mobile
+                    float pressureStrength = 0.05; // Increased for mobile
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
