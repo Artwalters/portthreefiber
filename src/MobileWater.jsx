@@ -39,8 +39,8 @@ const MobileWater = forwardRef((props, ref) => {
             type: textureType
         }
         
-        // Keep 256 resolution for strong effects
-        const resolution = 256
+        // Higher resolution for better quality while keeping strong effects
+        const resolution = 512
         
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
@@ -80,7 +80,7 @@ const MobileWater = forwardRef((props, ref) => {
                 varying vec2 vUv;
                 
                 void main() {
-                    vec2 texel = 1.0 / vec2(256.0);
+                    vec2 texel = 1.0 / vec2(512.0);
                     
                     // Get previous state
                     vec4 prev = texture2D(uPrevious, vUv);
@@ -115,17 +115,7 @@ const MobileWater = forwardRef((props, ref) => {
                         }
                     }
                     
-                    // Stronger idle deformation for mobile compatibility
-                    float idleWaveStrength = 0.08; // Even higher for mobile
-                    float idleSpeed = 0.3; // Keep slow, calmer movement
-                    
-                    // Multiple sine waves at different frequencies for natural movement
-                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
-                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
-                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
-                    
-                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
-                    pressure += idleDisturbance;
+                    // No idle waves - only mouse/touch interaction
                     
                     // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
@@ -165,8 +155,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Stronger distortion for mobile compatibility  
-                    float distortionStrength = 0.06;
+                    // Much stronger distortion for better layer deformation  
+                    float distortionStrength = 0.12;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
