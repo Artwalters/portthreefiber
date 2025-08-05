@@ -93,27 +93,25 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - like Webflow for continuous rippling
+                    // Webflow-style wave equation - very subtle propagation
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.2; // Gentler but continuous
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.2;
+                    float average = (left + right + up + down) * 0.25;
+                    velocity += (average - pressure) * 0.3; // Webflow-style averaging
+                    velocity *= 0.985; // Webflow damping
                     
-                    pressure += delta * velocity; // Normal pressure update
-                    
-                    // Extremely low damping like Webflow example - waves keep rippling
-                    velocity *= 0.998; // Almost no velocity damping
-                    pressure *= 0.999; // Almost no pressure damping
+                    pressure += velocity * delta;
+                    pressure *= 0.99; // Webflow pressure damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.5; // Gentler initial impact for longer ripples
-                        float rippleRadius = 0.05; // Much smaller, focused ripple area
+                        float rippleStrength = 0.04; // Webflow perturbance value
+                        float rippleRadius = 0.04; // Webflow dropRadius (20px at 512 resolution)
                         
                         if (dist < rippleRadius) {
-                            float falloff = 1.0 - dist / rippleRadius;
-                            falloff = smoothstep(0.0, 1.0, falloff); // Smoother falloff for better blending
-                            pressure += falloff * rippleStrength;
+                            float drop = 1.0 - (dist / rippleRadius);
+                            drop = sin(drop * 3.14159 * 0.5); // Smooth sine dropoff
+                            pressure += drop * rippleStrength;
                         }
                     }
                     
@@ -157,8 +155,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Extreme distortion for dramatic layer deformation  
-                    float distortionStrength = 0.25;
+                    // Webflow perturbance level - subtle but visible  
+                    float distortionStrength = 0.04;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
