@@ -108,10 +108,12 @@ const MobileWater = forwardRef((props, ref) => {
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
                         float rippleStrength = 0.8; // Stronger ripples
-                        float rippleRadius = 0.12; // Larger radius for broader waves
+                        float rippleRadius = 0.08; // Smaller, more focused ripples
                         
                         if (dist < rippleRadius) {
-                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
+                            float falloff = 1.0 - dist / rippleRadius;
+                            falloff = smoothstep(0.0, 1.0, falloff); // Smoother falloff for better blending
+                            pressure += falloff * rippleStrength;
                         }
                     }
                     
@@ -174,8 +176,8 @@ const MobileWater = forwardRef((props, ref) => {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
                     
-                    // Much more subtle water color - almost white
-                    vec3 waterColor = vec3(0.98, 0.99, 1.0);
+                    // Create subtle color variations to make water visible on white background
+                    vec3 waterColor = vec3(0.96, 0.98, 1.0); // Slightly more blue tint
                     
                     // Calculate normal from gradients for lighting
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
@@ -184,15 +186,33 @@ const MobileWater = forwardRef((props, ref) => {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Combine scene with water effects - stronger on mobile
-                    vec3 finalColor = sceneColor.rgb * waterColor;
+                    // Create depth-based color variation for better visibility
+                    float depthVariation = pressure * 0.15; // More pronounced depth effect
                     
-                    // Enhanced visual effects for mobile compatibility
-                    float effectStrength = 0.4; // Increased for mobile
-                    float pressureStrength = 0.05; // Increased for mobile
+                    // Smooth gradient from light to dark based on water movement
+                    float gradientIntensity = length(vec2(gradX, gradY)) * 2.0;
+                    
+                    // Create subtle shadows and highlights
+                    vec3 shadowColor = vec3(0.92, 0.94, 0.98); // Slightly darker blue-gray
+                    vec3 highlightColor = vec3(0.98, 0.99, 1.0); // Brighter white
+                    
+                    // Mix colors based on water movement and depth
+                    vec3 waterTint = mix(shadowColor, highlightColor, 0.5 + depthVariation);
+                    waterTint = mix(waterTint, waterColor, 0.7); // Blend with base water color
+                    
+                    // Apply water color modulation to scene
+                    vec3 finalColor = sceneColor.rgb * waterTint;
+                    
+                    // Enhanced visual effects for better water visibility
+                    float effectStrength = 0.6; // Increased for better visibility
+                    float pressureStrength = 0.08; // Increased for more pronounced depth
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
+                    
+                    // Add subtle gradient overlay to enhance water perception
+                    float gradientOverlay = gradientIntensity * 0.03;
+                    finalColor = mix(finalColor, shadowColor, gradientOverlay);
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
