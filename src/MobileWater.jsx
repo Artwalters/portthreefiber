@@ -93,21 +93,21 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - stronger for mobile compatibility
+                    // Wave equation - much stronger for dramatic effects  
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.25; // Increased from 0.1875 for stronger waves
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.35; // Much stronger propagation
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.35;
                     
                     pressure += delta * velocity;
                     
-                    // Much less damping - waves travel much further
-                    velocity *= 0.988; // Even less damping for longer waves
-                    pressure *= 0.992; // Even less damping for longer waves
+                    // Minimal damping - waves travel across entire screen
+                    velocity *= 0.982; // Drastically reduced damping
+                    pressure *= 0.987; // Drastically reduced damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.8; // Stronger ripples
+                        float rippleStrength = 1.2; // Much stronger initial impact
                         float rippleRadius = 0.08; // Smaller, more focused ripples
                         
                         if (dist < rippleRadius) {
@@ -157,8 +157,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Extreme distortion for maximum layer deformation  
-                    float distortionStrength = 0.18;
+                    // Extreme distortion for dramatic layer deformation  
+                    float distortionStrength = 0.25;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
@@ -186,11 +186,11 @@ const MobileWater = forwardRef((props, ref) => {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Create depth-based color variation for better visibility
-                    float depthVariation = pressure * 0.15; // More pronounced depth effect
+                    // Create dramatic depth-based color variation
+                    float depthVariation = pressure * 0.25; // Much more pronounced depth effect
                     
-                    // Smooth gradient from light to dark based on water movement
-                    float gradientIntensity = length(vec2(gradX, gradY)) * 2.0;
+                    // Dramatic gradient from light to dark based on water movement
+                    float gradientIntensity = length(vec2(gradX, gradY)) * 3.0;
                     
                     // Create subtle shadows and highlights
                     vec3 shadowColor = vec3(0.92, 0.94, 0.98); // Slightly darker blue-gray
@@ -203,15 +203,15 @@ const MobileWater = forwardRef((props, ref) => {
                     // Apply water color modulation to scene
                     vec3 finalColor = sceneColor.rgb * waterTint;
                     
-                    // Enhanced visual effects for better water visibility
-                    float effectStrength = 0.6; // Increased for better visibility
-                    float pressureStrength = 0.08; // Increased for more pronounced depth
+                    // Dramatic visual effects for maximum water impact
+                    float effectStrength = 0.8; // Much stronger specular highlights
+                    float pressureStrength = 0.12; // Much stronger pressure visualization
                     
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
                     
-                    // Add subtle gradient overlay to enhance water perception
-                    float gradientOverlay = gradientIntensity * 0.03;
+                    // Add strong gradient overlay for dramatic water perception
+                    float gradientOverlay = gradientIntensity * 0.05;
                     finalColor = mix(finalColor, shadowColor, gradientOverlay);
                     
                     gl_FragColor = vec4(finalColor, 1.0);
