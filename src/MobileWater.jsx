@@ -93,21 +93,21 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - balanced for edge propagation without instability
+                    // Wave equation - like Webflow for continuous rippling
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.3; // Strong but stable
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.3;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.2; // Gentler but continuous
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.2;
                     
                     pressure += delta * velocity; // Normal pressure update
                     
-                    // Balanced damping - waves reach edges but stay stable
-                    velocity *= 0.99; // Light damping for long waves
-                    pressure *= 0.993; // Light damping but stable
+                    // Extremely low damping like Webflow example - waves keep rippling
+                    velocity *= 0.998; // Almost no velocity damping
+                    pressure *= 0.999; // Almost no pressure damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 1.0; // Strong but stable initial impact
+                        float rippleStrength = 0.5; // Gentler initial impact for longer ripples
                         float rippleRadius = 0.05; // Much smaller, focused ripple area
                         
                         if (dist < rippleRadius) {
