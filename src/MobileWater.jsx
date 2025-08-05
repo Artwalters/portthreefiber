@@ -93,22 +93,22 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x * 2.0 - 1.0;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x * 2.0 - 1.0;
                     
-                    // SimpleWater wave equation
+                    // Stronger wave equation for longer lasting effect
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875;
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.25;
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.25;
                     
                     pressure += delta * velocity;
                     
-                    // SimpleWater damping
-                    velocity *= 0.995;
-                    pressure *= 0.998;
+                    // Much less damping for longer lasting waves
+                    velocity *= 0.999; // Almost no velocity damping
+                    pressure *= 0.9995; // Almost no pressure damping
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.5; // Stronger for better water effect
-                        float rippleRadius = 0.06; // Slightly larger for better interaction
+                        float rippleStrength = 0.8; // Much stronger initial impact
+                        float rippleRadius = 0.08; // Larger for better wave spread
                         
                         if (dist < rippleRadius) {
                             float drop = 1.0 - (dist / rippleRadius);
@@ -161,8 +161,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z * 2.0 - 1.0;
                     float gradY = water.w * 2.0 - 1.0;
                     
-                    // Good water distortion - visible but not extreme  
-                    float distortionStrength = 0.1;
+                    // Stronger water distortion for better visibility  
+                    float distortionStrength = 0.15;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
