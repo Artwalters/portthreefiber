@@ -451,12 +451,14 @@ function App() {
                     waterRef={waterRef}
                 />
                 
-                {/* Layer 3: Water (top) - Conditional rendering based on device */}
+                {/* Layer 3: Water (top) - TESTING: Force mobile water on all devices */}
+                <MobileWater ref={waterRef} />
+                {/* Original conditional logic:
                 {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )}
+                )} */}
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}

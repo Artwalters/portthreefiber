@@ -7,7 +7,6 @@ const MobileWater = forwardRef((props, ref) => {
     const meshRef = useRef()
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
     const mouseDown = useRef(false)
-    const lastRippleTime = useRef(0)
     
     // Expose update function for external components (like slider)
     useImperativeHandle(ref, () => ({
@@ -18,46 +17,27 @@ const MobileWater = forwardRef((props, ref) => {
         }
     }))
     
-    // Mobile-optimized buffers - smaller resolution, UnsignedByte for compatibility
+    // Create simple ping-pong buffers for water simulation + scene capture
     const buffers = useMemo(() => {
-        // Use HalfFloat for mobile compatibility, fallback to UnsignedByte
-        let textureType = THREE.HalfFloatType
-        const gl = gl.getContext()
-        
-        // Test HalfFloat support
-        const halfFloatExt = gl.getExtension('OES_texture_half_float')
-        if (!halfFloatExt) {
-            textureType = THREE.UnsignedByteType
-            console.log('MobileWater: Using UnsignedByte textures')
-        } else {
-            console.log('MobileWater: Using HalfFloat textures')
-        }
-        
         const options = {
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
             format: THREE.RGBAFormat,
-            type: textureType
+            type: THREE.FloatType
         }
-        
-        // Lower resolution for mobile performance
         const resolution = 256
-        
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),
             scene: new THREE.WebGLRenderTarget(size.width, size.height, {
                 minFilter: THREE.LinearFilter,
                 magFilter: THREE.LinearFilter,
-                format: THREE.RGBAFormat,
-                type: THREE.UnsignedByteType // Always use UnsignedByte for scene capture
-            }),
-            textureType: textureType,
-            resolution: resolution
+                format: THREE.RGBAFormat
+            })
         }
-    }, [])
+    }, []) // Remove size dependency to prevent buffer recreation
     
-    // Mobile-optimized water simulation - simpler but stable
+    // SimpleWater shader implementation - proper wave equation with idle waves
     const simMaterial = useMemo(() => {
         return new THREE.ShaderMaterial({
             uniforms: {
@@ -65,9 +45,7 @@ const MobileWater = forwardRef((props, ref) => {
                 uTime: { value: 0 },
                 uMouse: { value: new THREE.Vector2(0.5, 0.5) },
                 uMouseDown: { value: 0 },
-                uDelta: { value: 1.0 },
-                uRipple: { value: 0.0 },
-                uRipplePos: { value: new THREE.Vector2(0.5, 0.5) }
+                uDelta: { value: 1.0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -82,8 +60,6 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform vec2 uMouse;
                 uniform float uMouseDown;
                 uniform float uDelta;
-                uniform float uRipple;
-                uniform vec2 uRipplePos;
                 varying vec2 vUv;
                 
                 void main() {
@@ -91,62 +67,66 @@ const MobileWater = forwardRef((props, ref) => {
                     
                     // Get previous state
                     vec4 prev = texture2D(uPrevious, vUv);
-                    float height = prev.x;
+                    float pressure = prev.x;
                     float velocity = prev.y;
                     
-                    // Sample neighbors for wave equation
+                    // Sample neighbors
                     float left = texture2D(uPrevious, vUv - vec2(texel.x, 0.0)).x;
                     float right = texture2D(uPrevious, vUv + vec2(texel.x, 0.0)).x;
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Simple wave equation - optimized for mobile
+                    // Wave equation
                     float delta = min(uDelta, 1.0);
-                    float average = (left + right + up + down) * 0.25;
-                    velocity += (average - height) * delta * 2.0;
-                    height += velocity * delta;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // 0.25 * 0.75 = 0.1875
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
                     
-                    // Strong damping for mobile stability
-                    velocity *= 0.98;
-                    height *= 0.99;
+                    pressure += delta * velocity;
                     
-                    // Add ripple on touch/click - based on webflow ripples params
-                    if (uRipple > 0.0) {
-                        float dist = distance(vUv, uRipplePos);
-                        float rippleRadius = 0.08; // Similar to dropRadius: 20 in webflow
+                    // Damping
+                    velocity *= 0.995;
+                    pressure *= 0.998;
+                    
+                    // Mouse interaction - smaller ripples on mobile for better visibility
+                    if (uMouseDown > 0.5) {
+                        float dist = distance(vUv, uMouse);
+                        float rippleStrength = 0.5;
+                        float rippleRadius = 0.075; // 25% smaller
                         
                         if (dist < rippleRadius) {
-                            float ripple = (1.0 - dist / rippleRadius);
-                            ripple = sin(ripple * 3.14159); // Sine wave for smooth ripple
-                            height += ripple * uRipple * 0.3; // Moderate strength
+                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
                         }
                     }
                     
-                    // Subtle idle animation - much calmer for mobile
-                    float idleStrength = 0.02;
-                    float idleSpeed = 0.5;
-                    float idle = sin(vUv.x * 8.0 + uTime * idleSpeed) * 
-                                sin(vUv.y * 6.0 + uTime * idleSpeed * 0.8) * idleStrength;
-                    height += idle;
+                    // Stronger idle deformation for better plane movement
+                    float idleWaveStrength = 0.06; // Higher for more noticeable deformation
+                    float idleSpeed = 0.3; // Keep slow, calmer movement
                     
-                    // Calculate simple gradients
+                    // Multiple sine waves at different frequencies for natural movement
+                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
+                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
+                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                    
+                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                    pressure += idleDisturbance;
+                    
+                    // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
                     float gradY = (up - down) * 0.5;
                     
-                    gl_FragColor = vec4(height, velocity, gradX, gradY);
+                    gl_FragColor = vec4(pressure, velocity, gradX, gradY);
                 }
             `
         })
     }, [])
     
-    // Mobile-optimized display material
+    // Simple display material - webflow style
     const material = useMemo(() => {
         return new THREE.ShaderMaterial({
             uniforms: {
                 uWaterTexture: { value: null },
                 uSceneTexture: { value: null },
-                uTime: { value: 0 },
-                uResolution: { value: new THREE.Vector2(size.width, size.height) }
+                uTime: { value: 0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -159,47 +139,53 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform sampler2D uWaterTexture;
                 uniform sampler2D uSceneTexture;
                 uniform float uTime;
-                uniform vec2 uResolution;
                 varying vec2 vUv;
                 
                 void main() {
                     // Sample water simulation
                     vec4 water = texture2D(uWaterTexture, vUv);
-                    float height = water.x;
+                    float pressure = water.x;
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Mobile-optimized distortion - similar to perturbance: 0.04
+                    // Stronger distortion so images react more
                     float distortionStrength = 0.04;
+                    
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
                     
                     // Sample the scene with distortion
                     vec4 sceneColor = texture2D(uSceneTexture, distortedUv);
                     
-                    // Bounds check
-                    if (distortedUv.x < 0.0 || distortedUv.x > 1.0 || 
-                        distortedUv.y < 0.0 || distortedUv.y > 1.0) {
+                    // If distorted UV goes out of bounds, use original
+                    if (distortedUv.x < 0.0 || distortedUv.x > 1.0 || distortedUv.y < 0.0 || distortedUv.y > 1.0) {
                         sceneColor = texture2D(uSceneTexture, vUv);
                     }
                     
-                    // Fallback for empty pixels
+                    // Only use white fallback for completely empty pixels
                     if (sceneColor.a < 0.1) {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
                     
-                    // Very subtle water tint for mobile
-                    vec3 waterColor = vec3(0.99, 0.995, 1.0);
+                    // Much more subtle water color - almost white
+                    vec3 waterColor = vec3(0.98, 0.99, 1.0);
                     
-                    // Simple lighting calculation
-                    vec3 normal = normalize(vec3(-gradX, 0.2, -gradY));
-                    vec3 lightDir = normalize(vec3(-0.2, 1.0, 0.2));
-                    float spec = pow(max(dot(normal, lightDir), 0.0), 32.0);
+                    // Calculate normal from gradients for lighting
+                    vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
+                    vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
                     
-                    // Combine with very subtle effects for mobile
+                    // Specular highlight
+                    float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
+                    
+                    // Combine scene with water effects - stronger on mobile
                     vec3 finalColor = sceneColor.rgb * waterColor;
-                    finalColor += vec3(spec) * 0.1; // Very subtle specular
-                    finalColor += height * 0.02; // Very subtle height contribution
+                    
+                    // Reduced visual effect strength - keep deformation but less visible water effects
+                    float effectStrength = 0.3; // Reduced from 0.8 for less specular highlights
+                    float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
+                    
+                    finalColor += vec3(spec) * effectStrength;
+                    finalColor += pressure * pressureStrength;
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
@@ -208,103 +194,66 @@ const MobileWater = forwardRef((props, ref) => {
             depthTest: false,
             depthWrite: false
         })
-    }, [size])
+    }, [])
     
-    // Mobile-optimized touch/mouse tracking
+    // Simple mouse tracking - like SimpleWater
     useEffect(() => {
-        let currentTouchId = null
-        
-        const addRipple = (x, y) => {
-            const now = performance.now()
-            // Throttle ripples for mobile performance
-            if (now - lastRippleTime.current > 100) {
-                mouse.current.x = x / window.innerWidth
-                mouse.current.y = 1.0 - (y / window.innerHeight)
-                
-                // Trigger ripple in shader
-                if (simMaterial.uniforms) {
-                    simMaterial.uniforms.uRipple.value = 1.0
-                    simMaterial.uniforms.uRipplePos.value.copy(mouse.current)
-                }
-                
-                lastRippleTime.current = now
-            }
-        }
-        
         const handleMouseMove = (e) => {
-            if (mouseDown.current) {
-                addRipple(e.clientX, e.clientY)
-            }
+            mouse.current.x = e.clientX / window.innerWidth
+            mouse.current.y = 1.0 - (e.clientY / window.innerHeight)
         }
         
-        const handleMouseDown = (e) => {
+        const handleMouseDown = () => {
             mouseDown.current = true
-            addRipple(e.clientX, e.clientY)
         }
         
         const handleMouseUp = () => {
             mouseDown.current = false
         }
         
-        const handleTouchStart = (e) => {
-            if (e.touches.length > 0 && currentTouchId === null) {
-                currentTouchId = e.touches[0].identifier
-                mouseDown.current = true
-                addRipple(e.touches[0].clientX, e.touches[0].clientY)
-            }
-        }
-        
         const handleTouchMove = (e) => {
-            if (currentTouchId !== null) {
-                for (let touch of e.touches) {
-                    if (touch.identifier === currentTouchId) {
-                        addRipple(touch.clientX, touch.clientY)
-                        break
-                    }
-                }
+            if (e.touches.length > 0) {
+                mouse.current.x = e.touches[0].clientX / window.innerWidth
+                mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
             }
         }
         
-        const handleTouchEnd = (e) => {
-            // Check if our tracked touch ended
-            let touchEnded = true
-            for (let touch of e.touches) {
-                if (touch.identifier === currentTouchId) {
-                    touchEnded = false
-                    break
-                }
-            }
-            
-            if (touchEnded) {
-                currentTouchId = null
-                mouseDown.current = false
+        const handleTouchStart = (e) => {
+            if (e.touches.length > 0) {
+                mouse.current.x = e.touches[0].clientX / window.innerWidth
+                mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
+                mouseDown.current = true
             }
         }
         
-        // Add event listeners with passive for better mobile performance
+        const handleTouchEnd = () => {
+            mouseDown.current = false
+        }
+        
         window.addEventListener('mousemove', handleMouseMove, { passive: true })
         window.addEventListener('mousedown', handleMouseDown, { passive: true })
         window.addEventListener('mouseup', handleMouseUp, { passive: true })
-        window.addEventListener('touchstart', handleTouchStart, { passive: true })
         window.addEventListener('touchmove', handleTouchMove, { passive: true })
+        window.addEventListener('touchstart', handleTouchStart, { passive: true })
         window.addEventListener('touchend', handleTouchEnd, { passive: true })
         
         return () => {
             window.removeEventListener('mousemove', handleMouseMove)
             window.removeEventListener('mousedown', handleMouseDown)
             window.removeEventListener('mouseup', handleMouseUp)
-            window.removeEventListener('touchstart', handleTouchStart)
             window.removeEventListener('touchmove', handleTouchMove)
+            window.removeEventListener('touchstart', handleTouchStart)
             window.removeEventListener('touchend', handleTouchEnd)
         }
-    }, [simMaterial])
+    }, [])
     
     useFrame((state, delta) => {
-        // Clamp delta for mobile stability
-        const clampedDelta = Math.min(delta * 60, 1.2)
+        // Clamp delta to prevent simulation instability
+        const clampedDelta = Math.min(delta * 60, 1.4)
+        
         const currentTarget = gl.getRenderTarget()
         
-        // Update water simulation
+        // 1. ALWAYS update water simulation - this MUST never stop
         try {
             if (simMaterial.uniforms && buffers.read && buffers.write) {
                 simMaterial.uniforms.uPrevious.value = buffers.read.texture
@@ -313,26 +262,21 @@ const MobileWater = forwardRef((props, ref) => {
                 simMaterial.uniforms.uMouseDown.value = mouseDown.current ? 1.0 : 0.0
                 simMaterial.uniforms.uDelta.value = clampedDelta
                 
-                // Decay ripple effect
-                if (simMaterial.uniforms.uRipple.value > 0.0) {
-                    simMaterial.uniforms.uRipple.value *= 0.95
-                }
-                
-                // Render simulation
+                // Render simulation to write buffer - this MUST always happen
                 gl.setRenderTarget(buffers.write)
                 gl.clear()
                 gl.render(simScene, simCamera)
                 
-                // Swap buffers
+                // Swap buffers - this MUST always happen
                 const temp = buffers.read
                 buffers.read = buffers.write
                 buffers.write = temp
             }
         } catch (error) {
-            console.warn('MobileWater simulation error:', error)
+            console.warn('Water simulation error, continuing...', error)
         }
         
-        // Scene capture
+        // 2. Scene capture (safe fallback if it fails)
         try {
             if (meshRef.current && buffers.scene) {
                 meshRef.current.visible = false
@@ -345,20 +289,19 @@ const MobileWater = forwardRef((props, ref) => {
                 meshRef.current.visible = true
             }
         } catch (error) {
-            console.warn('MobileWater scene capture error:', error)
+            console.warn('Scene capture error, continuing...', error)
             if (meshRef.current) meshRef.current.visible = true
         }
         
-        // Update display material
+        // 3. Update display material (safe fallback)
         try {
             if (material.uniforms && buffers.read && buffers.scene) {
                 material.uniforms.uWaterTexture.value = buffers.read.texture
                 material.uniforms.uSceneTexture.value = buffers.scene.texture
                 material.uniforms.uTime.value = state.clock.elapsedTime
-                material.uniforms.uResolution.value.set(size.width, size.height)
             }
         } catch (error) {
-            console.warn('MobileWater display error:', error)
+            console.warn('Display material error, continuing...', error)
         }
         
         gl.setRenderTarget(currentTarget)
