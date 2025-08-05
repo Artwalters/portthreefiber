@@ -93,20 +93,20 @@ const MobileWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Webflow-style wave equation - very subtle propagation
+                    // Proper wave equation with good recovery
                     float delta = min(uDelta, 1.0);
                     float average = (left + right + up + down) * 0.25;
-                    velocity += (average - pressure) * 0.3; // Webflow-style averaging
-                    velocity *= 0.985; // Webflow damping
+                    velocity += (average - pressure) * 0.5; // Stronger propagation
+                    velocity *= 0.96; // More damping for recovery
                     
                     pressure += velocity * delta;
-                    pressure *= 0.99; // Webflow pressure damping
+                    pressure *= 0.98; // More damping to prevent drawing effect
                     
                     // Mouse interaction - smaller ripples on mobile for better visibility
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.04; // Webflow perturbance value
-                        float rippleRadius = 0.04; // Webflow dropRadius (20px at 512 resolution)
+                        float rippleStrength = 0.5; // Stronger for better water effect
+                        float rippleRadius = 0.06; // Slightly larger for better interaction
                         
                         if (dist < rippleRadius) {
                             float drop = 1.0 - (dist / rippleRadius);
@@ -155,8 +155,8 @@ const MobileWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Webflow perturbance level - subtle but visible  
-                    float distortionStrength = 0.04;
+                    // Good water distortion - visible but not extreme  
+                    float distortionStrength = 0.1;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
