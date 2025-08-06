@@ -351,7 +351,7 @@ function App() {
         setIsTransitioning(true)
     }
 
-    // Handle back button click to return to slider - 2 phase transition
+    // Handle back button click to return to slider - seamless transition
     const handleBackToSlider = () => {
         // Calculate initial offset to center the selected project
         const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
@@ -363,32 +363,27 @@ function App() {
         // Reset intro-specific UI fade state when returning from gallery
         setUiFadingIn(undefined)
         
-        // PHASE 1: Start returning process and scale down selected image
+        // Start returning process - all at once for smooth transition
         setIsReturningToSlider(true) // This triggers UI fade-out
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
         setIsReturningFromGallery(true) // Mark that we're returning from gallery
+        setIsPostTransition(false) // Exit post-transition mode immediately
         
-        // PHASE 2: After scale-down completes, trigger slider expansion
+        // Reset hover states
+        setHoveredProject(null)
+        setDisplayedProject(null)
+        setIsVisible(false)
+        setHighlightedProject(null)
+        setIsHighlightVisible(false)
+        
+        // Clean up after animation completes
         setTimeout(() => {
-            setIsPostTransition(false) // Exit post-transition mode
-            setSliderKey(prev => prev + 1) // Force complete slider recreation
-            
-            // Reset hover states
-            setHoveredProject(null)
-            setDisplayedProject(null)
-            setIsVisible(false)
-            setHighlightedProject(null)
-            setIsHighlightVisible(false)
-            
-            // PHASE 3: After slider expands completely, fade UI back in
-            setTimeout(() => {
-                setIsReturningToSlider(false) // This triggers UI fade-in
-                setIsScalingDownForReset(false)
-                setSelectedProject(null)
-                setCurrentImageIndex(0) // Reset image index
-                setIsReturningFromGallery(false) // Reset the return flag
-            }, 1500) // Wait for full expand animation to complete (1.5s as in original code)
-        }, 600) // Wait for scale-down animation to complete (0.6s)
+            setIsReturningToSlider(false) // This triggers UI fade-in
+            setIsScalingDownForReset(false)
+            setSelectedProject(null)
+            setCurrentImageIndex(0) // Reset image index
+            setIsReturningFromGallery(false) // Reset the return flag
+        }, 800) // Single shorter timeout for cleanup
     }
 
     // Handle intro completion
@@ -440,7 +435,6 @@ function App() {
                 
                 {/* Layer 2: Slider (middle) */}
                 <WebGLSlider 
-                    key={sliderKey}
                     projects={projects}
                     onHover={setHoveredProject}
                     onTransitionComplete={handleTransitionComplete}

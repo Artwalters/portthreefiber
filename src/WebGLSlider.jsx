@@ -292,8 +292,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
               x: 1,
               y: 1,
               z: 1,
-              duration: 0.8, // Slightly longer for smoother feel
-              ease: "back.out(1.2)", // Smooth bounce back effect
+              duration: 0.6, // Faster for more responsive feel
+              ease: "power3.out", // Smoother easing
+              overwrite: 'auto', // Allow interruption
               onComplete: () => {}
             })
           }
@@ -329,7 +330,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           y: 1,
           z: 1,
           duration: 0.6,
-          ease: "power3.inOut",
+          ease: "power3.out",
+          overwrite: 'auto', // Allow interruption
           onComplete: () => {}
         })
       }
@@ -353,9 +355,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         x: position[0], // Should be 0 for mobile
         y: position[1], // Should be the vertical offset for mobile
         z: finalZ, // Reset to normal positions after animation
-        duration: 1.5, // 25% faster (was 2s)
-        ease: "power3.inOut", // Smoother easing
-        delay: Math.random() * 0.15 // Slightly reduced delay for faster feel
+        duration: 1.2, // Faster for more responsive feel
+        ease: "power3.out", // Smoother easing
+        overwrite: 'auto', // Allow interruption if user starts dragging
+        delay: Math.random() * 0.1 // Reduced delay for faster feel
       })
     }
   }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown, isMobile])
@@ -642,14 +645,17 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   })
 
   useEffect(() => {
-    if (transitionComplete) return // Don't add event listeners after transition complete
-    
     const canvas = gl.domElement
 
     const handleMouseDown = (e) => {
-      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown) return // Disable drag during expand
+      if (isTransitioning || transitionComplete) return // Allow drag during scale down and initial expand
       
       e.preventDefault() // Prevent default touch behavior
+      
+      // Kill any ongoing position animations when user starts dragging
+      if (isInitialExpanding || isScalingDown) {
+        gsap.killTweensOf(items.current.map(item => item.mesh.position))
+      }
       
       isDragging.current = true
       hasDraggedEnough.current = false // Reset drag distance check
@@ -809,7 +815,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       window.removeEventListener('touchmove', handleMouseMove)
       window.removeEventListener('touchend', handleMouseUp)
     }
-  }, [offset, gl, transitionComplete, isInitialExpanding, isScalingDown])
+  }, [offset, gl, isTransitioning, transitionComplete, isInitialExpanding, isScalingDown])
 
   // Create infinite slides - only show slides within viewport
   const slides = []
