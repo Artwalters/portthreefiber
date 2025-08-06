@@ -40,18 +40,30 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       uOpacity: { value: 1.0 },
-      uProgress: { value: 0.0 } // For image transitions
+      uProgress: { value: 0.0 }, // For image transitions
+      uTime: { value: 0 }, // For water movement
+      uWaterInfluence: { value: 0 } // Water ripple influence
     },
     vertexShader: `
       precision mediump float;
       uniform float uVelo;
       uniform float uIsMobile;
+      uniform float uTime;
+      uniform float uWaterInfluence;
       varying vec2 vUv;
       
       #define M_PI 3.1415926535897932384626433832795
       
       void main(){
         vec3 pos = position;
+        
+        // Subtle water movement - like floating on gentle waves
+        float waterMovement = sin(uTime * 1.5 + position.x * 2.0) * 0.015 + 
+                             sin(uTime * 2.0 + position.y * 3.0) * 0.01;
+        
+        // Apply water movement scaled by influence (stronger when interacting with water)
+        pos.z += waterMovement * (0.3 + uWaterInfluence * 0.7);
+        pos.y += sin(uTime * 1.8 + position.x * 1.5) * 0.008 * (0.2 + uWaterInfluence * 0.8);
         
         if(uIsMobile > 0.5) {
           // Vertical deformation for mobile - stronger effect
@@ -135,8 +147,20 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   }, [material, isMobile])
 
   // Update velocity uniform and position - continue smooth fade even during transition
-  useFrame(() => {
+  useFrame((state) => {
     if (meshRef.current && material.uniforms && material.uniforms.uVelo) {
+      // Update time uniform for water movement
+      if (material.uniforms.uTime) {
+        material.uniforms.uTime.value = state.clock.elapsedTime
+      }
+      
+      // Calculate water influence based on mouse/touch interaction
+      // When slider is moving or being interacted with, increase water influence
+      if (material.uniforms.uWaterInfluence) {
+        const targetInfluence = Math.abs(sliderSpeed) > 0.1 ? 0.8 : 0.0
+        material.uniforms.uWaterInfluence.value += (targetInfluence - material.uniforms.uWaterInfluence.value) * 0.05
+      }
+      
       // During transition, fade to 0, otherwise use slider speed
       const targetSpeed = (isTransitioning || transitionComplete) ? 0 : (sliderSpeed || 0)
       
