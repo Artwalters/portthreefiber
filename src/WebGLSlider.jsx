@@ -25,8 +25,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   useEffect(() => {
     galleryTextures.forEach(tex => {
       tex.generateMipmaps = false
-      tex.wrapS = THREE.ClampToEdgeWrap
-      tex.wrapT = THREE.ClampToEdgeWrap
+      tex.wrapS = THREE.ClampToEdgeWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
       tex.minFilter = THREE.LinearFilter
       tex.magFilter = THREE.LinearFilter
     })
@@ -469,8 +469,8 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   useEffect(() => {
     textures.forEach(texture => {
       texture.generateMipmaps = false
-      texture.wrapS = THREE.ClampToEdgeWrap
-      texture.wrapT = THREE.ClampToEdgeWrap
+      texture.wrapS = THREE.ClampToEdgeWrapping
+      texture.wrapT = THREE.ClampToEdgeWrapping
       texture.minFilter = THREE.LinearFilter
       texture.magFilter = THREE.LinearFilter
     })

@@ -25,7 +25,7 @@ const SimpleWater = forwardRef((props, ref) => {
             format: THREE.RGBAFormat,
             type: THREE.FloatType
         }
-        const resolution = 256
+        const resolution = 512
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),

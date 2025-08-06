@@ -427,8 +427,12 @@ function App() {
                 }}
                 gl={{ 
                     clearColor: 'white',
-                    alpha: false
+                    alpha: false,
+                    antialias: !deviceCapabilities?.shouldUseMobileWater,
+                    powerPreference: 'high-performance',
+                    pixelRatio: deviceCapabilities?.shouldUseMobileWater ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio
                 }}
+                dpr={deviceCapabilities?.shouldUseMobileWater ? [1, 2] : [1, 3]}
             >
                 {/* Layer 1: Fish (bottom) */}
                 {/* <KoiFish /> */}
@@ -451,14 +455,12 @@ function App() {
                     waterRef={waterRef}
                 />
                 
-                {/* Layer 3: Water (top) - TESTING: Force mobile water on all devices */}
-                <MobileWater ref={waterRef} />
-                {/* Original conditional logic:
+                {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
                 {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )} */}
+                )}
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}
