@@ -648,14 +648,9 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     const canvas = gl.domElement
 
     const handleMouseDown = (e) => {
-      if (isTransitioning || transitionComplete) return // Allow drag during scale down and initial expand
+      if (isTransitioning || transitionComplete || isInitialExpanding) return // Block during transition and expand
       
       e.preventDefault() // Prevent default touch behavior
-      
-      // Kill any ongoing position animations when user starts dragging
-      if (isInitialExpanding || isScalingDown) {
-        gsap.killTweensOf(items.current.map(item => item.mesh.position))
-      }
       
       isDragging.current = true
       hasDraggedEnough.current = false // Reset drag distance check
