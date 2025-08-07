@@ -2,13 +2,15 @@ import './style.css'
 import ReactDOM from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
+import { EffectComposer } from '@react-three/postprocessing'
+import * as THREE from 'three'
 import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
-import IntroScreen from './IntroScreen.jsx'
 import SimpleWater from './SimpleWater.jsx'
 import MobileWater from './MobileWater.jsx'
 import KoiFish from './KoiFish.jsx'
 import FishParticleSystem from './FishParticleSystem.jsx'
+import { FishCausticsEffect } from './FishCausticsEffect.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
@@ -31,9 +33,6 @@ function App() {
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
-    const [showIntro, setShowIntro] = useState(true)
-    const [uiFadingIn, setUiFadingIn] = useState(false)
-    // Removed hasPlayedIntroAnimation - not needed anymore
     const waterRef = useRef()
     
     // Device capabilities detection
@@ -360,9 +359,6 @@ function App() {
         const calculatedOffset = selectedIndex * itemWidth
         setInitialOffset(calculatedOffset)
         
-        // Reset intro-specific UI fade state when returning from gallery
-        setUiFadingIn(undefined)
-        
         // PHASE 1: Start returning process and scale down selected image
         setIsReturningToSlider(true) // This triggers UI fade-out
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
@@ -396,16 +392,6 @@ function App() {
         }, 550) // Slightly faster to match animation
     }
 
-    // Handle intro completion
-    const handleIntroComplete = () => {
-        setShowIntro(false)
-        // Intro completed
-        // Start UI fade-in after a short delay
-        setTimeout(() => {
-            setUiFadingIn(true)
-        }, 100) // Small delay to ensure smooth transition
-    }
-
     // Don't render until projects are loaded
     if (!projectsLoaded) {
         return <div style={{ 
@@ -415,11 +401,6 @@ function App() {
             height: '100vh',
             fontFamily: 'PSTimesTrial, serif'
         }}>Loading...</div>
-    }
-
-    // Show intro screen first
-    if (showIntro) {
-        return <IntroScreen onComplete={handleIntroComplete} />
     }
 
     return (
@@ -437,6 +418,10 @@ function App() {
                     pixelRatio: deviceCapabilities?.shouldUseMobileWater ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio
                 }}
                 dpr={deviceCapabilities?.shouldUseMobileWater ? [1, 2] : [1, 3]}
+                onCreated={({ scene }) => {
+                    // Add white fog that starts at z=-5 and gets dense at z=-15
+                    scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                }}
             >
                 {/* Layer 1: Fish (bottom) */}
                 {/* <KoiFish /> */}
@@ -477,7 +462,6 @@ function App() {
                 selectedProject={selectedProject}
                 currentImageIndex={currentImageIndex}
                 onBackToSlider={handleBackToSlider}
-                uiFadingIn={uiFadingIn}
             />
         </>
     )

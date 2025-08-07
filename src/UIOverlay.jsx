@@ -1,11 +1,11 @@
-export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider, uiFadingIn }) {
+export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
   // Get current image data for selected project
   const currentImage = selectedProject && selectedProject.images && selectedProject.images[currentImageIndex] 
     ? selectedProject.images[currentImageIndex] 
     : null
   const totalImages = selectedProject && selectedProject.images ? selectedProject.images.length : 0
   return (
-    <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''} ${uiFadingIn !== undefined ? (uiFadingIn ? 'fading-in' : 'initial-hidden') : ''}`}>
+    <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}>
       {/* Top Section */}
       <div className="ui-top">
         <div className="ui-top-left">

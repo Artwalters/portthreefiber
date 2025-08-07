@@ -27,6 +27,7 @@ function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }
         // Clone material
         if (child.material) {
           child.material = child.material.clone()
+          // Fog will be handled by Three.js native fog
         }
         
         // If it's a SkinnedMesh, clone skeleton
@@ -124,7 +125,7 @@ function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }
     <group ref={group}>
       <primitive 
         object={clonedScene} 
-        scale={0.192}
+        scale={0.192}  // Fixed scale - let camera perspective handle size
         rotation={[-Math.PI / 2, 0, Math.PI]}
       />
     </group>
@@ -177,22 +178,26 @@ export default function FishParticleSystem() {
         const edge = Math.floor(Math.random() * 4) // 0=top, 1=right, 2=bottom, 3=left
         let startPos, targetPos, initialRotation
         
+        // Random depth between -2 (close) and -20 (very far)
+        // Much more depth for stronger fog effect
+        const fishDepth = -2 - Math.random() * 18
+        
         switch(edge) {
           case 0: // Top edge
-            startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, -2 - Math.random() * 2)
-            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+            startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, fishDepth)
+            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
             break
           case 1: // Right edge  
-            startPos = new THREE.Vector3(20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+            startPos = new THREE.Vector3(20, Math.random() * 10 - 5, fishDepth)
+            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
             break
           case 2: // Bottom edge
-            startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, -2 - Math.random() * 2)
-            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+            startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, fishDepth)
+            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
             break
           case 3: // Left edge
-            startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+            startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, fishDepth)
+            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
             break
         }
         
@@ -402,22 +407,25 @@ export default function FishParticleSystem() {
               const edge = Math.floor(Math.random() * 4)
               let startPos, targetPos
               
+              // Random depth between -2 (close) and -20 (very far)
+              const fishDepth = -2 - Math.random() * 18
+              
               switch(edge) {
                 case 0: // Top
-                  startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, -2 - Math.random() * 2)
-                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+                  startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, fishDepth)
+                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
                   break
                 case 1: // Right
-                  startPos = new THREE.Vector3(20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+                  startPos = new THREE.Vector3(20, Math.random() * 10 - 5, fishDepth)
+                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
                   break
                 case 2: // Bottom
-                  startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, -2 - Math.random() * 2)
-                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, startPos.z)
+                  startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, fishDepth)
+                  targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
                   break
                 case 3: // Left
-                  startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, -2 - Math.random() * 2)
-                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, startPos.z)
+                  startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, fishDepth)
+                  targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
                   break
               }
               return { startPos, targetPos }

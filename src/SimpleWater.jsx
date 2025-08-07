@@ -179,7 +179,7 @@ const SimpleWater = forwardRef((props, ref) => {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Combine scene with water effects - stronger on mobile
+                    // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
                     // Reduced visual effect strength - keep deformation but less visible water effects

@@ -276,7 +276,7 @@ const MobileWater = forwardRef((props, ref) => {
                     // Specular highlight
                     float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
-                    // Combine scene with water effects - match SimpleWater
+                    // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
                     // Match SimpleWater's reduced visual effect strength
