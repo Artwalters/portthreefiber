@@ -30,11 +30,9 @@ const MobileWater = forwardRef((props, ref) => {
             if (floatExt) {
                 textureType = THREE.FloatType
                 hasFloatSupport = true
-                console.log('MobileWater: Using FloatType (WebGL2 + EXT_color_buffer_float)')
             } else {
                 // Try half float on WebGL 2
                 textureType = THREE.HalfFloatType
-                console.log('MobileWater: Using HalfFloatType (WebGL2 fallback)')
             }
         } else {
             // WebGL 1 - check for half float support
@@ -43,9 +41,7 @@ const MobileWater = forwardRef((props, ref) => {
             
             if (halfFloatExt && halfFloatLinearExt) {
                 textureType = THREE.HalfFloatType
-                console.log('MobileWater: Using HalfFloatType (WebGL1)')
             } else {
-                console.log('MobileWater: Using UnsignedByteType (mobile safe fallback)')
             }
         }
         
@@ -69,7 +65,6 @@ const MobileWater = forwardRef((props, ref) => {
         const sceneWidth = Math.floor(size.width * pixelRatio)
         const sceneHeight = Math.floor(size.height * pixelRatio)
         
-        console.log(`MobileWater: Resolution ${resolution}x${resolution}, Scene ${sceneWidth}x${sceneHeight}, PixelRatio ${pixelRatio}`)
         
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),

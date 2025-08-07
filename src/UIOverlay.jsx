@@ -1,4 +1,6 @@
-export default function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
+import React from 'react'
+
+function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
   // Get current image data for selected project
   const currentImage = selectedProject && selectedProject.images && selectedProject.images[currentImageIndex] 
     ? selectedProject.images[currentImageIndex] 
@@ -77,3 +79,5 @@ export default function UIOverlay({ highlightedProject, isHighlightVisible, disp
     </div>
   )
 }
+
+export default React.memo(UIOverlay)

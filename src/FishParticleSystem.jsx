@@ -141,30 +141,22 @@ export default function FishParticleSystem() {
   
   // Animation info logged once
   useEffect(() => {
-    console.log(`🐟 Loaded ${animations.length} animations:`, animations.map(a => a.name))
     
     // Debug scene structure
-    console.log('Scene structure:')
     scene.traverse((child) => {
       if (child.isMesh || child.isSkinnedMesh) {
-        console.log(`- ${child.name || 'unnamed'}: ${child.type}, isSkinnedMesh: ${child.isSkinnedMesh}`)
         if (child.isSkinnedMesh && child.skeleton) {
-          console.log(`  - Has skeleton with ${child.skeleton.bones.length} bones`)
         }
         if (child.morphTargetInfluences) {
-          console.log(`  - Has ${child.morphTargetInfluences.length} morph targets`)
         }
         if (child.geometry && child.geometry.morphAttributes) {
-          console.log(`  - Morph attributes:`, Object.keys(child.geometry.morphAttributes))
         }
       }
     })
     
     // Debug animation clips
     animations.forEach((clip) => {
-      console.log(`Animation "${clip.name}":`)
       clip.tracks.forEach((track) => {
-        console.log(`  - Track: ${track.name} (${track.constructor.name})`)
       })
     })
   }, [animations, scene])

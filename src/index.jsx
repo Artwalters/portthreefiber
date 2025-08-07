@@ -2,15 +2,12 @@ import './style.css'
 import ReactDOM from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
-import { EffectComposer } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import WebGLSlider from './WebGLSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 import SimpleWater from './SimpleWater.jsx'
 import MobileWater from './MobileWater.jsx'
-import KoiFish from './KoiFish.jsx'
 import FishParticleSystem from './FishParticleSystem.jsx'
-import { FishCausticsEffect } from './FishCausticsEffect.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
@@ -42,7 +39,6 @@ function App() {
     useEffect(() => {
         const capabilities = getDeviceCapabilities()
         setDeviceCapabilities(capabilities)
-        console.log('Device capabilities:', capabilities)
     }, [])
 
     // Load projects data from JSON
@@ -54,7 +50,6 @@ function App() {
                 setProjectsLoaded(true)
             })
             .catch(error => {
-                console.error('Error loading projects:', error)
                 // Fallback to empty array if loading fails
                 setProjects([])
                 setProjectsLoaded(true)
@@ -424,7 +419,6 @@ function App() {
                 }}
             >
                 {/* Layer 1: Fish (bottom) */}
-                {/* <KoiFish /> */}
                 <FishParticleSystem />
                 
                 {/* Layer 2: Slider (middle) */}
