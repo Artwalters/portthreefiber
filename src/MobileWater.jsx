@@ -253,13 +253,27 @@ const MobileWater = forwardRef((props, ref) => {
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
                     
-                    // Sample the scene with distortion
-                    vec4 sceneColor = texture2D(uSceneTexture, distortedUv);
+                    // Chromatic aberration - sample RGB channels with slight offset
+                    float aberrationStrength = 0.002; // Very subtle
+                    vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
                     
-                    // If distorted UV goes out of bounds, use original
-                    if (distortedUv.x < 0.0 || distortedUv.x > 1.0 || distortedUv.y < 0.0 || distortedUv.y > 1.0) {
-                        sceneColor = texture2D(uSceneTexture, vUv);
-                    }
+                    // Sample each color channel with different offsets
+                    vec2 uvR = distortedUv + aberrationOffset;
+                    vec2 uvG = distortedUv;
+                    vec2 uvB = distortedUv - aberrationOffset;
+                    
+                    // Clamp UVs to prevent edge artifacts
+                    uvR = clamp(uvR, 0.001, 0.999);
+                    uvG = clamp(uvG, 0.001, 0.999);
+                    uvB = clamp(uvB, 0.001, 0.999);
+                    
+                    // Sample RGB separately for chromatic aberration
+                    float r = texture2D(uSceneTexture, uvR).r;
+                    float g = texture2D(uSceneTexture, uvG).g;
+                    float b = texture2D(uSceneTexture, uvB).b;
+                    float a = texture2D(uSceneTexture, uvG).a;
+                    
+                    vec4 sceneColor = vec4(r, g, b, a);
                     
                     // Only use white fallback for completely empty pixels
                     if (sceneColor.a < 0.1) {
