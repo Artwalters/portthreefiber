@@ -351,7 +351,7 @@ function App() {
         setIsTransitioning(true)
     }
 
-    // Handle back button click to return to slider - 2 phase transition
+    // Handle back button click to return to slider - 3 phase transition
     const handleBackToSlider = () => {
         // Calculate initial offset to center the selected project
         const selectedIndex = projects.findIndex(p => p.name === selectedProject.name)
@@ -368,10 +368,10 @@ function App() {
         setIsScalingDownForReset(true) // This triggers scale-down of selected image
         setIsReturningFromGallery(true) // Mark that we're returning from gallery
         
-        // PHASE 2: After scale-down completes, trigger slider expansion
+        // PHASE 2: After scale-down completes, recreate slider
         setTimeout(() => {
             setIsPostTransition(false) // Exit post-transition mode
-            setSliderKey(prev => prev + 1) // Force complete slider recreation
+            // Keep selectedProject active during transition to prevent jump
             
             // Reset hover states
             setHoveredProject(null)
@@ -380,15 +380,20 @@ function App() {
             setHighlightedProject(null)
             setIsHighlightVisible(false)
             
-            // PHASE 3: After slider expands completely, fade UI back in
+            // Small delay before recreating slider to ensure smooth transition
             setTimeout(() => {
-                setIsReturningToSlider(false) // This triggers UI fade-in
-                setIsScalingDownForReset(false)
-                setSelectedProject(null)
-                setCurrentImageIndex(0) // Reset image index
-                setIsReturningFromGallery(false) // Reset the return flag
-            }, 1500) // Wait for full expand animation to complete (1.5s as in original code)
-        }, 600) // Wait for scale-down animation to complete (0.6s)
+                setSliderKey(prev => prev + 1) // Force complete slider recreation
+                setIsScalingDownForReset(false) // Stop scale down state
+                
+                // PHASE 3: After slider expands completely, fade UI back in
+                setTimeout(() => {
+                    setIsReturningToSlider(false) // This triggers UI fade-in
+                    setSelectedProject(null) // Now safe to clear selected project
+                    setCurrentImageIndex(0) // Reset image index
+                    setIsReturningFromGallery(false) // Reset the return flag
+                }, 1500) // Match expand animation duration
+            }, 100) // Small delay for state propagation
+        }, 550) // Slightly faster to match animation
     }
 
     // Handle intro completion

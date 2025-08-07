@@ -4,7 +4,7 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery, sliderOpacity = 1 }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, isMobileRef, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery, sliderOpacity = 1 }) => {
   const meshRef = useRef()
   const hasTransitionAnimated = useRef(false)
   const hasScaleUpAnimated = useRef(false)
@@ -38,7 +38,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       uTexture1: { value: texture }, // Main texture (cover)
       uTexture2: { value: texture }, // Second texture for transitions
       uVelo: { value: 0 },
-      uIsMobile: { value: isMobile ? 1.0 : 0.0 },
+      uIsMobile: { value: isMobileRef?.current ? 1.0 : 0.0 },
       uOpacity: { value: 1.0 },
       uProgress: { value: 0.0 } // For image transitions
     },
@@ -127,62 +127,71 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
   }, [texture, material, galleryTextures, currentImageIndex])
 
-  // Update isMobile uniform without recreating material
-  useEffect(() => {
+  // Update isMobile uniform in useFrame to keep it synchronized
+  useFrame(() => {
     if (material.uniforms && material.uniforms.uIsMobile) {
-      material.uniforms.uIsMobile.value = isMobile ? 1.0 : 0.0
+      const currentMobileValue = isMobileRef.current ? 1.0 : 0.0
+      // Only update if value changed to prevent unnecessary GPU updates
+      if (material.uniforms.uIsMobile.value !== currentMobileValue) {
+        material.uniforms.uIsMobile.value = currentMobileValue
+      }
     }
-  }, [material, isMobile])
+  })
 
   // Update velocity uniform and position - continue smooth fade even during transition
   useFrame(() => {
-    if (meshRef.current && material.uniforms && material.uniforms.uVelo) {
-      // During transition, fade to 0, otherwise use slider speed
-      const targetSpeed = (isTransitioning || transitionComplete) ? 0 : (sliderSpeed || 0)
+    if (meshRef.current && material.uniforms) {
+      // Batch all uniform updates together
+      const uniforms = material.uniforms
       
-      // Safeguard against invalid values
-      if (isNaN(targetSpeed) || isNaN(currentSpeed.current)) {
-        currentSpeed.current = 0
-        material.uniforms.uVelo.value = 0
-        return
+      // Update velocity
+      if (uniforms.uVelo) {
+        // During transition, fade to 0, otherwise use slider speed
+        const targetSpeed = (isTransitioning || transitionComplete) ? 0 : (sliderSpeed || 0)
+        
+        // Safeguard against invalid values
+        if (isNaN(targetSpeed) || isNaN(currentSpeed.current)) {
+          currentSpeed.current = 0
+          uniforms.uVelo.value = 0
+        } else {
+          // Extra smooth easing for direction changes
+          let ease
+          if (isTransitioning || transitionComplete) {
+            // During transition, use slow fade out
+            ease = 0.02
+          } else if (Math.sign(targetSpeed) !== Math.sign(currentSpeed.current) && Math.abs(currentSpeed.current) > 0.01) {
+            // Direction change - faster easing for more responsive feel
+            ease = 0.04
+          } else if (Math.abs(targetSpeed) > Math.abs(currentSpeed.current)) {
+            // Speed increase - moderate easing
+            ease = 0.05
+          } else {
+            // Speed decrease - faster easing for quicker recovery
+            ease = 0.025
+          }
+          
+          currentSpeed.current += (targetSpeed - currentSpeed.current) * ease
+          
+          // Clamp to reasonable values
+          currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
+          
+          uniforms.uVelo.value = currentSpeed.current * 0.5 // Reduce effect intensity by 50%
+        }
       }
       
-      // Extra smooth easing for direction changes
-      let ease
-      if (isTransitioning || transitionComplete) {
-        // During transition, use slow fade out
-        ease = 0.02
-      } else if (Math.sign(targetSpeed) !== Math.sign(currentSpeed.current) && Math.abs(currentSpeed.current) > 0.01) {
-        // Direction change - faster easing for more responsive feel
-        ease = 0.04
-      } else if (Math.abs(targetSpeed) > Math.abs(currentSpeed.current)) {
-        // Speed increase - moderate easing
-        ease = 0.05
-      } else {
-        // Speed decrease - faster easing for quicker recovery
-        ease = 0.025
+      // Update opacity only if changed
+      if (uniforms.uOpacity && uniforms.uOpacity.value !== sliderOpacity) {
+        uniforms.uOpacity.value = sliderOpacity
       }
       
-      currentSpeed.current += (targetSpeed - currentSpeed.current) * ease
-      
-      // Clamp to reasonable values
-      currentSpeed.current = Math.max(-5, Math.min(5, currentSpeed.current))
-      
-      material.uniforms.uVelo.value = currentSpeed.current * 0.5 // Reduce effect intensity by 50%
+      // Update progress only during transitions
+      if (uniforms.uProgress && isImageTransitioning) {
+        uniforms.uProgress.value = transitionProgress.current
+      }
     }
     
-    // Update slider opacity
-    if (material.uniforms.uOpacity) {
-      material.uniforms.uOpacity.value = sliderOpacity
-    }
-    
-    // Ensure uProgress is updated during image transitions
-    if (material.uniforms.uProgress && isImageTransitioning) {
-      material.uniforms.uProgress.value = transitionProgress.current
-    }
-    
-    // Handle normal positioning only when not expanding, not transitioning, and not returning from gallery
-    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isReturningFromGallery && !isScalingDown) {
+    // Handle normal positioning only when not in any animation state
+    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isReturningFromGallery && !isScalingDown && !isScalingDownForReset) {
       // Check if this is the selected project for subtle z-positioning
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
       const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
@@ -198,11 +207,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     if (meshRef.current && isTransitioning && !hasTransitionAnimated.current) {
       hasTransitionAnimated.current = true
       
-      // Animate this slide to screen center - check if mobile for direction
-      const isMobile = window.innerWidth <= 768
+      // Animate this slide to screen center
       gsap.to(meshRef.current.position, {
-        x: isMobile ? 0 : 0, // Always center x
-        y: isMobile ? 0 : 0, // Always center y
+        x: 0, // Always center x
+        y: 0, // Always center y
         z: position[2] + (isClicked ? 0.01 : -0.01), // Very minimal z difference
         duration: 1.5, // 25% faster (was 2s)
         ease: "power3.inOut" // Smoother easing
@@ -221,8 +229,8 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         y: 1.75, 
         z: 1.75,
         duration: 0.6,
-        ease: "power3.out",
-        delay: 0.15,
+        ease: "power3.inOut", // Match the reverse animation
+        // No delay for immediate effect
         onComplete: () => {}
       })
     }
@@ -261,21 +269,14 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
   }, [isScalingDownForReset, transitionComplete, isClicked])
 
-  // Handle reverse scaling when back is clicked
-  useEffect(() => {
-    if (meshRef.current && isScalingDown && isClicked) {
-      // Scale down the selected image back to normal size
-      gsap.to(meshRef.current.position, {
-        z: position[2] + 0.01, // Back to subtle forward position
-        duration: 0.6, // 25% faster (was 0.8s)
-        ease: "power3.inOut" // Smoother easing
-      })
-    }
-  }, [isScalingDown, isClicked, position])
+  // Handle reverse scaling when back is clicked - REMOVED because it conflicts with scale-down-for-reset
+  // This animation is now handled in the isScalingDownForReset effect
 
   // Handle scaling down for reset (when back button is clicked)
   useEffect(() => {
     if (meshRef.current && isScalingDownForReset && transitionComplete && isClicked) {
+      // The card should already be at (0,0,z) from the transition
+      // We just need to ensure it stays at exact center during scale-down
       
       // First, reset to original image if not already there
       if (currentImageIndex !== 0) {
@@ -288,15 +289,19 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           
           // Start scale down animation parallel with image reset for smooth transition
           if (meshRef.current) {
+            // Scale down AND move to final position to prevent jump
             gsap.to(meshRef.current.scale, {
               x: 1,
               y: 1,
               z: 1,
-              duration: 0.6, // Faster for more responsive feel
-              ease: "power3.out", // Smoother easing
+              duration: 0.6, // Same duration as scale up
+              ease: "power3.inOut", // Same easing as scale up for symmetry
               overwrite: 'auto', // Allow interruption
               onComplete: () => {}
             })
+            
+            // Keep at center with higher z offset to stay on top
+            meshRef.current.position.set(0, 0, 0.1)
           }
           
           gsap.to(transitionProgress, {
@@ -330,10 +335,13 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
           y: 1,
           z: 1,
           duration: 0.6,
-          ease: "power3.out",
+          ease: "power3.inOut", // Match all other animations
           overwrite: 'auto', // Allow interruption
           onComplete: () => {}
         })
+        
+        // Keep at center with higher z offset to stay on top
+        meshRef.current.position.set(0, 0, 0.1)
       }
     }
   }, [isScalingDownForReset, transitionComplete, isClicked, position, currentImageIndex, material, galleryTextures])
@@ -341,38 +349,69 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
 
   // Handle initial expand animation (from center to normal positions)
   useEffect(() => {
-    if (meshRef.current && isInitialExpanding && !hasInitialExpanded.current) {
+    if (meshRef.current && isInitialExpanding && !hasInitialExpanded.current && !isScalingDownForReset) {
       hasInitialExpanded.current = true
       
       // Check if this is the selected project 
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      // Selected project animates from scale-down position to subtle forward position, others to normal
+      
+      // Final position - selected gets subtle forward position
       const finalZ = isSelectedProject ? position[2] + 0.01 : position[2]
       
-      
-      // Start animation immediately with no delay to prevent gaps
+      // Animate to final position - match IN animation parameters
       gsap.to(meshRef.current.position, {
-        x: position[0], // Should be 0 for mobile
-        y: position[1], // Should be the vertical offset for mobile
-        z: finalZ, // Reset to normal positions after animation
-        duration: 1.2, // Faster for more responsive feel
-        ease: "power3.out", // Smoother easing
+        x: position[0], // Final x position
+        y: position[1], // Final y position
+        z: finalZ, // Final z position
+        duration: 1.5, // Same as IN animation
+        ease: "power3.inOut", // Same as IN animation for symmetry
         overwrite: 'auto', // Allow interruption if user starts dragging
-        delay: Math.random() * 0.1 // Reduced delay for faster feel
+        // No delay - all cards animate simultaneously for immediate usability
+        onComplete: () => {
+          // After animation, reset render order for normal slider operation
+          if (meshRef.current) {
+            meshRef.current.renderOrder = 0
+          }
+        }
       })
     }
-  }, [isInitialExpanding, position, selectedProject, projectData, isScalingDown, isMobile])
+  }, [isInitialExpanding, position, selectedProject, projectData, isScalingDownForReset, isMobile, isReturningFromGallery])
 
   // Calculate render position - if expanding or returning from gallery, start at center
   const getRenderPosition = () => {
-    if (isInitialExpanding || isReturningFromGallery) {
-      const isSelectedProject = selectedProject && selectedProject.name === projectData.name
-      // Start selected image at scale-down end position (slightly above normal) to prevent jump
-      const zPosition = isSelectedProject ? position[2] + 0.02 : position[2]
-      // Always start from center (0,0) for both mobile and desktop
-      return [0, 0, zPosition]
+    const isSelectedProject = selectedProject && selectedProject.name === projectData.name
+    
+    // During scale-down, keep at exact center with z offset
+    if (isScalingDownForReset && isClicked) {
+      return [0, 0, 0.1] // Higher z to stay visually on top
     }
+    
+    // When expanding (either initial or returning from gallery)
+    if (isInitialExpanding || isReturningFromGallery) {
+      // Selected card stays slightly forward during expand
+      if (isSelectedProject) {
+        return [0, 0, 0.05] // Slightly forward to stay on top
+      }
+      // Other cards start from exact center
+      return [0, 0, 0]
+    }
+    
+    // Normal slider position
     return position
+  }
+
+  // Calculate render order - selected card should stay on top during entire return animation
+  const getRenderOrder = () => {
+    const isSelectedProject = selectedProject && selectedProject.name === projectData.name
+    
+    // Keep selected card on top during scale-down AND expand phases
+    if (isClicked && isScalingDownForReset) {
+      return 10 // Highest priority during scale-down
+    }
+    if (isSelectedProject && (isInitialExpanding || isReturningFromGallery)) {
+      return 5 // High priority during expand animation
+    }
+    return 0 // Normal render order
   }
 
   return (
@@ -380,7 +419,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
       ref={meshRef} 
       position={getRenderPosition()} 
       material={material}
-      renderOrder={-1}
+      renderOrder={getRenderOrder()}
       visible={true}
       onPointerEnter={() => {
         if (!transitionComplete && onHover) {
@@ -451,8 +490,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const lastMouseY = useRef(0)
-  const [isMobile, setIsMobile] = useState(() => {
-    // Initialize correctly on first render to prevent double flash
+  // Use ref instead of state to prevent re-renders on mobile check
+  const isMobileRef = useRef(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+  const [isMobile] = useState(() => {
+    // Initialize once and never change during component lifecycle
     return typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   })
   const [hoveredSlide, setHoveredSlide] = useState(null)
@@ -461,7 +502,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
   const [transitionComplete, setTransitionComplete] = useState(false)
   const [isInitialExpanding, setIsInitialExpanding] = useState(false)
-  const [isScalingDown, setIsScalingDown] = useState(selectedProject ? true : false)
+  const [isScalingDown, setIsScalingDown] = useState(false) // Always start false
   const [sliderOpacity, setSliderOpacity] = useState(hasPlayedIntroAnimation ? 1 : 0)
   
   // Load cover textures from projects data
@@ -483,21 +524,20 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const totalItems = textures.length
   const totalWidth = totalItems * itemWidth
 
-  // Check if mobile only on resize (not on mount to prevent double flash)
+  // Update mobile ref on resize without causing re-renders
   useEffect(() => {
     const checkMobile = () => {
-      const newIsMobile = window.innerWidth <= 768
-      if (newIsMobile !== isMobile) {
-        setIsMobile(newIsMobile)
-      }
+      isMobileRef.current = window.innerWidth <= 768
     }
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [isMobile])
+  }, [])
 
   // Handle return from gallery - only activate animation when explicitly returning
   useEffect(() => {
     if (isReturningFromGallery && !isInitialExpanding) {
+      // Clear hidden slides when returning to slider
+      setHiddenSlides(new Set())
       setIsInitialExpanding(true)
     }
   }, [isReturningFromGallery, isInitialExpanding])
@@ -505,10 +545,11 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   // Start fade-in only on first page load (not returning from gallery)
   useEffect(() => {
     if (!hasPlayedIntroAnimation && !isReturningFromGallery && !selectedProject && !isTransitioning && !transitionComplete) {
-      // Start fade-in animation only on first load
-      setTimeout(() => {
+      // Use RAF for smoother animation start
+      const rafId = requestAnimationFrame(() => {
         setSliderOpacity(1)
-      }, 100) // Small delay for smooth start
+      })
+      return () => cancelAnimationFrame(rafId)
     } else {
       // If returning from gallery or animation already played, show immediately without animation
       setSliderOpacity(1)
@@ -585,10 +626,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   useEffect(() => {
     if (isInitialExpanding) {
       
-      // Simple timer - always 3 seconds total regardless of other states
+      // Timer matches animation duration
       const timer = setTimeout(() => {
         setIsInitialExpanding(false)
-      }, 2250) // 25% faster (was 3000ms)
+      }, 1500) // Match expand animation duration
       
       return () => clearTimeout(timer)
     }
@@ -877,6 +918,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
           isScalingDown={isScalingDown}
           isScalingDownForReset={isScalingDownForReset}
           isMobile={isMobile}
+          isMobileRef={isMobileRef}
           externalCurrentImageIndex={externalCurrentImageIndex}
           onImageIndexChange={onImageIndexChange}
           isReturningFromGallery={isReturningFromGallery}
