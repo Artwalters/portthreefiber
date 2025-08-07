@@ -33,7 +33,7 @@ function App() {
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     const [showIntro, setShowIntro] = useState(true)
     const [uiFadingIn, setUiFadingIn] = useState(false)
-    const hasPlayedIntroAnimation = useRef(false)
+    // Removed hasPlayedIntroAnimation - not needed anymore
     const waterRef = useRef()
     
     // Device capabilities detection
@@ -399,8 +399,7 @@ function App() {
     // Handle intro completion
     const handleIntroComplete = () => {
         setShowIntro(false)
-        // Mark that intro has been completed
-        hasPlayedIntroAnimation.current = true
+        // Intro completed
         // Start UI fade-in after a short delay
         setTimeout(() => {
             setUiFadingIn(true)
@@ -456,7 +455,6 @@ function App() {
                     currentImageIndex={currentImageIndex}
                     onImageIndexChange={setCurrentImageIndex}
                     isReturningFromGallery={isReturningFromGallery}
-                    hasPlayedIntroAnimation={hasPlayedIntroAnimation.current}
                     waterRef={waterRef}
                 />
                 

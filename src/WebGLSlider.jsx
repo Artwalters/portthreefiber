@@ -4,13 +4,13 @@ import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import gsap from 'gsap'
 
-const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, shouldHide, transitionComplete, isInitialExpanding, selectedProject, isScalingDown, isScalingDownForReset, isMobile, isMobileRef, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery, sliderOpacity = 1 }) => {
+const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHover, onClick, onTouchEnd, onPointerUp, isClicked, isTransitioning, transitionComplete, isInitialExpanding, selectedProject, isScalingDownForReset, isMobile, isMobileRef, externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery }) => {
   const meshRef = useRef()
   const hasTransitionAnimated = useRef(false)
   const hasScaleUpAnimated = useRef(false)
   const hasInitialExpanded = useRef(false)
   const currentSpeed = useRef(0)
-  const opacity = useRef(1)
+  // Removed opacity ref - always 1 now to prevent flicker
   const [isImageTransitioning, setIsImageTransitioning] = useState(false)
   const transitionProgress = useRef(0)
   
@@ -182,10 +182,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         }
       }
       
-      // Update opacity only if changed
-      if (uniforms.uOpacity && uniforms.uOpacity.value !== sliderOpacity) {
-        uniforms.uOpacity.value = sliderOpacity
-      }
+      // Opacity is always 1 now - no need to update
       
       // Update progress only during transitions
       if (uniforms.uProgress && isImageTransitioning) {
@@ -194,7 +191,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
     
     // Handle normal positioning only when not in any animation state
-    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isReturningFromGallery && !isScalingDown && !isScalingDownForReset) {
+    if (meshRef.current && !isTransitioning && !transitionComplete && !isInitialExpanding && !isReturningFromGallery && !isScalingDownForReset) {
       // Check if this is the selected project for subtle z-positioning
       const isSelectedProject = selectedProject && selectedProject.name === projectData.name
       const zPosition = isSelectedProject ? position[2] + 0.01 : position[2]
@@ -239,13 +236,9 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
   }, [transitionComplete, isClicked, position])
   
-  // Reset opacity when transitioning back to slider
+  // Reset states when transitioning back to slider (opacity removed - always 1 now)
   useEffect(() => {
-    if (!transitionComplete && !isTransitioning && opacity.current < 1) {
-      opacity.current = 1
-      if (material.uniforms.uOpacity) {
-        material.uniforms.uOpacity.value = 1
-      }
+    if (!transitionComplete && !isTransitioning && !hasTransitionAnimated.current) {
       // Reset to first image when going back to slider
       if (onImageIndexChange) {
         onImageIndexChange(0)
@@ -477,10 +470,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   )
 }
 
-export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false, hasPlayedIntroAnimation = false, waterRef }) {
+export default function WebGLSlider({ projects, onHover, onTransitionComplete, onTransitionStart, selectedProject, isScalingDownForReset, initialOffset = 0, currentImageIndex: externalCurrentImageIndex, onImageIndexChange, isReturningFromGallery = false, waterRef }) {
   const { gl } = useThree()
   const [offset, setOffset] = useState(initialOffset)
-  const containerRef = useRef()
+  // Removed containerRef - not used
   const isDragging = useRef(false)
   const hasDraggedEnough = useRef(false) // Track if drag distance is significant
   const dragStart = useRef({ x: 0, y: 0, offset: 0 })
@@ -497,14 +490,14 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const isMobileRef = useRef(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   // Create stable value that never changes to prevent re-renders
   const isMobile = isMobileRef.current
-  const [hoveredSlide, setHoveredSlide] = useState(null)
+  // Removed hoveredSlide state - passed directly to parent
   const [clickedSlide, setClickedSlide] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hiddenSlides, setHiddenSlides] = useState(new Set())
   const [transitionComplete, setTransitionComplete] = useState(false)
   const [isInitialExpanding, setIsInitialExpanding] = useState(false)
-  const [isScalingDown, setIsScalingDown] = useState(false) // Always start false
-  const [sliderOpacity, setSliderOpacity] = useState(hasPlayedIntroAnimation ? 1 : 0)
+  // Removed isScalingDown state - using isScalingDownForReset instead
+  // Removed sliderOpacity state - always 1 to prevent flicker
   
   // Load cover textures from projects data
   const coverImages = projects.map(project => project.images[0].src)
@@ -543,25 +536,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     }
   }, [isReturningFromGallery, isInitialExpanding])
 
-  // Start fade-in only on first page load (not returning from gallery)
-  useEffect(() => {
-    if (!hasPlayedIntroAnimation && !isReturningFromGallery && !selectedProject && !isTransitioning && !transitionComplete) {
-      // Use RAF for smoother animation start
-      const rafId = requestAnimationFrame(() => {
-        setSliderOpacity(1)
-      })
-      return () => cancelAnimationFrame(rafId)
-    } else {
-      // If returning from gallery or animation already played, show immediately without animation
-      setSliderOpacity(1)
-    }
-  }, [hasPlayedIntroAnimation, isReturningFromGallery, selectedProject, isTransitioning, transitionComplete])
+  // Remove opacity animation - it's causing flicker on mobile
+  // Opacity is now always 1, intro animation is handled by CSS only
 
-  useEffect(() => {
-    if (onHover) {
-      onHover(hoveredSlide)
-    }
-  }, [hoveredSlide, onHover])
+  // Removed hoveredSlide effect - onHover called directly from SlideItem
 
   // Handle slide click - all slides move to screen center, then remove others
   const handleSlideClick = (projectData) => {
@@ -636,21 +614,11 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     }
   }, [isInitialExpanding]) // Remove other dependencies to prevent re-triggers
 
-  // Handle scaling down completion
-  useEffect(() => {
-    if (isScalingDown) {
-      // After scale-down animation completes, stop scaling down
-      const timer = setTimeout(() => {
-        setIsScalingDown(false)
-      }, 600) // Match the scale-down animation duration (25% faster)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [isScalingDown]) // Remove selectedProject dependency
+  // Removed isScalingDown effect - not needed anymore
 
   // Smooth interpolation with easing - much smoother than direct animations
   useFrame(() => {
-    if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDown) {
+    if (!isTransitioning && !transitionComplete && !isInitialExpanding && !isScalingDownForReset) {
       // Smooth interpolation between current and target
       const ease = 0.05 // Reduced from 0.075 for smoother, more controlled movement
       currentOffset.current += (targetOffset.current - currentOffset.current) * ease
@@ -813,7 +781,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
     }
 
     const handleWheel = (e) => {
-      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDown || isMobile) return // Disable scroll on mobile
+      if (isTransitioning || transitionComplete || isInitialExpanding || isScalingDownForReset || isMobile) return // Disable scroll on mobile
       
       e.preventDefault()
       
@@ -852,7 +820,7 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
       window.removeEventListener('touchmove', handleMouseMove)
       window.removeEventListener('touchend', handleMouseUp)
     }
-  }, [offset, gl, isTransitioning, transitionComplete, isInitialExpanding, isScalingDown])
+  }, [offset, gl, isTransitioning, transitionComplete, isInitialExpanding, isScalingDownForReset])
 
   // Create infinite slides - only show slides within viewport
   const slides = []
@@ -906,31 +874,28 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
           velocity={velocity.current}
           sliderSpeed={sliderSpeed.current}
           projectData={projects[textureIndex]}
-          onHover={setHoveredSlide}
+          onHover={onHover}
           onClick={handleSlideClick}
           onTouchEnd={handleTouchEnd}
           onPointerUp={handlePointerUp}
           isClicked={isClicked}
           isTransitioning={isTransitioning}
-          shouldHide={shouldHide}
           transitionComplete={transitionComplete}
           isInitialExpanding={isInitialExpanding}
           selectedProject={selectedProject}
-          isScalingDown={isScalingDown}
           isScalingDownForReset={isScalingDownForReset}
           isMobile={isMobile}
           isMobileRef={isMobileRef}
           externalCurrentImageIndex={externalCurrentImageIndex}
           onImageIndexChange={onImageIndexChange}
           isReturningFromGallery={isReturningFromGallery}
-          sliderOpacity={sliderOpacity}
         />
       )
     }
   }
 
   return (
-    <group ref={containerRef}>
+    <group>
       {slides}
     </group>
   )

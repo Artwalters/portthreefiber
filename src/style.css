@@ -440,10 +440,9 @@ body.gallery-mode {
     }
 }
 
-/* Slider fade-in styles with GPU acceleration */
+/* GPU acceleration for canvas - no opacity transition to prevent flicker */
 canvas {
-    transition: opacity 2s ease-in-out;
-    will-change: opacity;
+    /* Removed opacity transition - was causing flicker on mobile */
     transform: translateZ(0); /* Force GPU layer */
     -webkit-transform: translateZ(0);
     backface-visibility: hidden;
