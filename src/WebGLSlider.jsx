@@ -33,15 +33,19 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
   }, [galleryTextures])
   
   // Simple shader material with curve deformation - memoized to prevent recreation
-  const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uTexture1: { value: texture }, // Main texture (cover)
-      uTexture2: { value: texture }, // Second texture for transitions
-      uVelo: { value: 0 },
-      uIsMobile: { value: isMobileRef?.current ? 1.0 : 0.0 },
-      uOpacity: { value: 1.0 },
-      uProgress: { value: 0.0 } // For image transitions
-    },
+  const material = useMemo(() => {
+    // Capture mobile state once at creation time
+    const isMobileValue = typeof window !== 'undefined' && window.innerWidth <= 768 ? 1.0 : 0.0
+    
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTexture1: { value: texture }, // Main texture (cover)
+        uTexture2: { value: texture }, // Second texture for transitions
+        uVelo: { value: 0 },
+        uIsMobile: { value: isMobileValue },
+        uOpacity: { value: 1.0 },
+        uProgress: { value: 0.0 } // For image transitions
+      },
     vertexShader: `
       precision mediump float;
       uniform float uVelo;
@@ -112,9 +116,10 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         gl_FragColor = color;
       }
     `,
-    transparent: false,
-    side: THREE.DoubleSide
-  }), [texture]) // Only recreate if texture changes
+      transparent: false,
+      side: THREE.DoubleSide
+    })
+  }, [texture]) // Only recreate if texture changes
   
   // Update texture when it changes
   useEffect(() => {
@@ -127,20 +132,18 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
     }
   }, [texture, material, galleryTextures, currentImageIndex])
 
-  // Update isMobile uniform in useFrame to keep it synchronized
-  useFrame(() => {
-    if (material.uniforms && material.uniforms.uIsMobile) {
-      const currentMobileValue = isMobileRef.current ? 1.0 : 0.0
-      // Only update if value changed to prevent unnecessary GPU updates
-      if (material.uniforms.uIsMobile.value !== currentMobileValue) {
-        material.uniforms.uIsMobile.value = currentMobileValue
-      }
-    }
-  })
-
-  // Update velocity uniform and position - continue smooth fade even during transition
+  // Single useFrame for all updates to prevent synchronization issues
   useFrame(() => {
     if (meshRef.current && material.uniforms) {
+      // Update mobile uniform first
+      if (material.uniforms.uIsMobile) {
+        const currentMobileValue = isMobileRef.current ? 1.0 : 0.0
+        // Only update if value changed to prevent unnecessary GPU updates
+        if (material.uniforms.uIsMobile.value !== currentMobileValue) {
+          material.uniforms.uIsMobile.value = currentMobileValue
+        }
+      }
+      
       // Batch all uniform updates together
       const uniforms = material.uniforms
       
@@ -469,7 +472,7 @@ const SlideItem = ({ texture, position, velocity, sliderSpeed, projectData, onHo
         }
       }}
     >
-      <planeGeometry args={isMobile ? [2, 2, 32, 32] : [3, 3, 32, 32]} />
+      <planeGeometry args={isMobileRef.current ? [2, 2, 32, 32] : [3, 3, 32, 32]} />
     </mesh>
   )
 }
@@ -490,12 +493,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
   const lastMoveTime = useRef(0)
   const lastMouseX = useRef(0)
   const lastMouseY = useRef(0)
-  // Use ref instead of state to prevent re-renders on mobile check
+  // Use only ref to prevent any re-renders on mobile check
   const isMobileRef = useRef(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
-  const [isMobile] = useState(() => {
-    // Initialize once and never change during component lifecycle
-    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false
-  })
+  // Create stable value that never changes to prevent re-renders
+  const isMobile = isMobileRef.current
   const [hoveredSlide, setHoveredSlide] = useState(null)
   const [clickedSlide, setClickedSlide] = useState(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -746,10 +747,10 @@ export default function WebGLSlider({ projects, onHover, onTransitionComplete, o
         }
         
         if (deltaTime > 0) {
-          velocity.current = deltaY * 0.02 // Reduced from 0.05 for smoother movement
+          velocity.current = deltaY * 0.023 // 15% more responsive (was 0.02)
         }
-        const dragSpeed = 0.8 // Reduced from 2 for smoother drag
-        targetOffset.current = dragStart.current.offset + totalDeltaY * 0.01 * dragSpeed // Fixed: swipe up moves cards up
+        const dragSpeed = 0.92 // 15% more responsive (was 0.8)
+        targetOffset.current = dragStart.current.offset + totalDeltaY * 0.0115 * dragSpeed // 15% more responsive
         lastMouseY.current = clientY
       } else {
         // Horizontal movement on desktop
