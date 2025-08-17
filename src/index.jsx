@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import WebGLSlider from './WebGLSlider.jsx'
+import FilmStripSlider from './FilmStripSlider.jsx'
 import UIOverlay from './UIOverlay.jsx'
 import SimpleWater from './SimpleWater.jsx'
 import MobileWater from './MobileWater.jsx'
@@ -421,19 +421,10 @@ function App() {
                 {/* Layer 1: Fish (bottom) */}
                 <FishParticleSystem />
                 
-                {/* Layer 2: Slider (middle) */}
-                <WebGLSlider 
-                    key={sliderKey}
+                {/* Layer 2: Film Strip Slider */}
+                <FilmStripSlider 
                     projects={projects}
                     onHover={setHoveredProject}
-                    onTransitionComplete={handleTransitionComplete}
-                    onTransitionStart={handleTransitionStart}
-                    selectedProject={selectedProject}
-                    isScalingDownForReset={isScalingDownForReset}
-                    initialOffset={initialOffset}
-                    currentImageIndex={currentImageIndex}
-                    onImageIndexChange={setCurrentImageIndex}
-                    isReturningFromGallery={isReturningFromGallery}
                     waterRef={waterRef}
                 />
                 
