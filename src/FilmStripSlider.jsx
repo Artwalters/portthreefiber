@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 // Custom shader material for the film strip effect
 class FilmStripMaterial extends THREE.MeshBasicMaterial {
-  constructor(tiles = [], parameters = {}) {
+  constructor(tiles = [], isMobile = false, parameters = {}) {
     super(parameters)
     
     const tilesCount = Math.max(tiles.length, 1) // Ensure at least 1
@@ -13,6 +13,7 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
       time: { value: 0 },
       tiles: { value: tiles.length > 0 ? tiles : [new THREE.Texture()] },
       uVelo: { value: 0 }, // Add velocity uniform for deformation
+      uIsMobile: { value: isMobile ? 1.0 : 0.0 }, // Mobile detection
       ...this.uniforms
     }
     
@@ -21,6 +22,7 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
       shader.uniforms.time = this.uniforms.time
       shader.uniforms.tiles = this.uniforms.tiles
       shader.uniforms.uVelo = this.uniforms.uVelo
+      shader.uniforms.uIsMobile = this.uniforms.uIsMobile
       
       const aspect = 24 / (2.0 * 4/3) // Show more tiles on the curve
       
@@ -34,14 +36,21 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
       // Modify vertex shader for deformation
       shader.vertexShader = `
         uniform float uVelo;
+        uniform float uIsMobile;
         #define M_PI 3.1415926535897932384626433832795
         ${shader.vertexShader}
       `.replace(
         `#include <begin_vertex>`,
         `#include <begin_vertex>
         
-        // Apply curve deformation based on velocity (horizontal deformation)
-        transformed.x = transformed.x - ((sin(uv.y * M_PI) * uVelo) * 0.15);
+        // Apply curve deformation based on velocity and device type
+        if (uIsMobile > 0.5) {
+          // Mobile: vertical deformation (affects Y movement along the curve)
+          transformed.x = transformed.x - ((sin(uv.y * M_PI) * uVelo) * 0.15);
+        } else {
+          // Desktop: horizontal deformation
+          transformed.x = transformed.x - ((sin(uv.y * M_PI) * uVelo) * 0.15);
+        }
         `
       )
       
@@ -50,6 +59,7 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
         uniform float time;
         uniform sampler2D tiles[${tilesCount}];
         uniform float uVelo;
+        uniform float uIsMobile;
         ${shader.fragmentShader}
       `.replace(
         `#include <map_fragment>`,
@@ -74,6 +84,20 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
         
         tileUV.x = (tileUV.x - gapSize) / (1.0 - 2.0 * gapSize);
         tileUV.y = vUv.y;
+        
+        // Rotate and scale texture coordinates for mobile
+        if (uIsMobile > 0.5) {
+          vec2 center = vec2(0.5, 0.5);
+          tileUV -= center;
+          
+          // Rotate 90 degrees clockwise (correct orientation)
+          tileUV = vec2(tileUV.y, -tileUV.x);
+          
+          // Scale down to zoom out more
+          tileUV *= 0.5;
+          
+          tileUV += center;
+        }
         
         vec4 tileColor = vec4(0);
         
@@ -108,6 +132,18 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
   
+  // Detect mobile
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
   // Use refs for real-time values like WebGLSlider
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0, offset: 0 })
@@ -124,22 +160,42 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     const splineSegments = 300
     const filmWidth = 3.5 // Lower height for better proportions
     
-    // Create curve - long flat front, wider sides going off screen
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-20, 0, -6.0),   // Far left - off screen
-      new THREE.Vector3(-12, 0, -5.0),   // Left - going back
-      new THREE.Vector3(-8, 0, -3.0),    // Left curve - back
-      new THREE.Vector3(-6, 0, -1.0),    // Left corner - transition
-      new THREE.Vector3(-5, 0, 0),       // Left edge of front
-      new THREE.Vector3(-2, 0, 0),       // Left center front
-      new THREE.Vector3(0, 0, 0),        // Center front
-      new THREE.Vector3(2, 0, 0),        // Right center front
-      new THREE.Vector3(5, 0, 0),        // Right edge of front
-      new THREE.Vector3(6, 0, -1.0),     // Right corner - transition
-      new THREE.Vector3(8, 0, -3.0),     // Right curve - back
-      new THREE.Vector3(12, 0, -5.0),    // Right - going back
-      new THREE.Vector3(20, 0, -6.0)     // Far right - off screen
-    ], false, "catmullrom", 1)
+    let curve
+    if (isMobile) {
+      // Vertical curve for mobile - same shape but rotated 90 degrees
+      curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 20, -6.0),    // Far top - off screen
+        new THREE.Vector3(0, 12, -5.0),    // Top - going back
+        new THREE.Vector3(0, 8, -3.0),     // Top curve - back
+        new THREE.Vector3(0, 6, -1.0),     // Top corner - transition
+        new THREE.Vector3(0, 5, 0),        // Top edge of front
+        new THREE.Vector3(0, 2, 0),        // Top center front
+        new THREE.Vector3(0, 0, 0),        // Center front
+        new THREE.Vector3(0, -2, 0),       // Bottom center front
+        new THREE.Vector3(0, -5, 0),       // Bottom edge of front
+        new THREE.Vector3(0, -6, -1.0),    // Bottom corner - transition
+        new THREE.Vector3(0, -8, -3.0),    // Bottom curve - back
+        new THREE.Vector3(0, -12, -5.0),   // Bottom - going back
+        new THREE.Vector3(0, -20, -6.0)    // Far bottom - off screen
+      ], false, "catmullrom", 1)
+    } else {
+      // Horizontal curve for desktop - left to right
+      curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-20, 0, -6.0),   // Far left - off screen
+        new THREE.Vector3(-12, 0, -5.0),   // Left - going back
+        new THREE.Vector3(-8, 0, -3.0),    // Left curve - back
+        new THREE.Vector3(-6, 0, -1.0),    // Left corner - transition
+        new THREE.Vector3(-5, 0, 0),       // Left edge of front
+        new THREE.Vector3(-2, 0, 0),       // Left center front
+        new THREE.Vector3(0, 0, 0),        // Center front
+        new THREE.Vector3(2, 0, 0),        // Right center front
+        new THREE.Vector3(5, 0, 0),        // Right edge of front
+        new THREE.Vector3(6, 0, -1.0),     // Right corner - transition
+        new THREE.Vector3(8, 0, -3.0),     // Right curve - back
+        new THREE.Vector3(12, 0, -5.0),    // Right - going back
+        new THREE.Vector3(20, 0, -6.0)     // Far right - off screen
+      ], false, "catmullrom", 1)
+    }
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
@@ -157,18 +213,29 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       const curvePoint = curvePoints[idx]
       
       if (curvePoint) {
-        positions.setXYZ(
-          i, 
-          curvePoint.x, 
-          curvePoint.y + vertex.y * filmWidth, 
-          curvePoint.z
-        )
+        if (isMobile) {
+          // For mobile: map curve to Y axis and apply width to X
+          positions.setXYZ(
+            i, 
+            curvePoint.x + vertex.y * filmWidth, 
+            curvePoint.y, 
+            curvePoint.z
+          )
+        } else {
+          // For desktop: normal horizontal mapping
+          positions.setXYZ(
+            i, 
+            curvePoint.x, 
+            curvePoint.y + vertex.y * filmWidth, 
+            curvePoint.z
+          )
+        }
       }
     }
     
     geo.computeVertexNormals()
     return geo
-  }, [])
+  }, [isMobile])
   
   // Create textures from project images
   useEffect(() => {
@@ -206,21 +273,24 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     Promise.all(texturePromises).then(setTextures)
   }, [projects])
   
-  // Simple drag interactions - horizontal drag = horizontal scroll
+  // Drag interactions - responsive to mobile/desktop
   useEffect(() => {
     let startX = 0
+    let startY = 0
     let startOffset = 0
     let dragging = false
     
     const handleStart = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
       startX = clientX
+      startY = clientY
       startOffset = currentOffset.current
       dragging = true
       
       // Water effect
       if (waterRef?.current?.updateMouse) {
-        waterRef.current.updateMouse(clientX, e.touches ? e.touches[0].clientY : e.clientY, true)
+        waterRef.current.updateMouse(clientX, clientY, true)
       }
     }
     
@@ -228,15 +298,23 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       if (!dragging) return
       
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
-      const deltaX = clientX - startX
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
-      // Simple: horizontal drag = scroll (like wheel) - faster
-      targetOffset.current = startOffset - deltaX * 0.03 // 3x faster
-      sliderSpeed.current = -deltaX * 0.1 // For deformation
+      if (isMobile) {
+        // Mobile: vertical drag = scroll
+        const deltaY = clientY - startY
+        targetOffset.current = startOffset - deltaY * 0.03
+        sliderSpeed.current = -deltaY * 0.1
+      } else {
+        // Desktop: horizontal drag = scroll  
+        const deltaX = clientX - startX
+        targetOffset.current = startOffset - deltaX * 0.03
+        sliderSpeed.current = -deltaX * 0.1
+      }
       
       // Water effect
       if (waterRef?.current?.updateMouse) {
-        waterRef.current.updateMouse(clientX, e.touches ? e.touches[0].clientY : e.clientY, true)
+        waterRef.current.updateMouse(clientX, clientY, true)
       }
     }
     
@@ -250,8 +328,15 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     
     const handleWheel = (e) => {
       e.preventDefault()
-      targetOffset.current += e.deltaY * 0.003 // 3x faster to match drag
-      sliderSpeed.current = e.deltaY * 0.1
+      if (isMobile) {
+        // Mobile: use deltaY for vertical scrolling
+        targetOffset.current += e.deltaY * 0.003
+        sliderSpeed.current = e.deltaY * 0.1
+      } else {
+        // Desktop: use deltaY for horizontal scrolling
+        targetOffset.current += e.deltaY * 0.003
+        sliderSpeed.current = e.deltaY * 0.1
+      }
     }
     
     const canvas = gl.domElement
@@ -273,7 +358,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       window.removeEventListener('touchend', handleEnd)
       window.removeEventListener('wheel', handleWheel)
     }
-  }, [gl, waterRef])
+  }, [gl, waterRef, isMobile])
   
   // Simple animation loop
   useFrame((state) => {
@@ -302,9 +387,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
   // Create material with textures
   const material = useMemo(() => {
     if (textures.length === 0) return null
-    const mat = new FilmStripMaterial(textures)
+    const mat = new FilmStripMaterial(textures, isMobile)
     return mat
-  }, [textures])
+  }, [textures, isMobile])
   
   if (!material) return null
   

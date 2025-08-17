@@ -402,7 +402,7 @@ function App() {
         <>
             <Canvas
                 camera={{
-                    position: [0, 0, 5],
+                    position: [0, 0, deviceCapabilities?.shouldUseMobileWater ? 8 : 5],
                     fov: 75
                 }}
                 gl={{ 
