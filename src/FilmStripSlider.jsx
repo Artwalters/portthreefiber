@@ -3,68 +3,66 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 // Custom shader material for the film strip effect
-class FilmStripMaterial extends THREE.MeshBasicMaterial {
-  constructor(tiles = [], isMobile = false, parameters = {}) {
-    super(parameters)
-    
-    const tilesCount = Math.max(tiles.length, 1) // Ensure at least 1
-    
-    this.uniforms = {
+const createFilmStripMaterial = (tiles = [], isMobile = false) => {
+  const tilesCount = Math.max(tiles.length, 1)
+  const aspect = 24 / (2.0 * 4/3)
+  
+  // Generate texture sampling loop
+  const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
+    return `
+      if (tileID == ${tID}) { tileColor = texture2D(tiles[${tID}], tileUV); }
+    `
+  }).join("")
+  
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
       time: { value: 0 },
       tiles: { value: tiles.length > 0 ? tiles : [new THREE.Texture()] },
-      uVelo: { value: 0 }, // Add velocity uniform for deformation
-      uIsMobile: { value: isMobile ? 1.0 : 0.0 }, // Mobile detection
-      ...this.uniforms
-    }
-    
-    this.onBeforeCompile = (shader) => {
-      // Add uniforms to shader
-      shader.uniforms.time = this.uniforms.time
-      shader.uniforms.tiles = this.uniforms.tiles
-      shader.uniforms.uVelo = this.uniforms.uVelo
-      shader.uniforms.uIsMobile = this.uniforms.uIsMobile
+      uVelo: { value: 0 },
+      uIsMobile: { value: isMobile ? 1.0 : 0.0 },
+      fogColor: { value: new THREE.Color(0xffffff) },
+      fogNear: { value: 5 },
+      fogFar: { value: 15 }
+    },
+    vertexShader: `
+      uniform float uVelo;
+      uniform float uIsMobile;
+      uniform float time;
+      varying vec2 vUv;
+      varying float vFogDepth;
       
-      const aspect = 24 / (2.0 * 4/3) // Show more tiles on the curve
+      #define M_PI 3.1415926535897932384626433832795
       
-      // Generate texture sampling loop
-      const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
-        return `
-          if (tileID == ${tID}) { tileColor = texture2D(tiles[${tID}], tileUV); }
-        `
-      }).join("")
-      
-      // Modify vertex shader for deformation
-      shader.vertexShader = `
-        uniform float uVelo;
-        uniform float uIsMobile;
-        #define M_PI 3.1415926535897932384626433832795
-        ${shader.vertexShader}
-      `.replace(
-        `#include <begin_vertex>`,
-        `#include <begin_vertex>
+      void main() {
+        vec3 pos = position;
         
-        // Apply curve deformation based on velocity and device type
+        // Simple global deformation like original WebGLSlider
         if (uIsMobile > 0.5) {
-          // Mobile: vertical deformation (affects Y movement along the curve)
-          transformed.x = transformed.x - ((sin(uv.y * M_PI) * uVelo) * 0.15);
+          // Mobile: desktop effect maar 180° gedraaid - plus in plaats van minus
+          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0016);
         } else {
           // Desktop: horizontal deformation
-          transformed.x = transformed.x - ((sin(uv.y * M_PI) * uVelo) * 0.15);
+          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0016);
         }
-        `
-      )
-      
-      // Modify fragment shader
-      shader.fragmentShader = `
-        uniform float time;
-        uniform sampler2D tiles[${tilesCount}];
-        uniform float uVelo;
-        uniform float uIsMobile;
-        ${shader.fragmentShader}
-      `.replace(
-        `#include <map_fragment>`,
-        `#include <map_fragment>
         
+        vUv = uv;
+        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+        vFogDepth = -mvPosition.z;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      uniform sampler2D tiles[${tilesCount}];
+      uniform float uVelo;
+      uniform float uIsMobile;
+      uniform vec3 fogColor;
+      uniform float fogNear;
+      uniform float fogFar;
+      varying vec2 vUv;
+      varying float vFogDepth;
+      
+      void main() {
         // Calculate chromatic aberration based on velocity
         float aberrationStrength = abs(uVelo) * 0.005;
         aberrationStrength = min(aberrationStrength, 0.015);
@@ -103,28 +101,33 @@ class FilmStripMaterial extends THREE.MeshBasicMaterial {
         
         ${tilesLoop}
         
-        diffuseColor *= tileColor;
-        `
-      )
-    }
-    
-    this.defines = { USE_UV: "" }
-    this.side = THREE.DoubleSide
-  }
+        // Apply fog
+        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
+        
+        gl_FragColor = vec4(finalColor, tileColor.a);
+      }
+    `,
+    side: THREE.DoubleSide,
+    transparent: false
+  })
   
-  updateTime(time) {
+  // Add helper methods
+  material.updateTime = function(time) {
     this.uniforms.time.value = time
   }
   
-  updateVelocity(velocity) {
+  material.updateVelocity = function(velocity) {
     this.uniforms.uVelo.value = velocity
   }
   
-  updateTiles(tiles) {
+  material.updateTiles = function(tiles) {
     if (tiles.length > 0) {
       this.uniforms.tiles.value = tiles
     }
   }
+  
+  return material
 }
 
 const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
@@ -199,8 +202,8 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
-    // Create plane geometry and bend it along the curve
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 1)
+    // Create plane geometry with more subdivisions for deformation
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 32)
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
@@ -304,12 +307,12 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
         // Mobile: vertical drag = scroll
         const deltaY = clientY - startY
         targetOffset.current = startOffset - deltaY * 0.03
-        sliderSpeed.current = -deltaY * 0.1
+        sliderSpeed.current = -deltaY * 0.5 // Stronger deformation for mobile
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
         targetOffset.current = startOffset - deltaX * 0.03
-        sliderSpeed.current = -deltaX * 0.1
+        sliderSpeed.current = -deltaX * 0.5 // Stronger deformation for desktop
       }
       
       // Water effect
@@ -331,11 +334,11 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       if (isMobile) {
         // Mobile: use deltaY for vertical scrolling
         targetOffset.current += e.deltaY * 0.003
-        sliderSpeed.current = e.deltaY * 0.1
+        sliderSpeed.current = e.deltaY * 0.5 // Stronger deformation
       } else {
         // Desktop: use deltaY for horizontal scrolling
         targetOffset.current += e.deltaY * 0.003
-        sliderSpeed.current = e.deltaY * 0.1
+        sliderSpeed.current = e.deltaY * 0.5 // Stronger deformation
       }
     }
     
@@ -367,12 +370,17 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     // Smooth interpolation
     currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
     
-    // Fade deformation effect
-    sliderSpeed.current *= 0.9
+    // Fade deformation effect (smoother fade back to original)
+    sliderSpeed.current *= 0.92
     
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
+    
+    // Debug: log velocity when it's not zero
+    if (Math.abs(sliderSpeed.current) > 0.1) {
+      console.log('Velocity:', sliderSpeed.current)
+    }
     
     // Hover events
     if (projects.length > 0) {
@@ -387,7 +395,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
   // Create material with textures
   const material = useMemo(() => {
     if (textures.length === 0) return null
-    const mat = new FilmStripMaterial(textures, isMobile)
+    const mat = createFilmStripMaterial(textures, isMobile)
     return mat
   }, [textures, isMobile])
   
