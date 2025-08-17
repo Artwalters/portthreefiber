@@ -331,14 +331,18 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     
     const handleWheel = (e) => {
       e.preventDefault()
+      
+      // Smooth wheel scrolling - accumulate wheel delta for smoother movement
+      const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
+      
       if (isMobile) {
         // Mobile: use deltaY for vertical scrolling
-        targetOffset.current += e.deltaY * 0.003
-        sliderSpeed.current = e.deltaY * 0.5 // Stronger deformation
+        targetOffset.current += wheelDelta * 0.008
+        sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
       } else {
-        // Desktop: use deltaY for horizontal scrolling
-        targetOffset.current += e.deltaY * 0.003
-        sliderSpeed.current = e.deltaY * 0.5 // Stronger deformation
+        // Desktop: use deltaY for horizontal scrolling - smoother
+        targetOffset.current += wheelDelta * 0.008
+        sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
       }
     }
     
