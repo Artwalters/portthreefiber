@@ -38,10 +38,10 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         // Simple global deformation like original WebGLSlider
         if (uIsMobile > 0.5) {
-          // Mobile: desktop effect maar 180° gedraaid - plus in plaats van minus
-          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0016);
+          // Mobile: much lighter deformation to prevent flickering
+          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0008);
         } else {
-          // Desktop: horizontal deformation
+          // Desktop: normal deformation
           pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0016);
         }
         
@@ -74,10 +74,22 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         vec2 tileUV = fract(tilesUV);
         
-        // Create smaller gaps between images
+        // Create smaller gaps between images with better anti-aliased edges
         float gapSize = 0.05;
-        if (tileUV.x < gapSize || tileUV.x > (1.0 - gapSize)) {
-          discard;
+        float edgeSmooth = 0.008; // Larger smoothing for better AA
+        
+        // Use fwidth for pixel-perfect edge smoothing
+        float pixelSize = fwidth(tileUV.x);
+        float smoothSize = max(edgeSmooth, pixelSize * 2.0);
+        
+        // Smooth discard edges with better transitions
+        if (tileUV.x < gapSize + smoothSize) {
+          float edgeFactor = smoothstep(gapSize - smoothSize, gapSize + smoothSize, tileUV.x);
+          if (edgeFactor < 0.5) discard;
+        }
+        if (tileUV.x > (1.0 - gapSize - smoothSize)) {
+          float edgeFactor = smoothstep(1.0 - gapSize + smoothSize, 1.0 - gapSize - smoothSize, tileUV.x);
+          if (edgeFactor < 0.5) discard;
         }
         
         tileUV.x = (tileUV.x - gapSize) / (1.0 - 2.0 * gapSize);
@@ -109,7 +121,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       }
     `,
     side: THREE.DoubleSide,
-    transparent: false
+    transparent: false,
+    depthWrite: true,
+    depthTest: true
   })
   
   // Add helper methods
@@ -202,8 +216,8 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
-    // Create plane geometry with more subdivisions for deformation
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 32)
+    // Create plane geometry with optimal subdivisions for quality and deformation
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 16)
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
@@ -251,11 +265,12 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
           project.images?.[0]?.src || '/placeholder.jpg',
           (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace
-            tex.generateMipmaps = false
+            tex.generateMipmaps = true
             tex.wrapS = THREE.ClampToEdgeWrapping
             tex.wrapT = THREE.ClampToEdgeWrapping
-            tex.minFilter = THREE.LinearFilter
+            tex.minFilter = THREE.LinearMipmapLinearFilter
             tex.magFilter = THREE.LinearFilter
+            tex.anisotropy = gl.capabilities.getMaxAnisotropy()
             resolve(tex)
           },
           undefined,
@@ -304,10 +319,10 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
       if (isMobile) {
-        // Mobile: vertical drag = scroll
+        // Mobile: vertical drag = scroll with reduced deformation
         const deltaY = clientY - startY
         targetOffset.current = startOffset - deltaY * 0.03
-        sliderSpeed.current = -deltaY * 0.5 // Stronger deformation for mobile
+        sliderSpeed.current = -deltaY * 0.2 // Much lighter deformation for mobile
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
@@ -336,9 +351,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
       
       if (isMobile) {
-        // Mobile: use deltaY for vertical scrolling
+        // Mobile: use deltaY for vertical scrolling with reduced deformation
         targetOffset.current += wheelDelta * 0.008
-        sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
+        sliderSpeed.current = wheelDelta * 0.3 // Much lighter deformation for mobile
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
         targetOffset.current += wheelDelta * 0.008
@@ -374,8 +389,12 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     // Smooth interpolation
     currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
     
-    // Fade deformation effect (smoother fade back to original)
-    sliderSpeed.current *= 0.92
+    // Fade deformation effect (faster fade on mobile to prevent flickering)
+    if (isMobile) {
+      sliderSpeed.current *= 0.85 // Much faster fade on mobile
+    } else {
+      sliderSpeed.current *= 0.92 // Normal fade on desktop
+    }
     
     // Update material
     material.updateTime(currentOffset.current)
