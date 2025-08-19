@@ -1,6 +1,6 @@
 import './style.css'
 import ReactDOM from 'react-dom/client'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import FilmStripSlider from './FilmStripSlider.jsx'
@@ -9,6 +9,8 @@ import SimpleWater from './SimpleWater.jsx'
 import MobileWater from './MobileWater.jsx'
 import FishParticleSystem from './FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
+
+// No background color updater needed - keep everything white
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -30,6 +32,7 @@ function App() {
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
+    // Removed background color state - keeping everything white
     const waterRef = useRef()
     
     // Device capabilities detection
@@ -40,6 +43,8 @@ function App() {
         const capabilities = getDeviceCapabilities()
         setDeviceCapabilities(capabilities)
     }, [])
+
+    // Removed background color transition code
 
     // Load projects data from JSON
     useEffect(() => {
@@ -406,18 +411,33 @@ function App() {
                     fov: 75
                 }}
                 gl={{ 
-                    clearColor: 'white',
                     alpha: false,
                     antialias: !deviceCapabilities?.shouldUseMobileWater,
                     powerPreference: 'high-performance',
-                    pixelRatio: deviceCapabilities?.shouldUseMobileWater ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio
+                    pixelRatio: deviceCapabilities?.shouldUseMobileWater ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio,
+                    // Proper color management for accurate texture colors
+                    outputColorSpace: THREE.SRGBColorSpace,
+                    toneMapping: THREE.NoToneMapping,
+                    toneMappingExposure: 1.0
                 }}
                 dpr={deviceCapabilities?.shouldUseMobileWater ? [1, 2] : [1, 3]}
-                onCreated={({ scene }) => {
-                    // Add white fog that starts at z=-5 and gets dense at z=-15
-                    scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                // Enable multi-sample antialiasing
+                frameloop="always"
+                flat={false}
+                onCreated={({ scene, gl }) => {
+                    // Add fog - push back fog start for mobile to keep front images clear
+                    const isMobile = window.innerWidth <= 768
+                    if (isMobile) {
+                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                    } else {
+                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                    }
+                    // Set initial clear color to white
+                    gl.setClearColor('#ffffff')
                 }}
             >
+                {/* No background color updater needed */}
+                
                 {/* Layer 1: Fish (bottom) */}
                 <FishParticleSystem />
                 
@@ -426,6 +446,8 @@ function App() {
                     projects={projects}
                     onHover={setHoveredProject}
                     waterRef={waterRef}
+                    onTransitionStart={setIsTransitioning}
+                    onBackgroundColorChange={null}
                 />
                 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}

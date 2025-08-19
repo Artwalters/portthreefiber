@@ -175,20 +175,20 @@ export default function FishParticleSystem() {
         const fishDepth = -2 - Math.random() * 18
         
         switch(edge) {
-          case 0: // Top edge
-            startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, fishDepth)
+          case 0: // Top edge - spawn way above screen
+            startPos = new THREE.Vector3(Math.random() * 60 - 30, 18, fishDepth)
             targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
             break
-          case 1: // Right edge  
-            startPos = new THREE.Vector3(20, Math.random() * 10 - 5, fishDepth)
+          case 1: // Right edge - spawn way right of screen
+            startPos = new THREE.Vector3(35, Math.random() * 20 - 10, fishDepth)
             targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
             break
-          case 2: // Bottom edge
-            startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, fishDepth)
+          case 2: // Bottom edge - spawn way below screen
+            startPos = new THREE.Vector3(Math.random() * 60 - 30, -18, fishDepth)
             targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
             break
-          case 3: // Left edge
-            startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, fishDepth)
+          case 3: // Left edge - spawn way left of screen
+            startPos = new THREE.Vector3(-35, Math.random() * 20 - 10, fishDepth)
             targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
             break
         }
@@ -403,20 +403,20 @@ export default function FishParticleSystem() {
               const fishDepth = -2 - Math.random() * 18
               
               switch(edge) {
-                case 0: // Top
-                  startPos = new THREE.Vector3(Math.random() * 32 - 16, 8, fishDepth)
+                case 0: // Top - spawn way above screen
+                  startPos = new THREE.Vector3(Math.random() * 60 - 30, 18, fishDepth)
                   targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
                   break
-                case 1: // Right
-                  startPos = new THREE.Vector3(20, Math.random() * 10 - 5, fishDepth)
+                case 1: // Right - spawn way right of screen
+                  startPos = new THREE.Vector3(35, Math.random() * 20 - 10, fishDepth)
                   targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
                   break
-                case 2: // Bottom
-                  startPos = new THREE.Vector3(Math.random() * 32 - 16, -8, fishDepth)
+                case 2: // Bottom - spawn way below screen
+                  startPos = new THREE.Vector3(Math.random() * 60 - 30, -18, fishDepth)
                   targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
                   break
-                case 3: // Left
-                  startPos = new THREE.Vector3(-20, Math.random() * 10 - 5, fishDepth)
+                case 3: // Left - spawn way left of screen
+                  startPos = new THREE.Vector3(-35, Math.random() * 20 - 10, fishDepth)
                   targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
                   break
               }

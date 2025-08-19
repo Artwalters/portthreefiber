@@ -5,7 +5,7 @@ import * as THREE from 'three'
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   const tilesCount = Math.max(tiles.length, 1)
-  const aspect = 24 / (2.0 * 4/3)
+  const aspect = 24 / 3.3  // Slightly narrower for perfect square
   
   // Generate texture sampling loop
   const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
@@ -21,8 +21,10 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
-      fogNear: { value: 5 },
-      fogFar: { value: 15 }
+      fogNear: { value: isMobile ? 8 : 5 },
+      fogFar: { value: isMobile ? 18 : 15 },
+      uIsTransitioning: { value: 0 },
+      uSweepPosition: { value: -25 }
     },
     vertexShader: `
       uniform float uVelo;
@@ -30,6 +32,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uniform float time;
       varying vec2 vUv;
       varying float vFogDepth;
+      varying float vWorldX;
       
       #define M_PI 3.1415926535897932384626433832795
       
@@ -47,7 +50,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         vUv = uv;
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+        vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
         vFogDepth = -mvPosition.z;
+        vWorldX = worldPosition.x;
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
@@ -59,8 +64,11 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uniform vec3 fogColor;
       uniform float fogNear;
       uniform float fogFar;
+      uniform float uIsTransitioning;
+      uniform float uSweepPosition;
       varying vec2 vUv;
       varying float vFogDepth;
+      varying float vWorldX;
       
       void main() {
         // Calculate chromatic aberration based on velocity
@@ -76,11 +84,11 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         // Create smaller gaps between images with better anti-aliased edges
         float gapSize = 0.05;
-        float edgeSmooth = 0.008; // Larger smoothing for better AA
+        float edgeSmooth = 0.002; // Much smaller for sharper edges
         
         // Use fwidth for pixel-perfect edge smoothing
         float pixelSize = fwidth(tileUV.x);
-        float smoothSize = max(edgeSmooth, pixelSize * 2.0);
+        float smoothSize = max(edgeSmooth, pixelSize * 1.5); // Less aggressive smoothing for sharper edges
         
         // Smooth discard edges with better transitions
         if (tileUV.x < gapSize + smoothSize) {
@@ -95,16 +103,13 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         tileUV.x = (tileUV.x - gapSize) / (1.0 - 2.0 * gapSize);
         tileUV.y = vUv.y;
         
-        // Rotate and scale texture coordinates for mobile
+        // Rotate texture coordinates 90 degrees counterclockwise for mobile
         if (uIsMobile > 0.5) {
           vec2 center = vec2(0.5, 0.5);
           tileUV -= center;
           
-          // Rotate 90 degrees clockwise (correct orientation)
-          tileUV = vec2(tileUV.y, -tileUV.x);
-          
-          // Scale down to zoom out more
-          tileUV *= 0.5;
+          // Rotate 90 degrees counterclockwise
+          tileUV = vec2(-tileUV.y, tileUV.x);
           
           tileUV += center;
         }
@@ -113,15 +118,27 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         ${tilesLoop}
         
+        // Calculate fade transition
+        if (uIsTransitioning > 0.5) {
+          // Left-to-right fade sweep - discard pixels completely
+          float fadeWidth = 3.0;
+          float sweepAlpha = smoothstep(uSweepPosition - fadeWidth, uSweepPosition, vWorldX);
+          if (sweepAlpha < 0.5) {  // Changed from > to < so pixels disappear as sweep passes
+            discard;
+          }
+        }
+        
         // Apply fog
         float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
+        // Ensure proper gamma correction
         gl_FragColor = vec4(finalColor, tileColor.a);
+        gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(1.0/2.2)); // Gamma correction
       }
     `,
     side: THREE.DoubleSide,
-    transparent: false,
+    transparent: false, // Keep opaque to prevent double rendering
     depthWrite: true,
     depthTest: true
   })
@@ -141,10 +158,19 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     }
   }
   
+  material.updateTransition = function(isTransitioning, progress) {
+    this.uniforms.uIsTransitioning.value = isTransitioning ? 1.0 : 0.0
+    // Sweep from left (-25) to right (+25)
+    const sweepPosition = -25 + (progress * 50)
+    this.uniforms.uSweepPosition.value = sweepPosition
+  }
+  
+  // Removed fog color update function
+  
   return material
 }
 
-const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
+const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -175,49 +201,43 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
   // Create curved geometry
   const geometry = useMemo(() => {
     const splineSegments = 300
-    const filmWidth = 3.5 // Lower height for better proportions
+    const filmWidth = isMobile ? 3.2 : 3.2 // Same size for both mobile and desktop
     
     let curve
     if (isMobile) {
-      // Vertical curve for mobile - same shape but rotated 90 degrees
-      curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 20, -6.0),    // Far top - off screen
-        new THREE.Vector3(0, 12, -5.0),    // Top - going back
-        new THREE.Vector3(0, 8, -3.0),     // Top curve - back
-        new THREE.Vector3(0, 6, -1.0),     // Top corner - transition
-        new THREE.Vector3(0, 5, 0),        // Top edge of front
-        new THREE.Vector3(0, 2, 0),        // Top center front
-        new THREE.Vector3(0, 0, 0),        // Center front
-        new THREE.Vector3(0, -2, 0),       // Bottom center front
-        new THREE.Vector3(0, -5, 0),       // Bottom edge of front
-        new THREE.Vector3(0, -6, -1.0),    // Bottom corner - transition
-        new THREE.Vector3(0, -8, -3.0),    // Bottom curve - back
-        new THREE.Vector3(0, -12, -5.0),   // Bottom - going back
-        new THREE.Vector3(0, -20, -6.0)    // Far bottom - off screen
-      ], false, "catmullrom", 1)
+      // Mobile curve - shorter for better mobile fit
+      const mobileCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-12, 0, -7.0),   // Far left - off screen (shorter)
+        new THREE.Vector3(-8, 0, -4.0),    // Left curve start
+        new THREE.Vector3(-4, 0, -0.2),    // Left transition to flat
+        new THREE.Vector3(0, 0, 0.2),      // Center flat
+        new THREE.Vector3(4, 0, -0.2),     // Right transition from flat
+        new THREE.Vector3(8, 0, -4.0),     // Right curve start
+        new THREE.Vector3(12, 0, -7.0)     // Far right - off screen (shorter)
+      ], false, "catmullrom", 0.5)
+      
+      // Rotate for mobile: 90 degrees and move forward slightly
+      const rotatedPoints = mobileCurve.points.map(point => 
+        new THREE.Vector3(0, point.x, point.z + 0.5) // X → Y, Y → 0, Z moved forward by 0.5 units
+      )
+      curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
-      // Horizontal curve for desktop - left to right
+      // Desktop curve - original size
       curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-20, 0, -6.0),   // Far left - off screen
-        new THREE.Vector3(-12, 0, -5.0),   // Left - going back
-        new THREE.Vector3(-8, 0, -3.0),    // Left curve - back
-        new THREE.Vector3(-6, 0, -1.0),    // Left corner - transition
-        new THREE.Vector3(-5, 0, 0),       // Left edge of front
-        new THREE.Vector3(-2, 0, 0),       // Left center front
-        new THREE.Vector3(0, 0, 0),        // Center front
-        new THREE.Vector3(2, 0, 0),        // Right center front
-        new THREE.Vector3(5, 0, 0),        // Right edge of front
-        new THREE.Vector3(6, 0, -1.0),     // Right corner - transition
-        new THREE.Vector3(8, 0, -3.0),     // Right curve - back
-        new THREE.Vector3(12, 0, -5.0),    // Right - going back
-        new THREE.Vector3(20, 0, -6.0)     // Far right - off screen
-      ], false, "catmullrom", 1)
+        new THREE.Vector3(-18, 0, -7.0),   // Far left - off screen
+        new THREE.Vector3(-12, 0, -4.0),   // Left curve start
+        new THREE.Vector3(-6, 0, -0.2),    // Left transition to flat
+        new THREE.Vector3(0, 0, 0.2),     // Center flat
+        new THREE.Vector3(6, 0, -0.2),     // Right transition from flat
+        new THREE.Vector3(12, 0, -4.0),    // Right curve start
+        new THREE.Vector3(18, 0, -7.0)     // Far right - off screen
+      ], false, "catmullrom", 0.5)
     }
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
-    // Create plane geometry with optimal subdivisions for quality and deformation
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 16)
+    // Create plane geometry with more subdivisions for better quality
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 32)
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
@@ -264,13 +284,20 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
         const texture = loader.load(
           project.images?.[0]?.src || '/placeholder.jpg',
           (tex) => {
+            // Ensure correct color space for accurate colors
             tex.colorSpace = THREE.SRGBColorSpace
-            tex.generateMipmaps = true
+            tex.encoding = THREE.sRGBEncoding
+            // Maximum quality texture settings
+            tex.generateMipmaps = false // Disable mipmaps for sharper images
             tex.wrapS = THREE.ClampToEdgeWrapping
             tex.wrapT = THREE.ClampToEdgeWrapping
-            tex.minFilter = THREE.LinearMipmapLinearFilter
+            // Use nearest neighbor for pixel-perfect sharpness
+            tex.minFilter = THREE.LinearFilter
             tex.magFilter = THREE.LinearFilter
-            tex.anisotropy = gl.capabilities.getMaxAnisotropy()
+            // Maximum anisotropic filtering for sharp textures at angles
+            tex.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy())
+            // Ensure texture updates
+            tex.needsUpdate = true
             resolve(tex)
           },
           undefined,
@@ -319,10 +346,10 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
       if (isMobile) {
-        // Mobile: vertical drag = scroll with reduced deformation
+        // Mobile: vertical drag = scroll with reduced deformation (inverted)
         const deltaY = clientY - startY
-        targetOffset.current = startOffset - deltaY * 0.03
-        sliderSpeed.current = -deltaY * 0.2 // Much lighter deformation for mobile
+        targetOffset.current = startOffset + deltaY * 0.03 // Inverted direction
+        sliderSpeed.current = deltaY * 0.2 // Much lighter deformation for mobile (inverted)
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
@@ -351,9 +378,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
       
       if (isMobile) {
-        // Mobile: use deltaY for vertical scrolling with reduced deformation
-        targetOffset.current += wheelDelta * 0.008
-        sliderSpeed.current = wheelDelta * 0.3 // Much lighter deformation for mobile
+        // Mobile: use deltaY for vertical scrolling with reduced deformation (inverted)
+        targetOffset.current -= wheelDelta * 0.008 // Inverted direction
+        sliderSpeed.current = -wheelDelta * 0.3 // Much lighter deformation for mobile (inverted)
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
         targetOffset.current += wheelDelta * 0.008
@@ -382,37 +409,149 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
     }
   }, [gl, waterRef, isMobile])
   
+  // Animation state
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [isFading, setIsFading] = useState(false)
+  const [fadeProgress, setFadeProgress] = useState(0)
+  const [sliderProgress, setSliderProgress] = useState(0)
+  const fadeStartOffset = useRef(0)
+  
+  // Project colors - assign unique color to each project
+  const projectColors = [
+    '#FF6B6B', // Red - project-1
+    '#4ECDC4', // Teal - project-2  
+    '#45B7D1', // Blue - project-3
+    '#96CEB4', // Green - project-4
+    '#FFEAA7', // Yellow - project-5
+    '#DDA0DD', // Plum - project-6
+    '#98D8C8'  // Mint - project-7
+  ]
+  
+  // Click detection state
+  const isClickDragging = useRef(false)
+  const clickStartPos = useRef({ x: 0, y: 0 })
+  const clickThreshold = 5 // pixels
+  
+  // Click handler - only trigger if not dragging
+  const handleMeshClick = (event) => {
+    if (isFading || isClickDragging.current) return
+    
+    // Calculate which project was clicked
+    const uv = event.uv
+    if (!uv) return
+    
+    // Calculate project index from UV position
+    const aspect = 24 / (2.0 * 4/3)
+    const tilesUV = uv.x * aspect * 1.2
+    const tileIndex = Math.floor(tilesUV) % projects.length
+    
+    // Store current offset as start position
+    fadeStartOffset.current = currentOffset.current
+    
+    // Start both animations together (like before)
+    setIsFading(true)
+    setFadeProgress(0)
+    setSliderProgress(0)
+    
+    // Notify parent to fade out UI (and never bring it back)
+    if (onTransitionStart) {
+      onTransitionStart(true)
+    }
+    
+    // No background color change
+  }
+  
+  // Pointer events to detect dragging
+  const handlePointerDown = (event) => {
+    isClickDragging.current = false
+    clickStartPos.current = { x: event.clientX, y: event.clientY }
+  }
+  
+  const handlePointerMove = (event) => {
+    if (!clickStartPos.current) return
+    
+    const deltaX = Math.abs(event.clientX - clickStartPos.current.x)
+    const deltaY = Math.abs(event.clientY - clickStartPos.current.y)
+    
+    if (deltaX > clickThreshold || deltaY > clickThreshold) {
+      isClickDragging.current = true
+    }
+  }
+  
+  const handlePointerUp = () => {
+    // Reset after a short delay to allow click event to fire
+    setTimeout(() => {
+      isClickDragging.current = false
+      clickStartPos.current = null
+    }, 50)
+  }
+  
   // Simple animation loop
   useFrame((state) => {
     if (!material) return
     
-    // Smooth interpolation
-    currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
-    
-    // Fade deformation effect (faster fade on mobile to prevent flickering)
-    if (isMobile) {
-      sliderSpeed.current *= 0.85 // Much faster fade on mobile
+    // Handle fade animation (both slider and fade together)
+    if (isFading) {
+      // Calculate eased progress for FADE
+      const fadeBaseSpeed = 0.02 // Original base speed
+      const fadeEasingFactor = fadeProgress * fadeProgress * fadeProgress * 2.5 // Cubic easing
+      const fadeSpeed = fadeBaseSpeed * (0.2 + fadeEasingFactor) // Start at 20% speed
+      const fadeDeltaProgress = Math.min(fadeSpeed, fadeBaseSpeed * 5) // Higher cap
+      
+      // Calculate eased progress for SLIDER - same curve as fade
+      const sliderBaseSpeed = 0.0225 // Original slider speed
+      const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
+      const sliderSpeed = sliderBaseSpeed * (0.2 + sliderEasingFactor) // Start at 20% speed
+      const sliderDeltaProgress = Math.min(sliderSpeed, sliderBaseSpeed * 5) // Higher cap
+      
+      // Update fade progress
+      setFadeProgress(prev => {
+        const newProgress = prev + fadeDeltaProgress
+        if (newProgress >= 1.0) {
+          // Fade complete - but DON'T reset UI (never comes back)
+          return 1.0 // Stay invisible
+        }
+        return newProgress
+      })
+      
+      // Update slider progress separately
+      setSliderProgress(prev => {
+        const newProgress = prev + sliderDeltaProgress
+        return newProgress // Don't cap slider
+      })
+      
+      // Use slider progress for movement
+      const slideDistance = 67
+      const animatedOffset = fadeStartOffset.current - (sliderProgress * slideDistance)
+      currentOffset.current = animatedOffset
+      targetOffset.current = animatedOffset
+      
     } else {
-      sliderSpeed.current *= 0.92 // Normal fade on desktop
+      // Normal behavior when not fading
+      currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
+      
+      // Fade deformation effect
+      if (isMobile) {
+        sliderSpeed.current *= 0.85
+      } else {
+        sliderSpeed.current *= 0.92
+      }
+      
+      // Hover events
+      if (projects.length > 0) {
+        const currentProjectIndex = Math.floor(Math.abs(currentOffset.current * 10) % projects.length)
+        const currentProject = projects[currentProjectIndex]
+        if (currentProject && onHover) {
+          onHover(currentProject)
+        }
+      }
     }
     
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
-    
-    // Debug: log velocity when it's not zero
-    if (Math.abs(sliderSpeed.current) > 0.1) {
-      console.log('Velocity:', sliderSpeed.current)
-    }
-    
-    // Hover events
-    if (projects.length > 0) {
-      const currentProjectIndex = Math.floor(Math.abs(currentOffset.current * 10) % projects.length)
-      const currentProject = projects[currentProjectIndex]
-      if (currentProject && onHover) {
-        onHover(currentProject)
-      }
-    }
+    material.updateTransition(isFading, fadeProgress)
+    // No fog color update needed
   })
   
   // Create material with textures
@@ -425,7 +564,15 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef }) => {
   if (!material) return null
   
   return (
-    <mesh ref={meshRef} geometry={geometry} material={material} />
+    <mesh 
+      ref={meshRef} 
+      geometry={geometry} 
+      material={material} 
+      onClick={handleMeshClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    />
   )
 }
 

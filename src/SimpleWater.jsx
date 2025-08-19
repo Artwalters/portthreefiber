@@ -127,7 +127,8 @@ const SimpleWater = forwardRef((props, ref) => {
                 uWaterTexture: { value: null },
                 uSceneTexture: { value: null },
                 uTime: { value: 0 },
-                uResolution: { value: new THREE.Vector2(size.width, size.height) }
+                uResolution: { value: new THREE.Vector2(size.width, size.height) },
+                // Removed background color uniform
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -141,6 +142,7 @@ const SimpleWater = forwardRef((props, ref) => {
                 uniform sampler2D uSceneTexture;
                 uniform float uTime;
                 uniform vec2 uResolution;
+                // Removed background color uniform
                 varying vec2 vUv;
                 
                 void main() {
@@ -178,7 +180,7 @@ const SimpleWater = forwardRef((props, ref) => {
                     
                     vec4 sceneColor = vec4(r, g, b, a);
                     
-                    // Only use white fallback for completely empty pixels
+                    // Use white fallback for empty pixels
                     if (sceneColor.a < 0.1) {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
@@ -316,6 +318,7 @@ const SimpleWater = forwardRef((props, ref) => {
                 material.uniforms.uSceneTexture.value = buffers.scene.texture
                 material.uniforms.uTime.value = state.clock.elapsedTime
                 material.uniforms.uResolution.value.set(size.width, size.height)
+                // No background color update needed
             }
         } catch (error) {
             console.warn('Display material error, continuing...', error)
