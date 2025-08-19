@@ -41,8 +41,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         // Simple global deformation like original WebGLSlider
         if (uIsMobile > 0.5) {
-          // Mobile: much lighter deformation to prevent flickering
-          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0008);
+          // Mobile: increased deformation for better visual feedback
+          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0015);
         } else {
           // Desktop: normal deformation
           pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0016);
@@ -71,9 +71,13 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       varying float vWorldX;
       
       void main() {
-        // Calculate chromatic aberration based on velocity
-        float aberrationStrength = abs(uVelo) * 0.005;
-        aberrationStrength = min(aberrationStrength, 0.015);
+        // Calculate chromatic aberration - always present with base amount
+        float baseAberration = 0.003; // Always subtle RGB split
+        float velocityAberration = abs(uVelo) * 0.001; // Minimal additional based on movement
+        
+        // Combine base and velocity-based aberration
+        float aberrationStrength = baseAberration + velocityAberration;
+        aberrationStrength = min(aberrationStrength, 0.006); // Very low maximum for extreme subtlety
         
         vec2 globalUV = (vUv + vec2(1000. + time * 0.01, 0.));
         vec2 tilesUV = globalUV * vec2(${aspect * 1.2}, 1.);
@@ -116,7 +120,28 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         vec4 tileColor = vec4(0);
         
-        ${tilesLoop}
+        // Always apply chromatic aberration (base + velocity)
+        if (aberrationStrength > 0.0) {
+          vec4 rChannel = vec4(0);
+          vec4 gChannel = vec4(0);
+          vec4 bChannel = vec4(0);
+          
+          vec2 rUV = tileUV + vec2(aberrationStrength, 0.0);
+          vec2 gUV = tileUV;
+          vec2 bUV = tileUV - vec2(aberrationStrength, 0.0);
+          
+          // Sample each channel with offset
+          ${Array.from({length: tilesCount}, (_, tID) => `
+          if (tileID == ${tID}) { 
+            rChannel = texture2D(tiles[${tID}], rUV);
+            gChannel = texture2D(tiles[${tID}], gUV);
+            bChannel = texture2D(tiles[${tID}], bUV);
+          }`).join("")}
+          
+          tileColor = vec4(rChannel.r, gChannel.g, bChannel.b, gChannel.a);
+        } else {
+          ${tilesLoop}
+        }
         
         // Calculate fade transition
         if (uIsTransitioning > 0.5) {
@@ -194,6 +219,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const currentOffset = useRef(0)
   const velocity = useRef(0)
   const sliderSpeed = useRef(0)
+  const smoothedSpeed = useRef(0) // Extra smoothing layer like WebGLSlider
   const lastOffset = useRef(0)
   const lastMouseY = useRef(0)
   const lastMoveTime = useRef(0)
@@ -346,15 +372,19 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       
       if (isMobile) {
-        // Mobile: vertical drag = scroll with reduced deformation (inverted)
+        // Mobile: vertical drag = scroll with increased responsiveness (inverted)
         const deltaY = clientY - startY
-        targetOffset.current = startOffset + deltaY * 0.03 // Inverted direction
-        sliderSpeed.current = deltaY * 0.2 // Much lighter deformation for mobile (inverted)
+        targetOffset.current = startOffset + deltaY * 0.05 // More responsive
+        // Gradual speed buildup for smoother RGB effect
+        const targetSpeed = -deltaY * 0.6
+        sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
         targetOffset.current = startOffset - deltaX * 0.03
-        sliderSpeed.current = -deltaX * 0.5 // Stronger deformation for desktop
+        // Gradual speed buildup for smoother RGB effect
+        const targetSpeed = -deltaX * 0.5
+        sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
       
       // Water effect
@@ -378,9 +408,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
       
       if (isMobile) {
-        // Mobile: use deltaY for vertical scrolling with reduced deformation (inverted)
-        targetOffset.current -= wheelDelta * 0.008 // Inverted direction
-        sliderSpeed.current = -wheelDelta * 0.3 // Much lighter deformation for mobile (inverted)
+        // Mobile: use deltaY for vertical scrolling with increased responsiveness (inverted)
+        targetOffset.current -= wheelDelta * 0.012 // More responsive, inverted direction
+        sliderSpeed.current = wheelDelta * 0.7 // More deformation for mobile (corrected direction)
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
         targetOffset.current += wheelDelta * 0.008
@@ -530,11 +560,11 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       // Normal behavior when not fading
       currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
       
-      // Fade deformation effect
+      // Fade deformation effect - extremely smooth decay for gradual RGB fade
       if (isMobile) {
-        sliderSpeed.current *= 0.85
+        sliderSpeed.current *= 0.97  // Much slower fade out (was 0.92)
       } else {
-        sliderSpeed.current *= 0.92
+        sliderSpeed.current *= 0.98  // Much slower fade out (was 0.96)
       }
       
       // Hover events
