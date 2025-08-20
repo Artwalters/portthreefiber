@@ -33,6 +33,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       varying vec2 vUv;
       varying float vFogDepth;
       varying float vWorldX;
+      varying float vWorldY;
       
       #define M_PI 3.1415926535897932384626433832795
       
@@ -53,6 +54,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
         vFogDepth = -mvPosition.z;
         vWorldX = worldPosition.x;
+        vWorldY = worldPosition.y;
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
@@ -69,6 +71,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       varying vec2 vUv;
       varying float vFogDepth;
       varying float vWorldX;
+      varying float vWorldY;
       
       void main() {
         // Calculate chromatic aberration - always present with base amount
@@ -145,10 +148,18 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         // Calculate fade transition
         if (uIsTransitioning > 0.5) {
-          // Left-to-right fade sweep - discard pixels completely
           float fadeWidth = 3.0;
-          float sweepAlpha = smoothstep(uSweepPosition - fadeWidth, uSweepPosition, vWorldX);
-          if (sweepAlpha < 0.5) {  // Changed from > to < so pixels disappear as sweep passes
+          float sweepAlpha;
+          
+          if (uIsMobile > 0.5) {
+            // Mobile: top-to-bottom fade sweep (vertical)
+            sweepAlpha = smoothstep(uSweepPosition - fadeWidth, uSweepPosition, vWorldY);
+          } else {
+            // Desktop: left-to-right fade sweep (horizontal)
+            sweepAlpha = smoothstep(uSweepPosition - fadeWidth, uSweepPosition, vWorldX);
+          }
+          
+          if (sweepAlpha < 0.5) {  // Pixels disappear as sweep passes
             discard;
           }
         }
@@ -183,11 +194,18 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     }
   }
   
-  material.updateTransition = function(isTransitioning, progress) {
+  material.updateTransition = function(isTransitioning, progress, isMobile = false) {
     this.uniforms.uIsTransitioning.value = isTransitioning ? 1.0 : 0.0
-    // Sweep from left (-25) to right (+25)
-    const sweepPosition = -25 + (progress * 50)
-    this.uniforms.uSweepPosition.value = sweepPosition
+    
+    if (isMobile) {
+      // Mobile: sweep from top (-15) to bottom (+15) for vertical orientation
+      const sweepPosition = -15 + (progress * 30)
+      this.uniforms.uSweepPosition.value = sweepPosition
+    } else {
+      // Desktop: sweep from left (-25) to right (+25) for horizontal orientation
+      const sweepPosition = -25 + (progress * 50)
+      this.uniforms.uSweepPosition.value = sweepPosition
+    }
   }
   
   // Removed fog color update function
@@ -580,7 +598,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
-    material.updateTransition(isFading, fadeProgress)
+    material.updateTransition(isFading, fadeProgress, isMobile)
     // No fog color update needed
   })
   
