@@ -9,12 +9,29 @@ import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
+import ViewBasedProjects from './ViewBasedProjects.jsx'
+import TestScroll from './TestScroll.jsx'
 
 // No background color updater needed - keep everything white
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
 function App() {
+    // Check URL for template test
+    const urlParams = new URLSearchParams(window.location.search)
+    const templateTest = urlParams.get('template') === 'barrel-distortion'
+    const scrollTest = urlParams.get('test') === 'scroll'
+    
+    // If scroll test is requested
+    if (scrollTest) {
+        return <TestScroll />
+    }
+    
+    // If template test is requested, render the template instead of main app
+    if (templateTest) {
+        return <ViewBasedProjects />
+    }
+
     const [currentProject, setCurrentProject] = useState(0)
     const [hoveredProject, setHoveredProject] = useState(null)
     const [displayedProject, setDisplayedProject] = useState(null)

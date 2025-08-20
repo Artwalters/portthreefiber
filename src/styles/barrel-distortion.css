@@ -1,0 +1,106 @@
+/* Barrel Distortion Template Styles */
+
+/* Container and grid system */
+.container {
+  max-width: 120rem;
+  margin-inline: auto;
+  padding: 0 2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 5rem 2rem;
+  grid-template-columns: repeat(2, 1fr);
+  padding-block: 6rem;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 4rem 0;
+  }
+}
+
+/* Image wrapper styles */
+.img-wrap {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0; /* Hide original images, WebGL will render them */
+  pointer-events: none; /* Prevent interaction */
+}
+
+/* Images marked with data-webgl-media should be invisible */
+[data-webgl-media] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.img-wrap figcaption {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  color: white;
+  font-family: 'PSTimesTrial', serif;
+  z-index: 10;
+}
+
+.img-wrap figcaption strong {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+.img-wrap figcaption span {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: auto; /* Let Lenis handle smooth scrolling */
+}
+
+/* Lenis smooth scroll support */
+html.lenis {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  font-family: 'PSTimesTrial', serif;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+}
+
+/* Force scrollable content */
+html, body {
+  height: auto !important;
+  min-height: 100vh;
+}
+
+/* Canvas styles are handled inline in the component */
