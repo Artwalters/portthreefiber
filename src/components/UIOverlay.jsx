@@ -27,21 +27,7 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
             <div className="photo-counter">
               {totalImages > 0 ? `${currentImageIndex + 1}/${totalImages}` : '1/1'}
             </div>
-          ) : (
-            <div className="index-section">
-              <div className="index-title">index</div>
-              <div className="project-list">
-                {projects.map((project, index) => (
-                  <div 
-                    key={project.name}
-                    className={`project-name ${highlightedProject && highlightedProject.name === project.name && isHighlightVisible ? 'highlighted' : ''}`}
-                  >
-                    {project.name}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
         <div className="ui-top-right">
           <span className="about-button">about</span>

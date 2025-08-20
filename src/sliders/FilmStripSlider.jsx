@@ -242,6 +242,80 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const lastMouseY = useRef(0)
   const lastMoveTime = useRef(0)
   
+  // Center snapping state
+  const isSnapping = useRef(false)
+  const snapTimeout = useRef(null)
+  const lastInteractionTime = useRef(0)
+  const snapTarget = useRef(0)
+  const swipeDirection = useRef(0) // -1 = left, 1 = right, 0 = no direction
+  const isUserInteracting = useRef(false) // Track if user is actively dragging/scrolling
+  const momentum = useRef(0) // Track momentum for natural continuation
+  
+  // Center snapping functions
+  const calculateNearestSnapPosition = (currentPos, direction = 0) => {
+    const itemWidth = isMobile ? 2.3 : 3.5 // Same spacing as used elsewhere
+    
+    // The shader maps UV coordinates to tile positions
+    // At screen center (vUv.x = 0.5), we want a project to be perfectly centered
+    // We need to calculate what offset value will place a project exactly at screen center
+    
+    // From shader: tilesUV = (vUv + vec2(1000. + time * 0.01, 0.)) * vec2(aspect * 1.2, 1.)
+    // At screen center vUv.x = 0.5, so we want: (0.5 + 1000.0 + offset * 0.01) * aspect * 1.2
+    // to align with a project boundary
+    
+    const aspect = 24 / 3.3
+    const tileScaling = aspect * 1.2
+    
+    // Calculate which tile index is currently closest to screen center
+    const centerUV = 0.5 + 1000.0 + currentPos * 0.01
+    const centerTilePos = centerUV * tileScaling
+    
+    // We want to snap to the CENTER of a tile, not the edge
+    // Tile centers are at 0.5, 1.5, 2.5, etc.
+    let targetTileCenter
+    
+    if (direction > 0) {
+      // Swiped right - go to next project (higher index)
+      targetTileCenter = Math.ceil(centerTilePos - 0.5) + 0.5
+    } else if (direction < 0) {
+      // Swiped left - go to previous project (lower index) 
+      targetTileCenter = Math.floor(centerTilePos - 0.5) + 0.5
+    } else {
+      // No clear direction - go to nearest
+      targetTileCenter = Math.round(centerTilePos - 0.5) + 0.5
+    }
+    
+    // Calculate what offset would place this tile center perfectly at screen center
+    // targetTileCenter = (0.5 + 1000.0 + targetOffset * 0.01) * tileScaling
+    // Solve for targetOffset:
+    const targetOffset = (targetTileCenter / tileScaling - 0.5 - 1000.0) / 0.01
+    
+    return targetOffset
+  }
+  
+  const startSnapping = () => {
+    if (isSnapping.current) return
+    
+    const snapPosition = calculateNearestSnapPosition(targetOffset.current, swipeDirection.current)
+    snapTarget.current = snapPosition
+    isSnapping.current = true
+    swipeDirection.current = 0 // Reset direction after snapping
+  }
+  
+  const clearSnapTimeout = () => {
+    if (snapTimeout.current) {
+      clearTimeout(snapTimeout.current)
+      snapTimeout.current = null
+    }
+  }
+  
+  const scheduleSnap = () => {
+    clearSnapTimeout()
+    snapTimeout.current = setTimeout(() => {
+      startSnapping()
+    }, 300) // Longer delay to let natural movement happen first
+  }
+  
   // Create curved geometry
   const geometry = useMemo(() => {
     const splineSegments = 300
@@ -377,6 +451,13 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       startOffset = currentOffset.current
       dragging = true
       
+      // Cancel any ongoing snap
+      clearSnapTimeout()
+      isSnapping.current = false
+      isUserInteracting.current = true
+      lastInteractionTime.current = Date.now()
+      swipeDirection.current = 0 // Reset swipe direction
+      
       // Water effect
       if (waterRef?.current?.updateMouse) {
         waterRef.current.updateMouse(clientX, clientY, true)
@@ -388,6 +469,12 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      
+      // Update interaction time
+      lastInteractionTime.current = Date.now()
+      
+      // Calculate momentum for natural continuation
+      const prevOffset = targetOffset.current
       
       if (isMobile) {
         // Mobile: vertical drag = scroll with increased responsiveness (inverted)
@@ -405,6 +492,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
       
+      // Calculate momentum (velocity) for continuation effect
+      momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
+      
       // Water effect
       if (waterRef?.current?.updateMouse) {
         waterRef.current.updateMouse(clientX, clientY, true)
@@ -413,17 +503,53 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     
     const handleEnd = () => {
       dragging = false
+      isUserInteracting.current = false
+      
+      // Use momentum to determine direction and add continuation
+      if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
+        swipeDirection.current = momentum.current > 0 ? 1 : -1
+        
+        // Add momentum continuation - slider keeps moving in swipe direction
+        const momentumDistance = Math.min(Math.abs(momentum.current) * 15, 8) // Scale and cap momentum
+        const continuationOffset = momentumDistance * swipeDirection.current
+        targetOffset.current += continuationOffset
+        
+        // Set momentum to decay naturally
+        momentum.current *= 0.3
+      } else {
+        // Small movement - just center to nearest
+        swipeDirection.current = 0
+      }
+      
+      // Schedule snap to center after user stops dragging
+      scheduleSnap()
       
       if (waterRef?.current?.updateMouse) {
         waterRef.current.updateMouse(0, 0, false)
       }
     }
     
+    let wheelEndTimeout = null
+    
     const handleWheel = (e) => {
       e.preventDefault()
       
+      // Clear previous wheel end timeout
+      if (wheelEndTimeout) {
+        clearTimeout(wheelEndTimeout)
+        wheelEndTimeout = null
+      }
+      
+      // Cancel any ongoing snap and mark as interacting
+      clearSnapTimeout()
+      isSnapping.current = false
+      isUserInteracting.current = true
+      lastInteractionTime.current = Date.now()
+      
       // Smooth wheel scrolling - accumulate wheel delta for smoother movement
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
+      
+      const prevOffset = targetOffset.current
       
       if (isMobile) {
         // Mobile: use deltaY for vertical scrolling with increased responsiveness (inverted)
@@ -434,6 +560,34 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
         targetOffset.current += wheelDelta * 0.008
         sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
       }
+      
+      // Calculate momentum (velocity) for continuation effect like drag
+      momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
+      
+      // Schedule wheel end handling like drag
+      wheelEndTimeout = setTimeout(() => {
+        isUserInteracting.current = false
+        
+        // Use momentum to determine direction and add continuation like drag
+        if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
+          swipeDirection.current = momentum.current > 0 ? 1 : -1
+          
+          // Add momentum continuation - slider keeps moving in scroll direction
+          const momentumDistance = Math.min(Math.abs(momentum.current) * 15, 8) // Same as drag
+          const continuationOffset = momentumDistance * swipeDirection.current
+          targetOffset.current += continuationOffset
+          
+          // Set momentum to decay naturally
+          momentum.current *= 0.3
+        } else {
+          // Small movement - just center to nearest
+          swipeDirection.current = 0
+        }
+        
+        // Schedule snap after momentum continuation
+        scheduleSnap()
+        wheelEndTimeout = null
+      }, 150) // Same delay as drag for natural feel
     }
     
     const canvas = gl.domElement
@@ -454,6 +608,14 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       window.removeEventListener('touchmove', handleMove)
       window.removeEventListener('touchend', handleEnd)
       window.removeEventListener('wheel', handleWheel)
+      
+      // Cleanup snap timeout
+      clearSnapTimeout()
+      
+      // Cleanup wheel timeout
+      if (wheelEndTimeout) {
+        clearTimeout(wheelEndTimeout)
+      }
     }
   }, [gl, waterRef, isMobile])
   
@@ -575,8 +737,40 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       targetOffset.current = animatedOffset
       
     } else {
-      // Normal behavior when not fading
-      currentOffset.current += (targetOffset.current - currentOffset.current) * 0.1
+      // Always use smooth interpolation between current and target
+      const lerpSpeed = isUserInteracting.current ? 0.15 : 0.08 // Faster during interaction, slower when settling
+      currentOffset.current += (targetOffset.current - currentOffset.current) * lerpSpeed
+      
+      // Handle very subtle snapping only when not interacting
+      if (isSnapping.current && !isUserInteracting.current) {
+        const snapDistance = snapTarget.current - currentOffset.current
+        
+        // Extremely gentle snap influence - barely noticeable
+        const snapInfluence = 0.006 // Much weaker snap force
+        const snapDirection = Math.sign(snapDistance)
+        const snapForce = Math.min(Math.abs(snapDistance) * snapInfluence, 0.02) // Cap maximum snap force
+        
+        // Apply gentle bias toward snap target
+        targetOffset.current += snapDirection * snapForce
+        
+        // Stop snapping when reasonably close
+        if (Math.abs(snapDistance) < 0.02) {
+          isSnapping.current = false
+        }
+      }
+      
+      // Apply momentum decay when not interacting
+      if (!isUserInteracting.current && Math.abs(momentum.current) > 0.001) {
+        momentum.current *= 0.95 // Gradual momentum decay
+        targetOffset.current += momentum.current // Continue movement from momentum
+      }
+      
+      // Very subtle continuous centering when idle (almost imperceptible)
+      if (!isUserInteracting.current && !isSnapping.current && Math.abs(momentum.current) < 0.01) {
+        const continuousSnapTarget = calculateNearestSnapPosition(currentOffset.current, 0)
+        const centeringForce = 0.002 // Extremely weak centering
+        targetOffset.current += (continuousSnapTarget - targetOffset.current) * centeringForce
+      }
       
       // Fade deformation effect - extremely smooth decay for gradual RGB fade
       if (isMobile) {
