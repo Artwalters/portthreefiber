@@ -298,8 +298,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // Scale mesh to match image dimensions
         imageMesh.scale.set(bounds.width, bounds.height, 1)
 
-        // Don't hide mesh initially - let setPositions handle positioning
-        // imageMesh.position.y = 10000
+        // Hide mesh for main camera (only visible during scene capture by water shader)
+        imageMesh.visible = false
 
         scene.add(imageMesh)
 
@@ -341,9 +341,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       object.mesh.position.x = object.left - window.innerWidth / 2 + object.width / 2
       object.mesh.position.y = -object.top + window.innerHeight / 2 - object.height / 2 + scroll.scrollY
       
-      // Only hide if really far out of view
-      const inViewport = Math.abs(object.mesh.position.y) < window.innerHeight * 2
-      object.mesh.visible = inViewport
+      // Keep meshes invisible for main camera (only visible during water shader scene capture)
+      object.mesh.visible = false
     })
   }
 
