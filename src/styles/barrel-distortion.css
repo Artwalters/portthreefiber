@@ -91,7 +91,7 @@ html.lenis {
 body {
   margin: 0;
   padding: 0;
-  background: #ffffff;
+  background: transparent;
   font-family: 'PSTimesTrial', serif;
   overflow-x: hidden;
   overflow-y: auto !important;

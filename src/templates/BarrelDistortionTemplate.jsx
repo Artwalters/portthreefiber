@@ -74,7 +74,7 @@ const lerp = (start, end, factor) => start * (1 - factor) + end * factor
 
 const calcFov = (cameraPos) => 2 * Math.atan((window.innerHeight / 2) / cameraPos) * 180 / Math.PI
 
-export default function BarrelDistortionTemplate() {
+export default function BarrelDistortionTemplate({ waterRef }) {
   const { scene, camera, gl } = useThree()
   const [mediaStore, setMediaStore] = useState([])
   const [scroll, setScroll] = useState({ scrollY: 0, scrollVelocity: 0 })
@@ -168,18 +168,85 @@ export default function BarrelDistortionTemplate() {
     }
   }, [])
 
-  // Setup mouse tracking
+  // Setup mouse tracking with drag support like in FilmStripSlider
   useEffect(() => {
+    let isDragging = false
+    
     const handleMouseMove = (e) => {
       setCursorPos({
         x: e.clientX / window.innerWidth,
         y: e.clientY / window.innerHeight
       })
+      
+      // Update water shader mouse position - always send mouse move, dragging state in down/up
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, isDragging)
+      }
+    }
+    
+    const handleMouseDown = (e) => {
+      isDragging = true
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, true)
+      }
+    }
+    
+    const handleMouseUp = (e) => {
+      isDragging = false
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, false)
+      }
+    }
+    
+    // Touch events for mobile
+    const handleTouchStart = (e) => {
+      if (e.touches.length > 0) {
+        isDragging = true
+        const touch = e.touches[0]
+        if (waterRef?.current?.updateMouse) {
+          waterRef.current.updateMouse(touch.clientX, touch.clientY, true)
+        }
+      }
+    }
+    
+    const handleTouchMove = (e) => {
+      if (e.touches.length > 0) {
+        const touch = e.touches[0]
+        setCursorPos({
+          x: touch.clientX / window.innerWidth,
+          y: touch.clientY / window.innerHeight
+        })
+        
+        if (waterRef?.current?.updateMouse) {
+          waterRef.current.updateMouse(touch.clientX, touch.clientY, isDragging)
+        }
+      }
+    }
+    
+    const handleTouchEnd = (e) => {
+      isDragging = false
+      if (waterRef?.current?.updateMouse) {
+        // Use last known position
+        waterRef.current.updateMouse(0, 0, false)
+      }
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+    window.addEventListener('mousemove', handleMouseMove, { passive: true })
+    window.addEventListener('mousedown', handleMouseDown, { passive: true })
+    window.addEventListener('mouseup', handleMouseUp, { passive: true })
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+    window.addEventListener('touchend', handleTouchEnd, { passive: true })
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [waterRef])
 
   // Initialize media store from HTML images
   useEffect(() => {
