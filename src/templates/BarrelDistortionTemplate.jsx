@@ -261,7 +261,9 @@ export default function BarrelDistortionTemplate({ waterRef }) {
 
   // Initialize media store from HTML images and text elements
   useEffect(() => {
-    const initializeMediaStore = () => {
+    // Wait for fonts to be ready before initializing text meshes
+    const initializeMediaStore = async () => {
+      await document.fonts.ready
       const mediaElements = document.querySelectorAll('[data-webgl-media]')
       const textElements = document.querySelectorAll('[data-webgl-text]')
       const newMediaStore = []
@@ -309,8 +311,9 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         imageMaterial.uniforms.uTextureSize.value.set(media.naturalWidth, media.naturalHeight)
         imageMaterial.uniforms.uQuadSize.value.set(bounds.width, bounds.height)
 
-        // Hide mesh for main camera (only visible during scene capture by water shader)
+        // Hide mesh immediately and keep it hidden for main camera
         imageMesh.visible = false
+        imageMesh.frustumCulled = false // Prevent culling issues
 
         scene.add(imageMesh)
 
@@ -404,9 +407,10 @@ export default function BarrelDistortionTemplate({ waterRef }) {
           originalText: textMesh.text 
         }
 
-        // Hide mesh for main camera (only visible during scene capture by water shader)
+        // Hide mesh immediately and keep it hidden for main camera
         textMesh.visible = false
-
+        textMesh.frustumCulled = false // Prevent culling issues
+        
         scene.add(textMesh)
 
         newMediaStore.push({
@@ -488,8 +492,9 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // Will only be visible during water scene capture
       }
       
-      // Keep meshes invisible for main camera (only visible during water shader scene capture)
+      // Force meshes to stay invisible for main camera (only visible during water shader scene capture)
       object.mesh.visible = false
+      object.mesh.frustumCulled = false
     })
   }
 

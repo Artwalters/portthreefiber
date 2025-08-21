@@ -32,6 +32,7 @@ export default function ViewBasedProjects() {
         })
     }, [])
     
+    
     useEffect(() => {
         // Add class to body for barrel distortion page
         document.body.classList.add('barrel-distortion-page')
@@ -90,6 +91,7 @@ export default function ViewBasedProjects() {
                 
                 {/* Single Canvas with all layers - wait for fonts and device detection first */}
                 {fontsReady && deviceCapabilities && <Canvas
+                    frameloop="always"
                     camera={{
                         position: [0, 0, deviceCapabilities?.shouldUseMobileWater ? 8 : 5],
                         fov: 75
@@ -105,7 +107,6 @@ export default function ViewBasedProjects() {
                         precision: deviceCapabilities?.shouldUseMobileWater ? 'mediump' : 'highp'
                     }}
                     dpr={deviceCapabilities?.shouldUseMobileWater ? 1 : [1, 2]}
-                    frameloop="always"
                     style={{
                         position: 'fixed',
                         top: 0,
@@ -203,7 +204,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         THREE.JS WATER EFFECTS
@@ -212,7 +215,7 @@ export default function ViewBasedProjects() {
                         data-webgl-text 
                         style={{ 
                             fontSize: '1.2rem', 
-                            color: '#666',
+                            color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
                             fontFamily: 'PSTimesTrial, serif',
@@ -223,7 +226,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         Interactive water simulation with real-time distortion effects and responsive barrel transformations
@@ -252,7 +257,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         SCROLL DRIVEN SHADERS
@@ -261,7 +268,7 @@ export default function ViewBasedProjects() {
                         data-webgl-text 
                         style={{ 
                             fontSize: '1.2rem', 
-                            color: '#666',
+                            color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
                             fontFamily: 'PSTimesTrial, serif',
@@ -272,7 +279,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         Advanced shader effects that respond to user scrolling with smooth Lenis integration and velocity-based distortions
@@ -301,7 +310,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         RESPONSIVE WEBGL TEXT
@@ -310,7 +321,7 @@ export default function ViewBasedProjects() {
                         data-webgl-text 
                         style={{ 
                             fontSize: '1.2rem', 
-                            color: '#666',
+                            color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
                             fontFamily: 'PSTimesTrial, serif',
@@ -321,7 +332,9 @@ export default function ViewBasedProjects() {
                             userSelect: 'none',
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
-                            msUserSelect: 'none'
+                            msUserSelect: 'none',
+                            opacity: 0,
+                            visibility: 'hidden'
                         }}
                     >
                         HTML-first approach with WebGL rendering enables SEO-friendly text with custom shader effects and perfect responsive behavior
