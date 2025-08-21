@@ -205,8 +205,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         THREE.JS WATER EFFECTS
@@ -227,8 +225,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         Interactive water simulation with real-time distortion effects and responsive barrel transformations
@@ -258,8 +254,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         SCROLL DRIVEN SHADERS
@@ -280,8 +274,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         Advanced shader effects that respond to user scrolling with smooth Lenis integration and velocity-based distortions
@@ -311,8 +303,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         RESPONSIVE WEBGL TEXT
@@ -333,8 +323,6 @@ export default function ViewBasedProjects() {
                             WebkitUserSelect: 'none',
                             MozUserSelect: 'none',
                             msUserSelect: 'none',
-                            opacity: 0,
-                            visibility: 'hidden'
                         }}
                     >
                         HTML-first approach with WebGL rendering enables SEO-friendly text with custom shader effects and perfect responsive behavior

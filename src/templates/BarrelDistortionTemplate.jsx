@@ -393,26 +393,23 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // White space behavior
         textMesh.whiteSpace = computedStyle.whiteSpace
 
-        // Force sync and wait for geometry to be ready - tutorial method
-        textMesh.sync()
-        
-        // Add onAfterRender callback to ensure geometry is ready
-        textMesh.onAfterRender = () => {
-          // Text is now fully rendered and ready
-        }
-
         // Add marker so water shader can find this text mesh
         textMesh.userData = { 
           type: 'webgl-text',
           originalText: textMesh.text 
         }
 
-        // Hide mesh immediately and keep it hidden for main camera
+        // Hide mesh BEFORE adding to scene to prevent any flash
         textMesh.visible = false
         textMesh.frustumCulled = false // Prevent culling issues
         
-        scene.add(textMesh)
+        // Force sync after setting visibility to prevent flash
+        textMesh.sync(() => {
+          // Text is ready and invisible - safe to add to scene
+          scene.add(textMesh)
+        })
 
+        // Add to store immediately (mesh will be added to scene asynchronously)
         newMediaStore.push({
           type: 'text',
           media: textElement,
