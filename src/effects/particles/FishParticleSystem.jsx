@@ -132,7 +132,7 @@ function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }
   )
 }
 
-export default function FishParticleSystem() {
+export default function FishParticleSystem({ scrollY = 0 }) {
   const { scene, animations } = useGLTF('./models/koi.glb')
   const { camera } = useThree()
   const fishRefs = useRef([])
@@ -453,8 +453,9 @@ export default function FishParticleSystem() {
       
       fish.rotation += rotationDiff * delta * 3 // Smooth rotation
       
-      // Apply position and rotation to mesh
-      fishRef.position.copy(fish.position)
+      // Apply position and rotation to mesh with parallax effect
+      const parallaxY = scrollY * (0.001 * (1 + fish.position.z * -0.05)) // Parallax based on depth
+      fishRef.position.set(fish.position.x, fish.position.y + parallaxY, fish.position.z)
       // Keep top-down view: X-rotation for top-down, Z-rotation for direction
       fishRef.rotation.set(0, 0, fish.rotation)
     })

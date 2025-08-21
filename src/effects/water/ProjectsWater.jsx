@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect, useImperativeHandle, forwardRef } from 'rea
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const ProjectsWater = forwardRef((props, ref) => {
+const ProjectsWater = forwardRef(({ scrollY = 0 }, ref) => {
     const { gl, size, scene, camera } = useThree()
     const meshRef = useRef()
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
@@ -358,10 +358,13 @@ const ProjectsWater = forwardRef((props, ref) => {
         return new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
     }, [])
     
+    // Calculate parallax offset based on scroll
+    const parallaxY = scrollY * 0.002 // Much more noticeable vertical movement
+    
     return (
         <mesh 
             ref={meshRef}
-            position={[0, 0, 10]}
+            position={[0, parallaxY, 10]}
             frustumCulled={false}
             renderOrder={9999}
             raycast={() => null}

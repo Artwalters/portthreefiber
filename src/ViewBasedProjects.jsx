@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import BarrelDistortionTemplate from './templates/BarrelDistortionTemplate'
@@ -8,6 +8,17 @@ import './styles/barrel-distortion.css'
 
 export default function ViewBasedProjects() {
     const waterRef = useRef()
+    const [scrollY, setScrollY] = useState(0)
+    
+    // Track scroll position for parallax effect
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrollY(window.scrollY)
+        }
+        
+        window.addEventListener('scroll', handleScroll, { passive: true })
+        return () => window.removeEventListener('scroll', handleScroll)
+    }, [])
     
     useEffect(() => {
         // Add class to body for barrel distortion page
@@ -72,13 +83,13 @@ export default function ViewBasedProjects() {
                     }}
                 >
                     {/* Layer 1: Fish (bottom) */}
-                    <FishParticleSystem />
+                    <FishParticleSystem scrollY={scrollY} />
                     
                     {/* Layer 2: Barrel Distortion (middle) */}
                     <BarrelDistortionTemplate waterRef={waterRef} />
                     
                     {/* Layer 3: Water (top) */}
-                    <ProjectsWater ref={waterRef} />
+                    <ProjectsWater ref={waterRef} scrollY={scrollY} />
                 </Canvas>
 
             {/* Navigation UI */}
