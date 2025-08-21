@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Art Walters Portfolio</title>
     <script>
-        // GitHub Pages SPA router - redirect all 404s to index.html with original path as search param
-        (function(l) {
-            if (l.search[1] === '/' ) {
-                var decoded = l.search.slice(1).split('&').map(function(s) { 
-                    return s.replace(/~and~/g, '&')
-                }).join('?');
-                window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
-            }
-        }(window.location))
+        // Simple redirect to index.html with query params
+        console.log('404.html loaded, redirecting...')
+        console.log('Current URL:', window.location.href)
+        
+        // Extract query params and redirect to index.html
+        var params = window.location.search
+        if (!params && window.location.pathname !== '/') {
+            // If no query params but we have a path, convert path to query param
+            params = '?path=' + encodeURIComponent(window.location.pathname)
+        }
+        
+        var newUrl = '/portthreefiber/' + params + window.location.hash
+        console.log('Redirecting to:', newUrl)
+        window.location.replace(newUrl)
     </script>
 </head>
 <body>
