@@ -32,7 +32,7 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
         <div className="ui-top-right">
           <span 
             className="about-button" 
-            onClick={() => window.location.href = '/?template=barrel-distortion'}
+            onClick={() => window.location.href = '/portthreefiber/?template=barrel-distortion'}
             style={{ cursor: 'pointer' }}
           >
             barrel test
