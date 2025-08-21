@@ -1,4 +1,4 @@
-import { useGLTF, useAnimations } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { useEffect, useRef, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -139,27 +139,6 @@ export default function FishParticleSystem({ scrollY = 0 }) {
   const fishActions = useRef([])
   const mousePosition = useRef(new THREE.Vector2(0, 0))
   
-  // Animation info logged once
-  useEffect(() => {
-    
-    // Debug scene structure
-    scene.traverse((child) => {
-      if (child.isMesh || child.isSkinnedMesh) {
-        if (child.isSkinnedMesh && child.skeleton) {
-        }
-        if (child.morphTargetInfluences) {
-        }
-        if (child.geometry && child.geometry.morphAttributes) {
-        }
-      }
-    })
-    
-    // Debug animation clips
-    animations.forEach((clip) => {
-      clip.tracks.forEach((track) => {
-      })
-    })
-  }, [animations, scene])
   
   // Initialize fish data
   const fishData = useMemo(() => {

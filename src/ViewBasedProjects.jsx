@@ -3,7 +3,6 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import BarrelDistortionTemplate from './templates/BarrelDistortionTemplate'
 import FishParticleSystem from './effects/particles/FishParticleSystem'
-import ProjectsWater from './effects/water/ProjectsWater'
 import MobileWater from './effects/water/MobileWater'
 import SimpleWater from './effects/water/SimpleWater'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
@@ -20,10 +19,6 @@ export default function ViewBasedProjects() {
     // Detect device capabilities on mount
     useEffect(() => {
         const capabilities = getDeviceCapabilities()
-        console.log('Device capabilities (ViewBasedProjects):', capabilities)
-        console.log('Screen size:', window.innerWidth, 'x', window.innerHeight)
-        console.log('Touch support:', 'ontouchstart' in window)
-        console.log('User agent:', navigator.userAgent)
         setDeviceCapabilities(capabilities)
     }, [])
     
@@ -33,7 +28,6 @@ export default function ViewBasedProjects() {
     // Wait for fonts to load - critical for text rendering
     useEffect(() => {
         document.fonts.ready.then(() => {
-            console.log('Fonts are ready!')
             setFontsReady(true)
         })
     }, [])

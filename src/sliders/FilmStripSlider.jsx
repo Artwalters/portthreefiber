@@ -627,15 +627,6 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const fadeStartOffset = useRef(0)
   
   // Project colors - assign unique color to each project
-  const projectColors = [
-    '#FF6B6B', // Red - project-1
-    '#4ECDC4', // Teal - project-2  
-    '#45B7D1', // Blue - project-3
-    '#96CEB4', // Green - project-4
-    '#FFEAA7', // Yellow - project-5
-    '#DDA0DD', // Plum - project-6
-    '#98D8C8'  // Mint - project-7
-  ]
   
   // Click detection state
   const isClickDragging = useRef(false)

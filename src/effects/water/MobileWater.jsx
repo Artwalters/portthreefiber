@@ -211,7 +211,6 @@ const MobileWater = forwardRef((props, ref) => {
                 uSceneTexture: { value: null },
                 uTime: { value: 0 },
                 uHasFloatSupport: { value: buffers.hasFloatSupport ? 1.0 : 0.0 },
-                // Removed background color uniform
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -225,7 +224,6 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform sampler2D uSceneTexture;
                 uniform float uTime;
                 uniform float uHasFloatSupport;
-                // Removed background color uniform
                 varying vec2 vUv;
                 
                 void main() {
@@ -399,17 +397,13 @@ const MobileWater = forwardRef((props, ref) => {
                     if (child.isMesh && child.material && child.material.uniforms && child.material.uniforms.uScrollVelocity) {
                         barrelDistortionMeshes.push(child)
                         child.visible = true
-                        console.log('MobileWater: Image mesh made visible', child)
                     }
                     // Text meshes (troika Text objects)
                     else if (child.isText || child.type === 'Text' || child.userData?.type === 'webgl-text') {
                         barrelDistortionMeshes.push(child)
                         child.visible = true
-                        console.log('MobileWater: Text mesh made visible', child)
                     }
                 })
-                
-                console.log('MobileWater: Found', barrelDistortionMeshes.length, 'meshes to capture')
                 
                 gl.setRenderTarget(buffers.scene)
                 gl.setClearColor(new THREE.Color(1, 1, 1), 1.0)
@@ -436,7 +430,6 @@ const MobileWater = forwardRef((props, ref) => {
                 material.uniforms.uWaterTexture.value = buffers.read.texture
                 material.uniforms.uSceneTexture.value = buffers.scene.texture
                 material.uniforms.uTime.value = state.clock.elapsedTime
-                // No background color update needed
             }
         } catch (error) {
             console.warn('Display material error, continuing...', error)
