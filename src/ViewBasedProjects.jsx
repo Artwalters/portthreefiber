@@ -4,6 +4,9 @@ import * as THREE from 'three'
 import BarrelDistortionTemplate from './templates/BarrelDistortionTemplate'
 import FishParticleSystem from './effects/particles/FishParticleSystem'
 import ProjectsWater from './effects/water/ProjectsWater'
+import MobileWater from './effects/water/MobileWater'
+import SimpleWater from './effects/water/SimpleWater'
+import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import './styles/barrel-distortion.css'
 
 export default function ViewBasedProjects() {
@@ -11,15 +14,21 @@ export default function ViewBasedProjects() {
     const [scrollY, setScrollY] = useState(0)
     const [fontsReady, setFontsReady] = useState(false)
     
-    // Track scroll position for parallax effect
+    // Device capabilities detection
+    const [deviceCapabilities, setDeviceCapabilities] = useState(null)
+
+    // Detect device capabilities on mount
     useEffect(() => {
-        const handleScroll = () => {
-            setScrollY(window.scrollY)
-        }
-        
-        window.addEventListener('scroll', handleScroll, { passive: true })
-        return () => window.removeEventListener('scroll', handleScroll)
+        const capabilities = getDeviceCapabilities()
+        console.log('Device capabilities (ViewBasedProjects):', capabilities)
+        console.log('Screen size:', window.innerWidth, 'x', window.innerHeight)
+        console.log('Touch support:', 'ontouchstart' in window)
+        console.log('User agent:', navigator.userAgent)
+        setDeviceCapabilities(capabilities)
     }, [])
+    
+    // Scroll is now handled by Lenis in BarrelDistortionTemplate
+    // No need for separate scroll listener
     
     // Wait for fonts to load - critical for text rendering
     useEffect(() => {
@@ -33,7 +42,7 @@ export default function ViewBasedProjects() {
         // Add class to body for barrel distortion page
         document.body.classList.add('barrel-distortion-page')
         
-        // Force override ALL scroll-blocking CSS with !important
+        // Force override ALL scroll-blocking CSS with !important  
         const styleSheet = document.createElement('style')
         styleSheet.textContent = `
             html, body, #root {
@@ -44,7 +53,31 @@ export default function ViewBasedProjects() {
                 top: unset !important;
                 left: unset !important;
                 width: auto !important;
-                touch-action: auto !important;
+                touch-action: pan-y !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+            
+            /* Better mobile scroll handling */
+            @media (max-width: 768px) {
+                html, body {
+                    overscroll-behavior: none !important;
+                    -webkit-overflow-scrolling: touch !important;
+                    /* iOS Safari specific fixes */
+                    -webkit-touch-callout: none !important;
+                    -webkit-user-select: none !important;
+                }
+                
+                /* Prevent iOS bounce */
+                body {
+                    position: relative !important;
+                    overflow-x: hidden !important;
+                }
+                
+                /* Improve touch responsiveness */
+                * {
+                    -webkit-tap-highlight-color: transparent !important;
+                    -webkit-touch-callout: none !important;
+                }
             }
         `
         document.head.appendChild(styleSheet)
@@ -61,21 +94,23 @@ export default function ViewBasedProjects() {
             {/* Force scroll by creating a large content area first */}
             <div style={{ height: '300vh', width: '100%', position: 'relative', zIndex: 1 }}>
                 
-                {/* Single Canvas with all layers - wait for fonts first */}
-                {fontsReady && <Canvas
+                {/* Single Canvas with all layers - wait for fonts and device detection first */}
+                {fontsReady && deviceCapabilities && <Canvas
                     camera={{
-                        position: [0, 0, 5],
+                        position: [0, 0, deviceCapabilities?.shouldUseMobileWater ? 8 : 5],
                         fov: 75
                     }}
                     gl={{ 
                         alpha: false,
-                        antialias: true,
-                        powerPreference: 'high-performance',
+                        antialias: !deviceCapabilities?.shouldUseMobileWater,
+                        powerPreference: deviceCapabilities?.shouldUseMobileWater ? 'default' : 'high-performance',
+                        pixelRatio: deviceCapabilities?.shouldUseMobileWater ? 1 : Math.min(window.devicePixelRatio, 2),
                         outputColorSpace: THREE.SRGBColorSpace,
                         toneMapping: THREE.NoToneMapping,
-                        toneMappingExposure: 1.0
+                        toneMappingExposure: 1.0,
+                        precision: deviceCapabilities?.shouldUseMobileWater ? 'mediump' : 'highp'
                     }}
-                    dpr={[1, 2]}
+                    dpr={deviceCapabilities?.shouldUseMobileWater ? 1 : [1, 2]}
                     frameloop="always"
                     style={{
                         position: 'fixed',
@@ -87,7 +122,13 @@ export default function ViewBasedProjects() {
                         pointerEvents: 'auto'
                     }}
                     onCreated={({ scene, gl }) => {
-                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                        // Add fog - adjust for mobile
+                        const isMobile = window.innerWidth <= 768
+                        if (isMobile) {
+                            scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                        } else {
+                            scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                        }
                         gl.setClearColor('#ffffff')
                     }}
                 >
@@ -97,8 +138,12 @@ export default function ViewBasedProjects() {
                     {/* Layer 2: Barrel Distortion (middle) */}
                     <BarrelDistortionTemplate waterRef={waterRef} />
                     
-                    {/* Layer 3: Water (top) */}
-                    <ProjectsWater ref={waterRef} scrollY={scrollY} />
+                    {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
+                    {deviceCapabilities?.shouldUseMobileWater ? (
+                        <MobileWater ref={waterRef} scrollY={scrollY} />
+                    ) : (
+                        <SimpleWater ref={waterRef} scrollY={scrollY} />
+                    )}
                 </Canvas>}
 
             {/* Navigation UI */}

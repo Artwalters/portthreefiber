@@ -301,12 +301,36 @@ const SimpleWater = forwardRef((props, ref) => {
             if (meshRef.current && buffers.scene) {
                 meshRef.current.visible = false
                 
+                // Make BarrelDistortionTemplate meshes AND text meshes visible during scene capture
+                const barrelDistortionMeshes = []
+                scene.traverse((child) => {
+                    // Original barrel distortion meshes (images)
+                    if (child.isMesh && child.material && child.material.uniforms && child.material.uniforms.uScrollVelocity) {
+                        barrelDistortionMeshes.push(child)
+                        child.visible = true
+                        console.log('SimpleWater: Image mesh made visible', child)
+                    }
+                    // Text meshes (troika Text objects)
+                    else if (child.isText || child.type === 'Text' || child.userData?.type === 'webgl-text') {
+                        barrelDistortionMeshes.push(child)
+                        child.visible = true
+                        console.log('SimpleWater: Text mesh made visible', child)
+                    }
+                })
+                
+                console.log('SimpleWater: Found', barrelDistortionMeshes.length, 'meshes to capture')
+                
                 gl.setRenderTarget(buffers.scene)
                 gl.setClearColor(new THREE.Color(1, 1, 1), 1.0)
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT) // Clear both color and depth
                 
                 // Force a complete frame render with antialiasing
                 gl.render(scene, camera)
+                
+                // Hide BarrelDistortionTemplate meshes again after capture
+                barrelDistortionMeshes.forEach(mesh => {
+                    mesh.visible = false
+                })
                 
                 meshRef.current.visible = true
             }

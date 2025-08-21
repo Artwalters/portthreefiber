@@ -134,17 +134,25 @@ export default function BarrelDistortionTemplate({ waterRef }) {
     }
   }, [mediaStore])
 
-  // Setup Lenis smooth scroll
+  // Setup Lenis smooth scroll with mobile-specific optimizations
   useEffect(() => {
+    const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window
+    
     const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      duration: isMobile ? 0.8 : 1.2, // Faster response on mobile
+      easing: isMobile ? 
+        (t) => 1 - Math.pow(1 - t, 3) : // Simpler easing for mobile 
+        (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: 'vertical',
       gestureOrientation: 'vertical',
-      smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 2,
+      smoothWheel: !isMobile, // Disable smooth wheel on mobile - let native scroll handle it
+      wheelMultiplier: isMobile ? 0.5 : 1, // Reduce wheel sensitivity on mobile
+      touchMultiplier: isMobile ? 1.0 : 1.5, // More conservative touch multiplier
       infinite: false,
+      normalizeWheel: !isMobile, // Only normalize on desktop
+      lerp: isMobile ? 0.05 : 0.1, // More responsive on mobile
+      syncTouch: isMobile, // Better touch sync on mobile
+      touchInertiaMultiplier: isMobile ? 15 : 35 // Lighter inertia on mobile
     })
 
     // Update scroll state when Lenis scrolls
@@ -338,12 +346,18 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // Copy text content and apply CSS styles - tutorial method
         textMesh.text = textElement.innerText
         
-        // Font size - make it large for testing
+        // Font size - scale based on device for better visibility
         const fontSizeNum = parseFloat(computedStyle.fontSize)
-        textMesh.fontSize = fontSizeNum * 0.5 // Much larger for testing
+        const isMobile = window.innerWidth <= 768
+        textMesh.fontSize = fontSizeNum * (isMobile ? 0.3 : 0.6) // 6x larger than before
         
-        // Color - convert CSS color to THREE color
-        textMesh.color = new THREE.Color(computedStyle.color)
+        // Color - convert CSS color to THREE color, handle transparent colors
+        const cssColor = computedStyle.color
+        if (cssColor === 'transparent' || cssColor.includes('rgba(0, 0, 0, 0)')) {
+          textMesh.color = new THREE.Color('#333333') // Default dark color for transparent text
+        } else {
+          textMesh.color = new THREE.Color(cssColor)
+        }
         
         // Text alignment
         textMesh.textAlign = computedStyle.textAlign
@@ -465,7 +479,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // Troika handles text sizing internally based on fontSize property
         // We just need to position it correctly
         const pixelsPerUnit = window.innerHeight / height
-        const newFontSize = parseFloat(object.computedStyle.fontSize) / pixelsPerUnit * 0.5 // Much larger
+        const isMobile = window.innerWidth <= 768
+        const newFontSize = parseFloat(object.computedStyle.fontSize) / pixelsPerUnit * (isMobile ? 0.3 : 0.6)
         object.mesh.fontSize = newFontSize
         object.mesh.maxWidth = object.width / pixelsPerUnit
         
@@ -512,7 +527,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         } else if (object.type === 'text') {
           // Update text properties from CSS
           const computedStyle = window.getComputedStyle(object.media)
-          object.mesh.fontSize = parseFloat(computedStyle.fontSize) * 0.5 // Much larger
+          const isMobile = window.innerWidth <= 768
+          object.mesh.fontSize = parseFloat(computedStyle.fontSize) * (isMobile ? 0.3 : 0.6)
           object.mesh.maxWidth = bounds.width
           object.computedStyle = computedStyle
         }

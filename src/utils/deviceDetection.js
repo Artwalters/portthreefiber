@@ -4,17 +4,20 @@ export const isMobileDevice = () => {
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
     
     // Check user agent for mobile indicators
-    const mobileRegex = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+    const mobileRegex = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i
     const isMobileUA = mobileRegex.test(navigator.userAgent)
     
-    // Check screen size (mobile-typical sizes)
-    const isSmallScreen = window.innerWidth <= 768
+    // Check screen size (mobile-typical sizes) - more aggressive detection
+    const isSmallScreen = window.innerWidth <= 1024 // Increased threshold for tablets
     
     // Check for mobile-specific features
     const isMobileOrientation = typeof window.orientation !== 'undefined'
     
+    // Check for mobile-specific CSS media query support
+    const isMobileMedia = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+    
     // Combine checks - if any mobile indicator is true, treat as mobile
-    return hasTouch || isMobileUA || (isSmallScreen && isMobileOrientation)
+    return hasTouch && (isMobileUA || isSmallScreen || isMobileOrientation || isMobileMedia)
 }
 
 // Check if device supports float textures (for desktop water shader)
