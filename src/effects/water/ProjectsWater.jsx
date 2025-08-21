@@ -301,12 +301,19 @@ const ProjectsWater = forwardRef(({ scrollY = 0 }, ref) => {
             if (meshRef.current && buffers.scene) {
                 meshRef.current.visible = false
                 
-                // Make BarrelDistortionTemplate meshes visible during scene capture
+                // Make BarrelDistortionTemplate meshes AND text meshes visible during scene capture
                 const barrelDistortionMeshes = []
                 scene.traverse((child) => {
+                    // Original barrel distortion meshes (images)
                     if (child.isMesh && child.material && child.material.uniforms && child.material.uniforms.uScrollVelocity) {
                         barrelDistortionMeshes.push(child)
                         child.visible = true
+                    }
+                    // Text meshes (troika Text objects)
+                    else if (child.isText || child.type === 'Text' || child.userData?.type === 'webgl-text') {
+                        barrelDistortionMeshes.push(child)
+                        child.visible = true
+                        // Text mesh found and made visible for capture
                     }
                 })
                 

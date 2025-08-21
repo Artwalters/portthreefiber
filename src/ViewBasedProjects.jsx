@@ -9,6 +9,7 @@ import './styles/barrel-distortion.css'
 export default function ViewBasedProjects() {
     const waterRef = useRef()
     const [scrollY, setScrollY] = useState(0)
+    const [fontsReady, setFontsReady] = useState(false)
     
     // Track scroll position for parallax effect
     useEffect(() => {
@@ -18,6 +19,14 @@ export default function ViewBasedProjects() {
         
         window.addEventListener('scroll', handleScroll, { passive: true })
         return () => window.removeEventListener('scroll', handleScroll)
+    }, [])
+    
+    // Wait for fonts to load - critical for text rendering
+    useEffect(() => {
+        document.fonts.ready.then(() => {
+            console.log('Fonts are ready!')
+            setFontsReady(true)
+        })
     }, [])
     
     useEffect(() => {
@@ -52,8 +61,8 @@ export default function ViewBasedProjects() {
             {/* Force scroll by creating a large content area first */}
             <div style={{ height: '300vh', width: '100%', position: 'relative', zIndex: 1 }}>
                 
-                {/* Single Canvas with all layers - just like the main app */}
-                <Canvas
+                {/* Single Canvas with all layers - wait for fonts first */}
+                {fontsReady && <Canvas
                     camera={{
                         position: [0, 0, 5],
                         fov: 75
@@ -90,7 +99,7 @@ export default function ViewBasedProjects() {
                     
                     {/* Layer 3: Water (top) */}
                     <ProjectsWater ref={waterRef} scrollY={scrollY} />
-                </Canvas>
+                </Canvas>}
 
             {/* Navigation UI */}
             <div style={{
@@ -133,34 +142,151 @@ export default function ViewBasedProjects() {
                     borderRadius: '8px'
                 }}>Barrel Distortion Test</h1>
                 
-                {/* Image 1 */}
-                <div style={{ margin: '10rem auto', width: '600px', height: '400px', maxWidth: '90vw' }}>
-                    <img 
-                        src="./img/project-1.png" 
-                        alt="Image 1" 
-                        data-webgl-media
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
-                    />
+                {/* Project 1 */}
+                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
+                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                        <img 
+                            src="./img/project-1.png" 
+                            alt="Image 1" 
+                            data-webgl-media
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
+                        />
+                    </div>
+                    <h2 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '2.5rem', 
+                            fontWeight: '700',
+                            color: '#333',
+                            margin: '0 0 1rem 0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        THREE.JS WATER EFFECTS
+                    </h2>
+                    <p 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '1.2rem', 
+                            color: '#666',
+                            lineHeight: '1.6',
+                            margin: '0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            maxWidth: '500px',
+                            marginLeft: 'auto',
+                            marginRight: 'auto',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        Interactive water simulation with real-time distortion effects and responsive barrel transformations
+                    </p>
                 </div>
 
-                {/* Image 2 */}
-                <div style={{ margin: '10rem auto', width: '600px', height: '400px', maxWidth: '90vw' }}>
-                    <img 
-                        src="./img/project-2.png" 
-                        alt="Image 2" 
-                        data-webgl-media
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
-                    />
+                {/* Project 2 */}
+                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
+                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                        <img 
+                            src="./img/project-2.png" 
+                            alt="Image 2" 
+                            data-webgl-media
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
+                        />
+                    </div>
+                    <h2 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '2.5rem', 
+                            fontWeight: '700',
+                            color: '#333',
+                            margin: '0 0 1rem 0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        SCROLL DRIVEN SHADERS
+                    </h2>
+                    <p 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '1.2rem', 
+                            color: '#666',
+                            lineHeight: '1.6',
+                            margin: '0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            maxWidth: '500px',
+                            marginLeft: 'auto',
+                            marginRight: 'auto',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        Advanced shader effects that respond to user scrolling with smooth Lenis integration and velocity-based distortions
+                    </p>
                 </div>
 
-                {/* Image 3 */}
-                <div style={{ margin: '10rem auto', width: '600px', height: '400px', maxWidth: '90vw' }}>
-                    <img 
-                        src="./img/project-3.png" 
-                        alt="Image 3" 
-                        data-webgl-media
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
-                    />
+                {/* Project 3 */}
+                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
+                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                        <img 
+                            src="./img/project-3.png" 
+                            alt="Image 3" 
+                            data-webgl-media
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0, visibility: 'hidden' }}
+                        />
+                    </div>
+                    <h2 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '2.5rem', 
+                            fontWeight: '700',
+                            color: '#333',
+                            margin: '0 0 1rem 0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        RESPONSIVE WEBGL TEXT
+                    </h2>
+                    <p 
+                        data-webgl-text 
+                        style={{ 
+                            fontSize: '1.2rem', 
+                            color: '#666',
+                            lineHeight: '1.6',
+                            margin: '0',
+                            fontFamily: 'PSTimesTrial, serif',
+                            maxWidth: '500px',
+                            marginLeft: 'auto',
+                            marginRight: 'auto',
+                            color: 'transparent',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                            msUserSelect: 'none'
+                        }}
+                    >
+                        HTML-first approach with WebGL rendering enables SEO-friendly text with custom shader effects and perfect responsive behavior
+                    </p>
                 </div>
 
                 <div style={{ height: '50vh' }}></div>

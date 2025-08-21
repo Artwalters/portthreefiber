@@ -2,6 +2,9 @@ import React, { useRef, useEffect, useState, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import Lenis from 'lenis'
+// Import troika text - tutorial style
+// @ts-ignore
+import { Text } from 'troika-three-text'
 
 // Define shaders inline (since we don't have raw imports configured)
 const vertexShader = `
@@ -248,16 +251,19 @@ export default function BarrelDistortionTemplate({ waterRef }) {
     }
   }, [waterRef])
 
-  // Initialize media store from HTML images
+  // Initialize media store from HTML images and text elements
   useEffect(() => {
     const initializeMediaStore = () => {
       const mediaElements = document.querySelectorAll('[data-webgl-media]')
+      const textElements = document.querySelectorAll('[data-webgl-text]')
       const newMediaStore = []
+      let globalIndex = 0
 
-      mediaElements.forEach((media, index) => {
+      // Process image elements
+      mediaElements.forEach((media) => {
         // Set up observer
         if (observerRef.current) {
-          media.dataset.index = String(index)
+          media.dataset.index = String(globalIndex)
           observerRef.current.observe(media)
         }
 
@@ -295,14 +301,13 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         imageMaterial.uniforms.uTextureSize.value.set(media.naturalWidth, media.naturalHeight)
         imageMaterial.uniforms.uQuadSize.value.set(bounds.width, bounds.height)
 
-        // Don't set scale here - let setPositions handle it
-
         // Hide mesh for main camera (only visible during scene capture by water shader)
         imageMesh.visible = false
 
         scene.add(imageMesh)
 
         newMediaStore.push({
+          type: 'image',
           media,
           material: imageMaterial,
           mesh: imageMesh,
@@ -312,7 +317,100 @@ export default function BarrelDistortionTemplate({ waterRef }) {
           left: bounds.left,
           isInView: true // Always set to true initially, let observer handle it
         })
+
+        globalIndex++
       })
+
+      // Process text elements
+      textElements.forEach((textElement, index) => {
+        // Set up observer
+        if (observerRef.current) {
+          textElement.dataset.index = String(globalIndex)
+          observerRef.current.observe(textElement)
+        }
+
+        const bounds = textElement.getBoundingClientRect()
+        const computedStyle = window.getComputedStyle(textElement)
+        
+        // Create text mesh using troika-three-text
+        const textMesh = new Text()
+        
+        // Copy text content and apply CSS styles - tutorial method
+        textMesh.text = textElement.innerText
+        
+        // Font size - make it large for testing
+        const fontSizeNum = parseFloat(computedStyle.fontSize)
+        textMesh.fontSize = fontSizeNum * 0.5 // Much larger for testing
+        
+        // Color - convert CSS color to THREE color
+        textMesh.color = new THREE.Color(computedStyle.color)
+        
+        // Text alignment
+        textMesh.textAlign = computedStyle.textAlign
+        
+        // Max width for text wrapping
+        textMesh.maxWidth = bounds.width
+        
+        // Text mesh created successfully
+        
+        // Don't set font for now - let troika use default
+        // textMesh.font = 'Arial' // This was causing the font loading error
+        
+        // Anchor based on CSS text alignment
+        textMesh.anchorX = computedStyle.textAlign === 'center' ? '50%' : 
+                          computedStyle.textAlign === 'right' ? '100%' : '0%'
+        textMesh.anchorY = "50%" // Tutorial uses "50%" for middle
+        
+        // Line spacing - tutorial method
+        const lineHeight = parseFloat(computedStyle.lineHeight)
+        if (!isNaN(lineHeight)) {
+          textMesh.lineHeight = lineHeight / fontSizeNum
+        }
+        
+        // Letter spacing - tutorial method  
+        const letterSpacing = parseFloat(computedStyle.letterSpacing) 
+        if (!isNaN(letterSpacing)) {
+          textMesh.letterSpacing = letterSpacing / fontSizeNum
+        }
+        
+        // White space behavior
+        textMesh.whiteSpace = computedStyle.whiteSpace
+
+        // Force sync and wait for geometry to be ready - tutorial method
+        textMesh.sync()
+        
+        // Add onAfterRender callback to ensure geometry is ready
+        textMesh.onAfterRender = () => {
+          // Text is now fully rendered and ready
+        }
+
+        // Add marker so water shader can find this text mesh
+        textMesh.userData = { 
+          type: 'webgl-text',
+          originalText: textMesh.text 
+        }
+
+        // Hide mesh for main camera (only visible during scene capture by water shader)
+        textMesh.visible = false
+
+        scene.add(textMesh)
+
+        newMediaStore.push({
+          type: 'text',
+          media: textElement,
+          mesh: textMesh,
+          computedStyle,
+          width: bounds.width,
+          height: bounds.height,
+          top: bounds.top + scroll.scrollY,
+          left: bounds.left,
+          isInView: true
+        })
+
+        globalIndex++
+      })
+
+      // Text setup complete
 
       setMediaStore(newMediaStore)
     }
@@ -326,8 +424,14 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       mediaStore.forEach(item => {
         if (item.mesh) {
           scene.remove(item.mesh)
-          item.mesh.geometry.dispose()
-          item.material.dispose()
+          
+          if (item.type === 'image') {
+            item.mesh.geometry.dispose()
+            item.material.dispose()
+          } else if (item.type === 'text') {
+            // Troika text meshes have their own disposal method
+            item.mesh.dispose()
+          }
         }
       })
     }
@@ -345,14 +449,29 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       const x = ((object.left + object.width / 2) / window.innerWidth - 0.5) * width
       const y = -((object.top - scroll.scrollY + object.height / 2) / window.innerHeight - 0.5) * height
       
+      // Text positioning calculated
+      
       object.mesh.position.x = x
       object.mesh.position.y = y
       object.mesh.position.z = 0
       
-      // Scale mesh to match screen size at camera distance
-      const scaleX = (object.width / window.innerWidth) * width
-      const scaleY = (object.height / window.innerHeight) * height
-      object.mesh.scale.set(scaleX, scaleY, 1)
+      if (object.type === 'image') {
+        // Scale image mesh to match screen size at camera distance
+        const scaleX = (object.width / window.innerWidth) * width
+        const scaleY = (object.height / window.innerHeight) * height
+        object.mesh.scale.set(scaleX, scaleY, 1)
+      } else if (object.type === 'text') {
+        // For text, we don't scale the mesh itself, but ensure font size matches screen
+        // Troika handles text sizing internally based on fontSize property
+        // We just need to position it correctly
+        const pixelsPerUnit = window.innerHeight / height
+        const newFontSize = parseFloat(object.computedStyle.fontSize) / pixelsPerUnit * 0.5 // Much larger
+        object.mesh.fontSize = newFontSize
+        object.mesh.maxWidth = object.width / pixelsPerUnit
+        
+        // Ensure text stays hidden for main camera
+        // Will only be visible during water scene capture
+      }
       
       // Keep meshes invisible for main camera (only visible during water shader scene capture)
       object.mesh.visible = false
@@ -365,15 +484,17 @@ export default function BarrelDistortionTemplate({ waterRef }) {
   useFrame((state) => {
     const time = state.clock.elapsedTime
 
-    // Update uniforms for ALL meshes (not just visible ones)
+    // Update uniforms for image meshes only (text meshes don't have material uniforms)
     mediaStore.forEach((object) => {
-      object.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
-      object.material.uniforms.uTime.value = time
-      object.material.uniforms.uCursor.value.set(cursorPos.x, cursorPos.y)
-      object.material.uniforms.uScrollVelocity.value = scroll.scrollVelocity
+      if (object.type === 'image' && object.material && object.material.uniforms) {
+        object.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
+        object.material.uniforms.uTime.value = time
+        object.material.uniforms.uCursor.value.set(cursorPos.x, cursorPos.y)
+        object.material.uniforms.uScrollVelocity.value = scroll.scrollVelocity
+      }
     })
 
-    // Update positions
+    // Update positions for both images and text
     setPositions()
   })
 
@@ -385,7 +506,16 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       // Update media store bounds
       setMediaStore(prev => prev.map(object => {
         const bounds = object.media.getBoundingClientRect()
-        object.mesh.scale.set(bounds.width, bounds.height, 1)
+        
+        if (object.type === 'image') {
+          object.mesh.scale.set(bounds.width, bounds.height, 1)
+        } else if (object.type === 'text') {
+          // Update text properties from CSS
+          const computedStyle = window.getComputedStyle(object.media)
+          object.mesh.fontSize = parseFloat(computedStyle.fontSize) * 0.5 // Much larger
+          object.mesh.maxWidth = bounds.width
+          object.computedStyle = computedStyle
+        }
         
         const newObject = {
           ...object,
@@ -396,8 +526,10 @@ export default function BarrelDistortionTemplate({ waterRef }) {
           isInView: bounds.top >= -500 && bounds.top <= window.innerHeight + 500
         }
 
-        // Update uniforms
-        object.material.uniforms.uQuadSize.value.set(bounds.width, bounds.height)
+        // Update uniforms for images only
+        if (object.type === 'image' && object.material && object.material.uniforms) {
+          object.material.uniforms.uQuadSize.value.set(bounds.width, bounds.height)
+        }
         
         return newObject
       }))
