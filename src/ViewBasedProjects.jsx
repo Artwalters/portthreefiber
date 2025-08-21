@@ -10,6 +10,9 @@ export default function ViewBasedProjects() {
     const waterRef = useRef()
     
     useEffect(() => {
+        // Add class to body for barrel distortion page
+        document.body.classList.add('barrel-distortion-page')
+        
         // Force override ALL scroll-blocking CSS with !important
         const styleSheet = document.createElement('style')
         styleSheet.textContent = `
@@ -22,13 +25,13 @@ export default function ViewBasedProjects() {
                 left: unset !important;
                 width: auto !important;
                 touch-action: auto !important;
-                background: transparent !important;
             }
         `
         document.head.appendChild(styleSheet)
         
         return () => {
             document.head.removeChild(styleSheet)
+            document.body.classList.remove('barrel-distortion-page')
         }
     }, [])
     
@@ -61,10 +64,10 @@ export default function ViewBasedProjects() {
                         width: '100%',
                         height: '100vh',
                         zIndex: 1,
-                        pointerEvents: 'none'
+                        pointerEvents: 'auto'
                     }}
                     onCreated={({ scene, gl }) => {
-                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
                         gl.setClearColor('#ffffff')
                     }}
                 >

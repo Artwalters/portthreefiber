@@ -295,8 +295,7 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         imageMaterial.uniforms.uTextureSize.value.set(media.naturalWidth, media.naturalHeight)
         imageMaterial.uniforms.uQuadSize.value.set(bounds.width, bounds.height)
 
-        // Scale mesh to match image dimensions
-        imageMesh.scale.set(bounds.width, bounds.height, 1)
+        // Don't set scale here - let setPositions handle it
 
         // Hide mesh for main camera (only visible during scene capture by water shader)
         imageMesh.visible = false
@@ -337,21 +336,30 @@ export default function BarrelDistortionTemplate({ waterRef }) {
   // Set mesh positions to match HTML elements
   const setPositions = () => {
     mediaStore.forEach((object) => {
-      // Always position meshes at their HTML element location
-      object.mesh.position.x = object.left - window.innerWidth / 2 + object.width / 2
-      object.mesh.position.y = -object.top + window.innerHeight / 2 - object.height / 2 + scroll.scrollY
+      // Convert pixel positions to world coordinates for perspective camera
+      const vFov = camera.fov * Math.PI / 180
+      const height = 2 * Math.tan(vFov / 2) * camera.position.z
+      const width = height * camera.aspect
+      
+      // Position meshes based on HTML element positions
+      const x = ((object.left + object.width / 2) / window.innerWidth - 0.5) * width
+      const y = -((object.top - scroll.scrollY + object.height / 2) / window.innerHeight - 0.5) * height
+      
+      object.mesh.position.x = x
+      object.mesh.position.y = y
+      object.mesh.position.z = 0
+      
+      // Scale mesh to match screen size at camera distance
+      const scaleX = (object.width / window.innerWidth) * width
+      const scaleY = (object.height / window.innerHeight) * height
+      object.mesh.scale.set(scaleX, scaleY, 1)
       
       // Keep meshes invisible for main camera (only visible during water shader scene capture)
       object.mesh.visible = false
     })
   }
 
-  // Setup camera
-  useEffect(() => {
-    camera.position.z = CAMERA_POS
-    camera.fov = calcFov(CAMERA_POS)
-    camera.updateProjectionMatrix()
-  }, [camera])
+  // Don't override camera - use the camera position from Canvas
 
   // Render loop
   useFrame((state) => {
@@ -372,10 +380,7 @@ export default function BarrelDistortionTemplate({ waterRef }) {
   // Handle resize
   useEffect(() => {
     const handleResize = () => {
-      const fov = calcFov(CAMERA_POS)
-      camera.fov = fov
-      camera.aspect = window.innerWidth / window.innerHeight
-      camera.updateProjectionMatrix()
+      // Don't override camera settings
 
       // Update media store bounds
       setMediaStore(prev => prev.map(object => {
