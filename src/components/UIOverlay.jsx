@@ -32,7 +32,12 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
         <div className="ui-top-right">
           <span 
             className="about-button" 
-            onClick={() => window.location.href = '/portthreefiber/?template=barrel-distortion'}
+            onClick={() => {
+              // Add template parameter to current URL
+              const url = new URL(window.location);
+              url.searchParams.set('template', 'barrel-distortion');
+              window.location.href = url.toString();
+            }}
             style={{ cursor: 'pointer' }}
           >
             barrel test

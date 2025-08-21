@@ -45,6 +45,20 @@
   visibility: hidden !important;
 }
 
+/* Text elements marked with data-webgl-text should be transparent from start */
+[data-webgl-text] {
+  color: transparent !important;
+  position: relative;
+  /* Prevent text selection highlight */
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  /* Prevent layout shift during loading */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 .img-wrap figcaption {
   position: absolute;
   bottom: 1rem;

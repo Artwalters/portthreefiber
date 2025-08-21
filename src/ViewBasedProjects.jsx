@@ -150,7 +150,12 @@ export default function ViewBasedProjects() {
                 fontFamily: 'PSTimesTrial, serif'
             }}>
                 <span 
-                    onClick={() => window.location.href = '/'}
+                    onClick={() => {
+                        // Remove the template parameter to go back to main page
+                        const url = new URL(window.location);
+                        url.searchParams.delete('template');
+                        window.location.href = url.toString();
+                    }}
                     style={{ 
                         cursor: 'pointer',
                         background: 'rgba(0,0,0,0.8)',
@@ -199,12 +204,7 @@ export default function ViewBasedProjects() {
                             fontWeight: '700',
                             color: '#333',
                             margin: '0 0 1rem 0',
-                            fontFamily: 'PSTimesTrial, serif',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            fontFamily: 'PSTimesTrial, serif'
                         }}
                     >
                         THREE.JS WATER EFFECTS
@@ -219,12 +219,7 @@ export default function ViewBasedProjects() {
                             fontFamily: 'PSTimesTrial, serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
-                            marginRight: 'auto',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            marginRight: 'auto'
                         }}
                     >
                         Interactive water simulation with real-time distortion effects and responsive barrel transformations
@@ -248,12 +243,7 @@ export default function ViewBasedProjects() {
                             fontWeight: '700',
                             color: '#333',
                             margin: '0 0 1rem 0',
-                            fontFamily: 'PSTimesTrial, serif',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            fontFamily: 'PSTimesTrial, serif'
                         }}
                     >
                         SCROLL DRIVEN SHADERS
@@ -268,12 +258,7 @@ export default function ViewBasedProjects() {
                             fontFamily: 'PSTimesTrial, serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
-                            marginRight: 'auto',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            marginRight: 'auto'
                         }}
                     >
                         Advanced shader effects that respond to user scrolling with smooth Lenis integration and velocity-based distortions
@@ -297,12 +282,7 @@ export default function ViewBasedProjects() {
                             fontWeight: '700',
                             color: '#333',
                             margin: '0 0 1rem 0',
-                            fontFamily: 'PSTimesTrial, serif',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            fontFamily: 'PSTimesTrial, serif'
                         }}
                     >
                         RESPONSIVE WEBGL TEXT
@@ -317,12 +297,7 @@ export default function ViewBasedProjects() {
                             fontFamily: 'PSTimesTrial, serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
-                            marginRight: 'auto',
-                            color: 'transparent',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                            MozUserSelect: 'none',
-                            msUserSelect: 'none',
+                            marginRight: 'auto'
                         }}
                     >
                         HTML-first approach with WebGL rendering enables SEO-friendly text with custom shader effects and perfect responsive behavior

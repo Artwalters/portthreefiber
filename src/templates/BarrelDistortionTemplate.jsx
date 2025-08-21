@@ -314,6 +314,9 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         // Hide mesh immediately and keep it hidden for main camera
         imageMesh.visible = false
         imageMesh.frustumCulled = false // Prevent culling issues
+        
+        // Set initial position far away to prevent flash
+        imageMesh.position.z = -1000
 
         scene.add(imageMesh)
 
@@ -326,7 +329,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
           height: bounds.height,
           top: bounds.top + scroll.scrollY,
           left: bounds.left,
-          isInView: true // Always set to true initially, let observer handle it
+          isInView: true, // Always set to true initially, let observer handle it
+          isInitialized: false // Track if mesh has been positioned
         })
 
         globalIndex++
@@ -403,6 +407,9 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         textMesh.visible = false
         textMesh.frustumCulled = false // Prevent culling issues
         
+        // Set initial position far away to prevent flash
+        textMesh.position.z = -1000
+        
         // Force sync after setting visibility to prevent flash
         textMesh.sync(() => {
           // Text is ready and invisible - safe to add to scene
@@ -419,7 +426,8 @@ export default function BarrelDistortionTemplate({ waterRef }) {
           height: bounds.height,
           top: bounds.top + scroll.scrollY,
           left: bounds.left,
-          isInView: true
+          isInView: true,
+          isInitialized: false // Track if mesh has been positioned
         })
 
         globalIndex++
@@ -428,10 +436,27 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       // Text setup complete
 
       setMediaStore(newMediaStore)
+      
+      // Initialize positions after a delay to ensure no flicker
+      setTimeout(() => {
+        newMediaStore.forEach(item => {
+          item.isInitialized = true
+          // Force initial position update
+          const vFov = camera.fov * Math.PI / 180
+          const height = 2 * Math.tan(vFov / 2) * camera.position.z
+          const width = height * camera.aspect
+          const x = ((item.left + item.width / 2) / window.innerWidth - 0.5) * width
+          const y = -((item.top - scroll.scrollY + item.height / 2) / window.innerHeight - 0.5) * height
+          
+          item.mesh.position.x = x
+          item.mesh.position.y = y
+          item.mesh.position.z = 0
+        })
+      }, 100) // Small delay after media store creation
     }
 
-    // Wait for images to load
-    const timeout = setTimeout(initializeMediaStore, 100)
+    // Wait for images to load and add delay to prevent text flicker
+    const timeout = setTimeout(initializeMediaStore, 300)
     
     return () => {
       clearTimeout(timeout)
@@ -466,9 +491,12 @@ export default function BarrelDistortionTemplate({ waterRef }) {
       
       // Text positioning calculated
       
-      object.mesh.position.x = x
-      object.mesh.position.y = y
-      object.mesh.position.z = 0
+      // Only update position after initial delay to prevent flash
+      if (object.isInitialized) {
+        object.mesh.position.x = x
+        object.mesh.position.y = y
+        object.mesh.position.z = 0
+      }
       
       if (object.type === 'image') {
         // Scale image mesh to match screen size at camera distance
