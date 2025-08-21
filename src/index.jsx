@@ -1,6 +1,6 @@
 import './styles/style.css'
 import ReactDOM from 'react-dom/client'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import FilmStripSlider from './sliders/FilmStripSlider.jsx'
@@ -10,7 +10,6 @@ import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import ViewBasedProjects from './ViewBasedProjects.jsx'
-import TestScroll from './TestScroll.jsx'
 
 // No background color updater needed - keep everything white
 
@@ -20,12 +19,6 @@ function App() {
     // Check URL for template test
     const urlParams = new URLSearchParams(window.location.search)
     const templateTest = urlParams.get('template') === 'barrel-distortion'
-    const scrollTest = urlParams.get('test') === 'scroll'
-    
-    // If scroll test is requested
-    if (scrollTest) {
-        return <TestScroll />
-    }
     
     // If template test is requested, render the template instead of main app
     if (templateTest) {
