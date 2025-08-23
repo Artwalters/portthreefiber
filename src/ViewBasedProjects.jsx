@@ -12,6 +12,7 @@ export default function ViewBasedProjects() {
     const waterRef = useRef()
     const [scrollY, setScrollY] = useState(0)
     const [fontsReady, setFontsReady] = useState(false)
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
     
     // Device capabilities detection
     const [deviceCapabilities, setDeviceCapabilities] = useState(null)
@@ -20,6 +21,14 @@ export default function ViewBasedProjects() {
     useEffect(() => {
         const capabilities = getDeviceCapabilities()
         setDeviceCapabilities(capabilities)
+        
+        // Handle resize
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768)
+        }
+        
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
     }, [])
     
     // Scroll is now handled by Lenis in BarrelDistortionTemplate
@@ -156,40 +165,273 @@ export default function ViewBasedProjects() {
                         url.searchParams.delete('template');
                         window.location.href = url.toString();
                     }}
-                    style={{ 
-                        cursor: 'pointer',
-                        background: 'rgba(0,0,0,0.8)',
-                        color: 'white',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem'
-                    }}
+                    className="back-button"
                 >
                     ← back to main
                 </span>
             </div>
 
             <main style={{ 
-                padding: '2rem 0',
+                padding: '0',
                 background: 'transparent',
                 position: 'relative',
                 zIndex: 5
             }}>
-                <h1 style={{ 
-                    textAlign: 'center', 
-                    margin: '2rem 0',
-                    color: 'black',
-                    textShadow: '0 0 10px rgba(255,255,255,0.8)',
+                {/* Hero Section */}
+                <section style={{
+                    minHeight: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: isMobile ? '2rem' : '4rem 6rem',
                     position: 'relative',
-                    zIndex: 20,
-                    backgroundColor: 'rgba(255,255,255,0.8)',
-                    padding: '1rem',
-                    borderRadius: '8px'
-                }}>Barrel Distortion Test</h1>
+                    marginBottom: '5rem'
+                }}>
+                    {/* Title Row */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                        alignItems: 'flex-start',
+                        gap: isMobile ? '3rem' : '6rem',
+                        marginBottom: isMobile ? '4rem' : '8rem'
+                    }}>
+                        {/* Left side - Project titles */}
+                        <div>
+                            <h1 
+                                data-webgl-text
+                                style={{
+                                    fontSize: isMobile ? '2rem' : '5rem',
+                                    fontWeight: '300',
+                                    fontStyle: 'italic',
+                                    fontFamily: 'PSTimesTrial, serif',
+                                    color: 'transparent',
+                                    lineHeight: '1',
+                                    margin: '0 0 0.25rem 0',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '-0.02em'
+                                }}
+                            >
+                                Projects/
+                            </h1>
+                            <h2
+                                data-webgl-text
+                                style={{
+                                    fontSize: isMobile ? '3.5rem' : '10rem',
+                                    fontWeight: '700',
+                                    fontFamily: 'PSTimesTrial, serif',
+                                    color: 'transparent',
+                                    lineHeight: '0.85',
+                                    margin: '0',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '-0.02em'
+                                }}
+                            >
+                                ROBCO
+                            </h2>
+                        </div>
+                        
+                        {/* Right side - Title */}
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-start',
+                            alignItems: isMobile ? 'center' : 'flex-end',
+                            textAlign: isMobile ? 'center' : 'right'
+                        }}>
+                            <h3
+                                data-webgl-text
+                                style={{
+                                    fontSize: isMobile ? '3rem' : '10rem',
+                                    fontWeight: '700',
+                                    fontFamily: 'PSTimesTrial, serif',
+                                    color: 'transparent',
+                                    lineHeight: '0.85',
+                                    margin: '0',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '-0.03em'
+                                }}
+                            >
+                                MODULAR
+                            </h3>
+                            <h3
+                                data-webgl-text
+                                style={{
+                                    fontSize: isMobile ? '3rem' : '5rem',
+                                    fontWeight: '300',
+                                    fontStyle: 'italic',
+                                    fontFamily: 'PSTimesTrial, serif',
+                                    color: 'transparent',
+                                    lineHeight: '0.85',
+                                    margin: '0',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '-0.03em'
+                                }}
+                            >
+                                MOTION.
+                            </h3>
+                        </div>
+                    </div>
+                    
+                    {/* Info Grid - Below the titles */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr',
+                        gap: isMobile ? '2rem' : '4rem',
+                        fontSize: '0.9rem'
+                    }}>
+                            {/* PROJECT OVERVIEW - first column */}
+                            <div>
+                                <p 
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        margin: '0 0 0.75rem 0',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.15em',
+                                        opacity: '0.7',
+                                        padding: '5rem'
+                                    }}
+                                >
+                                    PROJECT OVERVIEW
+                                </p>
+                                <p
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: isMobile ? '1.2rem' : '1.6rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        lineHeight: '1.5',
+                                        margin: '0',
+                                        maxWidth: isMobile ? '100%' : '50ch'
+                                    }}
+                                >
+                                    Following the success of our brand evolution for RobCo, we were commissioned to create a 3D motion piece that brought their four core brand messages to life. Through immersive visuals and thoughtful storytelling, we transformed these messages into a dynamic animation that reflects RobCo's innovative spirit and values.
+                                </p>
+                            </div>
+                            
+                            {/* SERVICES column */}
+                            <div>
+                                <p 
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        margin: '0 0 0.5rem 0',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.15em',
+                                        opacity: '0.7'
+                                    }}
+                                >
+                                    SERVICES
+                                </p>
+                                <p
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.9rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        lineHeight: '1.4',
+                                        margin: '0'
+                                    }}
+                                >
+                                    Storyboarding<br/>
+                                    3D Modelling<br/>
+                                    Motion Design
+                                </p>
+                            </div>
+                            
+                            {/* DATE/CLIENT/LOCATION column */}
+                            <div>
+                                <p 
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        margin: '0 0 0.5rem 0',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.15em',
+                                        opacity: '0.7'
+                                    }}
+                                >
+                                    DATE
+                                </p>
+                                <p
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.9rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        lineHeight: '1.4',
+                                        margin: '0 0 1.5rem 0'
+                                    }}
+                                >
+                                    September, 2024
+                                </p>
+                                
+                                <p 
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        margin: '0 0 0.5rem 0',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.15em',
+                                        opacity: '0.7'
+                                    }}
+                                >
+                                    CLIENT
+                                </p>
+                                <p
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.9rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        lineHeight: '1.4',
+                                        margin: '0 0 1.5rem 0'
+                                    }}
+                                >
+                                    RobCo
+                                </p>
+                                
+                                <p 
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        margin: '0 0 0.5rem 0',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.15em',
+                                        opacity: '0.7'
+                                    }}
+                                >
+                                    LOCATION
+                                </p>
+                                <p
+                                    data-webgl-text
+                                    style={{
+                                        fontSize: '0.9rem',
+                                        fontFamily: 'PSTimesTrial, serif',
+                                        color: 'transparent',
+                                        lineHeight: '1.4',
+                                        margin: '0'
+                                    }}
+                                >
+                                    Berlin, Germany
+                                </p>
+                            </div>
+                        </div>
+                </section>
                 
                 {/* Project 1 */}
-                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
-                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                <div className="project-container">
+                    <div className="project-image-wrap">
                         <img 
                             src="./img/project-1.png" 
                             alt="Image 1" 
@@ -216,7 +458,7 @@ export default function ViewBasedProjects() {
                             color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
-                            fontFamily: 'PSTimesTrial, serif',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
                             marginRight: 'auto'
@@ -227,8 +469,8 @@ export default function ViewBasedProjects() {
                 </div>
 
                 {/* Project 2 */}
-                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
-                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                <div className="project-container">
+                    <div className="project-image-wrap">
                         <img 
                             src="./img/project-2.png" 
                             alt="Image 2" 
@@ -242,7 +484,7 @@ export default function ViewBasedProjects() {
                             fontSize: '2.5rem', 
                             fontWeight: '700',
                             color: '#333',
-                            margin: '0 0 1rem 0',
+                            margin: '0 0 0rem 0',
                             fontFamily: 'PSTimesTrial, serif'
                         }}
                     >
@@ -255,7 +497,7 @@ export default function ViewBasedProjects() {
                             color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
-                            fontFamily: 'PSTimesTrial, serif',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
                             marginRight: 'auto'
@@ -266,8 +508,8 @@ export default function ViewBasedProjects() {
                 </div>
 
                 {/* Project 3 */}
-                <div style={{ margin: '10rem auto', width: '600px', maxWidth: '90vw', textAlign: 'center' }}>
-                    <div style={{ height: '400px', marginBottom: '2rem' }}>
+                <div className="project-container">
+                    <div className="project-image-wrap">
                         <img 
                             src="./img/project-3.png" 
                             alt="Image 3" 
@@ -294,7 +536,7 @@ export default function ViewBasedProjects() {
                             color: 'transparent',
                             lineHeight: '1.6',
                             margin: '0',
-                            fontFamily: 'PSTimesTrial, serif',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                             maxWidth: '500px',
                             marginLeft: 'auto',
                             marginRight: 'auto'

@@ -745,7 +745,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
         targetOffset.current += snapDirection * snapForce
         
         // Stop snapping when reasonably close
-        if (Math.abs(snapDistance) < 0.02) {
+        if (Math.abs(snapDistance) < 0.01) {
           isSnapping.current = false
         }
       }

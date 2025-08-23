@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import Lenis from 'lenis'
 // Import troika text - tutorial style
 // @ts-ignore
-import { Text } from 'troika-three-text'
+import { Text, preloadFont } from 'troika-three-text'
 
 // Define shaders inline (since we don't have raw imports configured)
 const vertexShader = `
@@ -12,9 +12,11 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform vec2 uCursor;
 uniform float uScrollVelocity;
+uniform float uSmoothVelocity;
 uniform sampler2D uTexture;
 uniform vec2 uTextureSize;
 uniform vec2 uQuadSize;
+uniform float uIsText;
 
 varying vec2 vUv;
 varying vec2 vUvCover;
@@ -36,8 +38,23 @@ vec2 getCoverUvVert(vec2 uv, vec2 textureSize, vec2 quadSize) {
 
 // Barrel distortion curve function
 vec3 deformationCurve(vec3 position, vec2 uv) {
-  // Create barrel distortion based on scroll velocity
-  position.y = position.y - (sin(uv.x * PI) * min(abs(uScrollVelocity), 5.0) * sign(uScrollVelocity) * -0.01);
+  // Skip distortion for text elements
+  if (uIsText > 0.5) {
+    return position;
+  }
+  
+  // Use smoothed velocity for smoother transitions
+  float velocity = uSmoothVelocity;
+  float absVelocity = abs(velocity);
+  
+  // Progressive intensity based on velocity using built-in smoothstep
+  // Starts at 0.2 (more sensitive), becomes more intense up to 3.0
+  float intensity = smoothstep(0.2, 3.0, absVelocity);
+  
+  // Apply easing to make the effect more natural - increased from -0.008 to -0.02
+  float distortion = sin(uv.x * PI) * intensity * sign(velocity) * -0.02;
+  
+  position.y = position.y - distortion;
   
   return position;
 }
@@ -83,7 +100,22 @@ export default function BarrelDistortionTemplate({ waterRef }) {
   const [scroll, setScroll] = useState({ scrollY: 0, scrollVelocity: 0 })
   const [cursorPos, setCursorPos] = useState({ x: 0.5, y: 0.5 })
   const observerRef = useRef()
+  const smoothVelocityRef = useRef(0)
+  const [fontLoaded, setFontLoaded] = useState(false)
   const CAMERA_POS = 500
+
+  // Preload custom font
+  useEffect(() => {
+    const fontUrl = './fonts/PSTimesTrial-Regular.otf'
+    preloadFont(
+      fontUrl,
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?;:/()- ',
+      () => {
+        setFontLoaded(true)
+        console.log('PSTimesTrial font loaded successfully')
+      }
+    )
+  }, [])
 
   // Create shader material
   const material = useMemo(() => {
@@ -93,9 +125,11 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         uTime: { value: 0 },
         uCursor: { value: new THREE.Vector2(0.5, 0.5) },
         uScrollVelocity: { value: 0 },
+        uSmoothVelocity: { value: 0 },
         uTexture: { value: null },
         uTextureSize: { value: new THREE.Vector2(100, 100) },
-        uQuadSize: { value: new THREE.Vector2(100, 100) }
+        uQuadSize: { value: new THREE.Vector2(100, 100) },
+        uIsText: { value: 0 }
       },
       vertexShader,
       fragmentShader,
@@ -374,8 +408,14 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         
         // Text mesh created successfully
         
-        // Don't set font for now - let troika use default
-        // textMesh.font = 'Arial' // This was causing the font loading error
+        // Load custom font - Troika supports .ttf, .otf, .woff files directly
+        // Use the absolute URL path to the font file
+        textMesh.font = './fonts/PSTimesTrial-Regular.otf'
+        
+        // Wait for font to load before making text visible
+        if (!fontLoaded) {
+          textMesh.visible = false
+        }
         
         // Anchor based on CSS text alignment
         textMesh.anchorX = computedStyle.textAlign === 'center' ? '50%' : 
@@ -526,8 +566,16 @@ export default function BarrelDistortionTemplate({ waterRef }) {
   // Don't override camera - use the camera position from Canvas
 
   // Render loop
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const time = state.clock.elapsedTime
+
+    // Smooth the velocity for more natural transitions
+    // Slower return to normal (1.5 instead of 3)
+    smoothVelocityRef.current = lerp(
+      smoothVelocityRef.current, 
+      scroll.scrollVelocity, 
+      delta * 1.5 // Slower smoothing for longer-lasting effect
+    )
 
     // Update uniforms for image meshes only (text meshes don't have material uniforms)
     mediaStore.forEach((object) => {
@@ -536,6 +584,7 @@ export default function BarrelDistortionTemplate({ waterRef }) {
         object.material.uniforms.uTime.value = time
         object.material.uniforms.uCursor.value.set(cursorPos.x, cursorPos.y)
         object.material.uniforms.uScrollVelocity.value = scroll.scrollVelocity
+        object.material.uniforms.uSmoothVelocity.value = smoothVelocityRef.current
       }
     })
 

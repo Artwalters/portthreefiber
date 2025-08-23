@@ -118,3 +118,97 @@ html, body {
 }
 
 /* Canvas styles are handled inline in the component */
+
+/* Project text styles */
+.project-container {
+  margin: 5rem auto;  /* Reduced from 10rem to bring sections closer */
+  width: 600px;
+  max-width: 90vw;
+  text-align: left;  /* Changed to left */
+}
+
+.project-image-wrap {
+  height: 400px;
+  margin-bottom: 1rem;  /* Reduced from 2rem */
+}
+
+/* Desktop specific sizing */
+@media (min-width: 769px) {
+  .project-container {
+    width: 80vw; /* Match image width */
+    max-width: none; /* Remove max-width constraint */
+    margin: 5rem auto; /* Center the container */
+  }
+  
+  .project-image-wrap {
+    height: 45vw; /* Proportional height based on viewport width */
+    max-height: 600px; /* Maximum height limit */
+    width: 100%; /* Full container width */
+  }
+  
+  .project-title {
+    font-size: 3rem; /* Larger on desktop */
+    max-width: 100%;
+  }
+  
+  .project-description {
+    font-size: 1.6rem; /* Larger on desktop */
+    max-width: 50ch; /* Character-based width for better readability */
+    margin-left: 0; /* Left align */
+    margin-right: 0;
+  }
+}
+
+.project-title {
+  font-size: 8rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.5rem 0;  /* Reduced bottom margin from 1rem */
+  font-family: 'PSTimesTrial', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;  /* Changed to left */
+}
+
+.project-description {
+  font-size: 1.2rem;
+  color: transparent;
+  line-height: 1.4;  /* Reduced from 1.6 for tighter line spacing */
+  margin: 0;
+  font-family: 'PSTimesTrial', serif;
+  max-width: 100%;  /* Changed from 500px to use full width */
+  margin-left: 0;  /* Changed from auto */
+  margin-right: 0;  /* Changed from auto */
+  text-align: left;  /* Changed to left */
+}
+
+.page-title {
+  text-align: center;
+  margin: 2rem 0;
+  color: black;
+  text-shadow: 0 0 10px rgba(255,255,255,0.8);
+  position: relative;
+  z-index: 20;
+  background-color: rgba(255,255,255,0.8);
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 3rem;
+  font-weight: 300;
+}
+
+.back-button {
+  cursor: pointer;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.back-button:hover {
+  background: rgba(0,0,0,0.9);
+  transform: translateX(-5px);
+}
