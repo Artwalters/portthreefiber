@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { Perf } from 'r3f-perf'
 import FilmStripSlider from './sliders/FilmStripSlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
@@ -466,6 +467,9 @@ function App() {
                 ) : (
                     <SimpleWater ref={waterRef} />
                 )}
+                
+                {/* Performance Monitor */}
+                <Perf position="top-left" />
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}
