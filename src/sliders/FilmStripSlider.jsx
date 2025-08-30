@@ -91,14 +91,14 @@ const createCurvedTextMaterial = (isMobile = false) => {
         if (textLength > 0.0) {
           // Calculate position along curve based on x coordinate within the text
           float textProgress = (position.x + textLength * 0.5) / textLength; // 0 to 1 across text width
-          float curveT = clamp(curveOffset + textProgress * 0.15, 0.0, 1.0); // Small spread across curve
+          float curveT = clamp(curveOffset + textProgress * 0.08, 0.0, 1.0); // Reduced spread to minimize stretching
           
           // Get curve position for this vertex
           vec3 curvePos = getCurvePosition(curveT);
           
-          // Transform position to follow curve - full deformation
+          // Transform position to follow curve - position text directly under images
           position.x = curvePos.x;
-          position.y = curvePos.y + position.y - (isMobile > 0.5 ? 0.0 : 2.5);
+          position.y = curvePos.y + position.y - (isMobile > 0.5 ? 1.2 : 1.8);
           position.z = curvePos.z;
         }
       `
@@ -517,22 +517,22 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       // Text configuration
       textMesh.text = project.title
       textMesh.font = './fonts/PSTimesTrial-Regular.otf'
-      textMesh.fontSize = 0.3
+      textMesh.fontSize = 0.2
       textMesh.color = 0x000000
       textMesh.anchorX = 'center'
       textMesh.anchorY = 'top'
-      textMesh.letterSpacing = 0.02
-      textMesh.lineHeight = 1.2
-      textMesh.maxWidth = 4
+      textMesh.letterSpacing = 0.08
+      textMesh.lineHeight = 1.6
+      textMesh.maxWidth = 3.5
       textMesh.textAlign = 'center'
-      // Minimal subdivision for curve deformation (performance optimized)
-      textMesh.glyphGeometryDetail = 2
+      // Higher subdivision for smoother curve deformation
+      textMesh.glyphGeometryDetail = 4
       
       // Set font size based on device
       if (isMobile) {
-        textMesh.fontSize = 0.25
+        textMesh.fontSize = 0.12
       } else {
-        textMesh.fontSize = 0.3
+        textMesh.fontSize = 0.14
       }
       
       // Store project index for movement calculations
@@ -972,19 +972,20 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       textMeshesRef.current.forEach((textMesh, index) => {
         if (!textMesh || !textMesh.userData.curvedMaterial) return
         
-        // Calculate tile position in UV space (matching shader logic)
-        const tileUVWidth = 1.0 / tileSpacing
-        const baseUV = index * tileUVWidth
-        const movingUV = baseUV + baseOffset
+        // Simulate the exact UV calculation from the fragment shader for this text
+        // Each text represents a "virtual UV coordinate" that matches its image
         
-        // Map UV to curve position (0 to 1) and update material uniform
-        const normalizedUV = (movingUV % 1.0 + 1.0) % 1.0
+        // Calculate what UV coordinate would place this text at the center of its tile
+        const tileWidth = 1.0 / tileSpacing; // Width of each tile in UV space
+        const centerOfTileUV = (index + 0.5) * tileWidth; // Center of tile for this index
         
-        // Position each text at its own location along the curve
-        // Use the same logic as the shader tiling but convert to curve position
-        const finalPosition = normalizedUV // This already has the correct position per text
+        // Apply the same offset that affects the images
+        const movingTileUV = centerOfTileUV - (baseOffset - 1000.0); // Move with the slider
         
-        textMesh.userData.curvedMaterial.uniforms.curveOffset.value = finalPosition
+        // Map to curve position (0 to 1) - this creates the continuous movement
+        const curvePosition = ((movingTileUV % 1.0) + 1.0) % 1.0;
+        
+        textMesh.userData.curvedMaterial.uniforms.curveOffset.value = curvePosition;
       })
     }
   })
