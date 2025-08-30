@@ -91,7 +91,7 @@ const createCurvedTextMaterial = (isMobile = false) => {
         if (textLength > 0.0) {
           // Calculate position along curve based on x coordinate within the text
           float textProgress = (position.x + textLength * 0.5) / textLength; // 0 to 1 across text width
-          float curveT = clamp(curveOffset + textProgress * 0.08, 0.0, 1.0); // Reduced spread to minimize stretching
+          float curveT = clamp(curveOffset + textProgress * 0.02, 0.0, 1.0); // Ultra minimal spread to minimize stretching
           
           // Get curve position for this vertex
           vec3 curvePos = getCurvePosition(curveT);
@@ -506,7 +506,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     return geo
   }, [isMobile])
   
-  // Create text meshes positioned on curve
+  // Create one text per project that follows infinite continuous track
   const textMeshes = useMemo(() => {
     if (!fontLoaded || projects.length === 0) return []
     
@@ -519,23 +519,23 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       textMesh.font = './fonts/PSTimesTrial-Regular.otf'
       textMesh.fontSize = 0.2
       textMesh.color = 0x000000
-      textMesh.anchorX = 'center'
+      textMesh.anchorX = 'left'
       textMesh.anchorY = 'top'
       textMesh.letterSpacing = 0.08
       textMesh.lineHeight = 1.6
       textMesh.maxWidth = 3.5
-      textMesh.textAlign = 'center'
+      textMesh.textAlign = 'left'
       // Higher subdivision for smoother curve deformation
       textMesh.glyphGeometryDetail = 4
       
       // Set font size based on device
       if (isMobile) {
-        textMesh.fontSize = 0.12
+        textMesh.fontSize = 0.10
       } else {
-        textMesh.fontSize = 0.14
+        textMesh.fontSize = 0.12
       }
       
-      // Store project index for movement calculations
+      // Store project index
       textMesh.userData.projectIndex = index
       
       // Create custom curved material
@@ -969,21 +969,25 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       const timeOffset = currentOffset.current * 0.01
       const baseOffset = 1000.0 + timeOffset
       
-      textMeshesRef.current.forEach((textMesh, index) => {
+      textMeshesRef.current.forEach((textMesh, textIndex) => {
         if (!textMesh || !textMesh.userData.curvedMaterial) return
         
-        // Simulate the exact UV calculation from the fragment shader for this text
-        // Each text represents a "virtual UV coordinate" that matches its image
+        // EXACT SYNC WITH IMAGE SHADER: Copy the exact same calculation as the fragment shader
         
-        // Calculate what UV coordinate would place this text at the center of its tile
-        const tileWidth = 1.0 / tileSpacing; // Width of each tile in UV space
-        const centerOfTileUV = (index + 0.5) * tileWidth; // Center of tile for this index
+        // Start with the exact same globalUV calculation as images
+        const globalUV = 0.5 + baseOffset; // Same as images: vec2 globalUV = (vUv + vec2(1000. + time * 0.01, 0.));
         
-        // Apply the same offset that affects the images
-        const movingTileUV = centerOfTileUV - (baseOffset - 1000.0); // Move with the slider
+        // Same tiling calculation as images  
+        const tilesUV = globalUV * tileSpacing; // Same as images: vec2 tilesUV = globalUV * vec2(aspect * 1.2, 1.);
         
-        // Map to curve position (0 to 1) - this creates the continuous movement
-        const curvePosition = ((movingTileUV % 1.0) + 1.0) % 1.0;
+        // Much simpler approach: directly calculate text position like the original working version
+        const textTilePosition = textIndex - (tilesUV - Math.floor(tilesUV)); // REVERSED: subtract to move opposite direction
+        const textGlobalUV = textTilePosition / tileSpacing;
+        const leftAlignedUV = textGlobalUV + 0.2 / tileSpacing; // Left alignment offset (positive for left)
+        
+        // Convert to curve position
+        let curvePosition = leftAlignedUV % 1.0;
+        if (curvePosition < 0) curvePosition += 1.0;
         
         textMesh.userData.curvedMaterial.uniforms.curveOffset.value = curvePosition;
       })
