@@ -301,7 +301,18 @@ const ProjectsWater = forwardRef(({ scrollY = 0 }, ref) => {
                 
                 // Make BarrelDistortionTemplate meshes AND text meshes visible during scene capture
                 const barrelDistortionMeshes = []
+                const hiddenContainers = []
                 scene.traverse((child) => {
+                    // Skip blue container from water capture to prevent double rendering
+                    // Only hide during capture, but allow it to exist normally for water interaction
+                    if (child.userData?.skipWaterCapture) {
+                        if (child.visible) {
+                            hiddenContainers.push(child)
+                            child.visible = false
+                        }
+                        return
+                    }
+                    
                     // Original barrel distortion meshes (images)
                     if (child.isMesh && child.material && child.material.uniforms && child.material.uniforms.uScrollVelocity) {
                         barrelDistortionMeshes.push(child)
@@ -325,6 +336,11 @@ const ProjectsWater = forwardRef(({ scrollY = 0 }, ref) => {
                 // Hide BarrelDistortionTemplate meshes again after capture
                 barrelDistortionMeshes.forEach(mesh => {
                     mesh.visible = false
+                })
+                
+                // Restore visibility of hidden containers
+                hiddenContainers.forEach(mesh => {
+                    mesh.visible = true
                 })
                 
                 meshRef.current.visible = true
