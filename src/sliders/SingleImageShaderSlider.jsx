@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 // Custom shader material for single repeating image
 const createSingleImageMaterial = (texture, isMobile = false) => {
-  const aspect = 24 / 3.3  // Same aspect as FilmStripSlider
+  const aspect = 30 / 3.3  // Same aspect as FilmStripSlider - more square
   
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -62,7 +62,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
         aberrationStrength = min(aberrationStrength, 0.006);
         
         // Define single image bounds (centered) - same as original tiles
-        // Original tiles had aspect ratio of 24/3.3 * 1.2 with gaps
+        // Original tiles had aspect ratio of 30/3.3 * 1.2 with gaps
         // After gaps (0.05 on each side), effective width was 0.9 of tile width
         // Each tile was 1/(aspect*1.2) = 1/(8.7) ≈ 0.115 of UV space
         // With gaps removed: 0.115 * 0.9 ≈ 0.103
@@ -114,10 +114,9 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
           tileColor = texture2D(uTexture, tileUV);
         }
         
-        // Apply fog - DISABLED FOR DEBUGGING
-        // float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-        // vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
-        vec3 finalColor = tileColor.rgb; // No fog for debugging
+        // Apply fog
+        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
         gl_FragColor = vec4(finalColor, tileColor.a);
         gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(1.0/2.2)); // Gamma correction
@@ -147,10 +146,10 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
+const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [currentImageIndex, setCurrentImageIndex] = useState(initialImageIndex)
   const [projectImages, setProjectImages] = useState([])
   const { gl } = useThree()
   
@@ -172,7 +171,27 @@ const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
   
   // Animation state for fly-in
   const [isAnimating, setIsAnimating] = useState(true)
+  const [isVisible, setIsVisible] = useState(false)
   const animationProgress = useRef(0)
+  
+  // Update current image index when initial index changes and reset animation
+  useEffect(() => {
+    setCurrentImageIndex(initialImageIndex)
+    setIsVisible(false) // Reset visibility
+    // Reset animation state when initialImageIndex changes
+    currentOffset.current = -100 // Reset to off-screen position
+    animationProgress.current = 0 // Reset animation progress
+    setIsAnimating(true) // Start animation again
+  }, [initialImageIndex])
+  
+  // Make visible after short delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true)
+    }, 250) // 1/4 second delay before becoming visible
+    
+    return () => clearTimeout(timer)
+  }, [initialImageIndex]) // Reset timer when initialImageIndex changes
   
   // Load projects data
   useEffect(() => {
@@ -193,8 +212,6 @@ const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
   }, [])
   
   
-  // Store curve for debug visualization
-  const [debugCurve, setDebugCurve] = useState(null)
   
   // Create curved geometry like FilmStripSlider
   const geometry = useMemo(() => {
@@ -231,8 +248,6 @@ const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
       ], false, "catmullrom", 0.5)
     }
     
-    // Store curve for debug visualization
-    setDebugCurve(curve)
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
@@ -389,38 +404,10 @@ const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
         ref={meshRef} 
         geometry={geometry} 
         material={material}
+        visible={isVisible}
         onPointerOver={() => document.body.style.cursor = 'pointer'}
         onPointerOut={() => document.body.style.cursor = 'auto'}
       />
-      
-      {/* Automatic curve visualization */}
-      {showDebugCurve && debugCurve && (
-        <>
-          {/* Draw the curve line */}
-          <line>
-            <bufferGeometry>
-              <bufferAttribute
-                attach="attributes-position"
-                count={debugCurve.points.length}
-                array={new Float32Array(debugCurve.points.flatMap(p => [p.x, p.y, p.z]))}
-                itemSize={3}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color="#00ff00" linewidth={2} />
-          </line>
-          
-          {/* Draw spheres at each control point */}
-          {debugCurve.points.map((point, index) => {
-            const colors = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta', 'darkred']
-            return (
-              <mesh key={index} position={[point.x, point.y, point.z]}>
-                <sphereGeometry args={[0.15, 16, 16]} />
-                <meshBasicMaterial color={colors[index % colors.length]} />
-              </mesh>
-            )
-          })}
-        </>
-      )}
     </>
   )
 }

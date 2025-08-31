@@ -1,128 +1,11 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-// @ts-ignore
-import { Text, preloadFont } from 'troika-three-text'
-// @ts-ignore
-import { createDerivedMaterial } from 'troika-three-utils'
-
-// Create custom material for curved text
-const createCurvedTextMaterial = (isMobile = false) => {
-  return createDerivedMaterial(
-    new THREE.MeshBasicMaterial({ 
-      side: THREE.DoubleSide,
-      color: 0xffffff
-    }),
-    {
-      uniforms: {
-        textLength: { value: 0 },
-        curveOffset: { value: 0 },
-        isMobile: { value: isMobile ? 1.0 : 0.0 }
-      },
-      vertexDefs: `
-        uniform float textLength;
-        uniform float curveOffset;
-        uniform float isMobile;
-        
-        // CatmullRom curve evaluation function
-        vec3 catmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t) {
-          float t2 = t * t;
-          float t3 = t2 * t;
-          
-          vec3 v0 = (p2 - p0) * 0.5;
-          vec3 v1 = (p3 - p1) * 0.5;
-          
-          return (2.0 * p1 - 2.0 * p2 + v0 + v1) * t3 +
-                 (-3.0 * p1 + 3.0 * p2 - 2.0 * v0 - v1) * t2 +
-                 v0 * t + p1;
-        }
-        
-        vec3 getCurvePosition(float t) {
-          // Mobile curve points - EXACT SAME as geometry, then rotated
-          vec3 mobileCurve[7];
-          mobileCurve[0] = vec3(0.0, -12.0, -6.5); // Rotated: X → Y, Z + 0.5
-          mobileCurve[1] = vec3(0.0, -8.0, -3.5);
-          mobileCurve[2] = vec3(0.0, -4.0, 0.3);
-          mobileCurve[3] = vec3(0.0, 0.0, 0.7);
-          mobileCurve[4] = vec3(0.0, 4.0, 0.3);
-          mobileCurve[5] = vec3(0.0, 8.0, -3.5);
-          mobileCurve[6] = vec3(0.0, 12.0, -6.5);
-          
-          // Desktop curve points - EXACT SAME as geometry
-          vec3 desktopCurve[7];
-          desktopCurve[0] = vec3(-18.0, 0.0, -7.0);
-          desktopCurve[1] = vec3(-12.0, 0.0, -4.0);
-          desktopCurve[2] = vec3(-6.0, 0.0, -0.2);
-          desktopCurve[3] = vec3(0.0, 0.0, 0.2);
-          desktopCurve[4] = vec3(6.0, 0.0, -0.2);
-          desktopCurve[5] = vec3(12.0, 0.0, -4.0);
-          desktopCurve[6] = vec3(18.0, 0.0, -7.0);
-          
-          // Select curve based on mobile flag
-          vec3 curve[7];
-          if (isMobile > 0.5) {
-            for (int i = 0; i < 7; i++) {
-              curve[i] = mobileCurve[i];
-            }
-          } else {
-            for (int i = 0; i < 7; i++) {
-              curve[i] = desktopCurve[i];
-            }
-          }
-          
-          // Find segment
-          float scaledT = t * 6.0; // 6 segments between 7 points
-          int segment = int(floor(scaledT));
-          float segmentT = fract(scaledT);
-          
-          // Clamp segment
-          segment = clamp(segment, 0, 5);
-          
-          // Get 4 points for catmull-rom
-          vec3 p0 = curve[max(0, segment - 1)];
-          vec3 p1 = curve[segment];
-          vec3 p2 = curve[min(6, segment + 1)];
-          vec3 p3 = curve[min(6, segment + 2)];
-          
-          return catmullRom(p0, p1, p2, p3, segmentT);
-        }
-      `,
-      vertexTransform: `
-        if (textLength > 0.0) {
-          // Simple position offset from the exact same curve as working original text
-          
-          // Use same curve calculation as original working text
-          float textProgress = (position.x + textLength * 0.5) / textLength;
-          float curveT = clamp(curveOffset + textProgress * 0.08, 0.0, 1.0); // Same as original working text
-          
-          // Get curve position - same as original text
-          vec3 curvePos = getCurvePosition(curveT);
-          
-          // Apply EXACT SAME transformation as original text, then just shift Y position down
-          float filmWidth = 3.2;
-          
-          if (isMobile > 0.5) {
-            // Mobile: exact same as original text positioning
-            position.x = curvePos.x + position.y * filmWidth;
-            position.y = curvePos.y - (filmWidth * 0.6); // Closer to image - reduced from 0.8 to 0.6
-            position.z = curvePos.z + 0.01;
-          } else {
-            // Desktop: exact same as original text positioning
-            position.x = curvePos.x;
-            position.y = curvePos.y + position.y * filmWidth - (filmWidth * 0.6); // Closer to image - reduced from 0.8 to 0.6
-            position.z = curvePos.z + 0.01;
-          }
-        }
-      `
-    }
-  )
-}
 
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   const tilesCount = Math.max(tiles.length, 1)
-  const aspect = 24 / 3.3  // Slightly narrower for perfect square
+  const aspect = 30 / 3.3  // More square/rectangular shape
   
   // Generate texture sampling loop
   const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
@@ -330,11 +213,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange }) => {
+const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange, onImageSelect }) => {
   const meshRef = useRef()
-  const textMeshesRef = useRef([])
   const [textures, setTextures] = useState([])
-  const [fontLoaded, setFontLoaded] = useState(false)
   const { gl } = useThree()
   
   // Detect mobile
@@ -347,14 +228,6 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-  
-  // Preload font for text rendering
-  useEffect(() => {
-    preloadFont(
-      { font: './fonts/PSTimesTrial-Regular.otf' },
-      () => setFontLoaded(true)
-    )
   }, [])
   
   // Use refs for real-time values like WebGLSlider
@@ -390,7 +263,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     // At screen center vUv.x = 0.5, so we want: (0.5 + 1000.0 + offset * 0.01) * aspect * 1.2
     // to align with a project boundary
     
-    const aspect = 24 / 3.3
+    const aspect = 30 / 3.3
     const tileScaling = aspect * 1.2
     
     // Calculate which tile index is currently closest to screen center
@@ -467,15 +340,15 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       )
       curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
-      // Desktop curve - original size
+      // Desktop curve - subtle extension
       curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-18, 0, -7.0),   // Far left - off screen
+        new THREE.Vector3(-20, 0, -7.5),   // Far left - slightly further off screen
         new THREE.Vector3(-12, 0, -4.0),   // Left curve start
         new THREE.Vector3(-6, 0, -0.2),    // Left transition to flat
-        new THREE.Vector3(0, 0, 0.2),     // Center flat
+        new THREE.Vector3(0, 0, 0.2),      // Center flat
         new THREE.Vector3(6, 0, -0.2),     // Right transition from flat
         new THREE.Vector3(12, 0, -4.0),    // Right curve start
-        new THREE.Vector3(18, 0, -7.0)     // Far right - off screen
+        new THREE.Vector3(20, 0, -7.5)     // Far right - slightly further off screen
       ], false, "catmullrom", 0.5)
     }
     
@@ -518,116 +391,6 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     geo.computeVertexNormals()
     return geo
   }, [isMobile])
-
-
-  
-  // Create one text per project that follows infinite continuous track
-  const textMeshes = useMemo(() => {
-    if (!fontLoaded || projects.length === 0) return []
-    
-    return projects.map((project, index) => {
-      // Create Text mesh using troika-three-text
-      const textMesh = new Text()
-      
-      // Text configuration
-      textMesh.text = project.title
-      textMesh.font = './fonts/PSTimesTrial-Regular.otf'
-      textMesh.fontSize = 0.2
-      textMesh.color = 0x000000
-      textMesh.anchorX = 'left'
-      textMesh.anchorY = 'top'
-      textMesh.letterSpacing = 0.08
-      textMesh.lineHeight = 1.6
-      textMesh.maxWidth = 3.5
-      textMesh.textAlign = 'left'
-      // Higher subdivision for smoother curve deformation
-      textMesh.glyphGeometryDetail = 4
-      
-      // Set font size based on device
-      if (isMobile) {
-        textMesh.fontSize = 0.10
-      } else {
-        textMesh.fontSize = 0.12
-      }
-      
-      // Store project index for movement calculations and mark for water shader
-      textMesh.userData.projectIndex = index
-      textMesh.userData.type = 'webgl-text' // Mark for water shader recognition
-      
-      // Create custom curved material
-      const curvedMaterial = createCurvedTextMaterial(isMobile)
-      
-      // Add synccomplete listener to calculate text length
-      textMesh.addEventListener('synccomplete', () => {
-        const bounds = textMesh.textRenderInfo.blockBounds
-        const textLength = bounds[2] - bounds[0]
-        curvedMaterial.uniforms.textLength.value = textLength
-        
-        // Apply the custom material
-        textMesh.material = curvedMaterial
-      })
-      
-      // Store material reference for later updates
-      textMesh.userData.curvedMaterial = curvedMaterial
-      
-      // Sync text mesh for later updates
-      textMesh.sync()
-      
-      return textMesh
-    })
-  }, [projects, fontLoaded, isMobile])
-  
-  // Update text meshes ref
-  useEffect(() => {
-    textMeshesRef.current = textMeshes
-  }, [textMeshes])
-
-  // Create container text meshes - limited to 8 text meshes that get reused
-  const containerTextMeshes = useMemo(() => {
-    if (!fontLoaded || projects.length === 0) return []
-    
-    // Create more text meshes to prevent spawning glitches at edges
-    const maxTextMeshes = 12 // Increased from 8 to cover more area
-    const textMeshes = []
-    
-    for (let i = 0; i < maxTextMeshes; i++) {
-      const project = projects[i % projects.length]
-      const textMesh = new Text()
-      
-      // Text configuration
-      textMesh.text = project.title
-      textMesh.font = './fonts/PSTimesTrial-Regular.otf'
-      textMesh.fontSize = isMobile ? 0.08 : 0.1
-      textMesh.color = 0x000000
-      textMesh.anchorX = 'left'
-      textMesh.anchorY = 'top'
-      textMesh.letterSpacing = 0.02
-      textMesh.textAlign = 'left'
-      textMesh.maxWidth = 2.0
-      textMesh.glyphGeometryDetail = 4
-      
-      // Store mesh index for positioning and mark for water shader
-      textMesh.userData.meshIndex = i
-      textMesh.userData.type = 'webgl-text' // Mark for water shader recognition
-      
-      // Use curved material
-      const curvedMaterial = createCurvedTextMaterial(isMobile)
-      
-      textMesh.addEventListener('synccomplete', () => {
-        const bounds = textMesh.textRenderInfo.blockBounds
-        const textLength = bounds[2] - bounds[0]
-        curvedMaterial.uniforms.textLength.value = textLength
-        textMesh.material = curvedMaterial
-      })
-      
-      textMesh.userData.curvedMaterial = curvedMaterial
-      textMesh.sync()
-      
-      textMeshes.push(textMesh)
-    }
-    
-    return textMeshes
-  }, [projects, fontLoaded, isMobile])
   
   // Create textures from project images
   useEffect(() => {
@@ -879,9 +642,15 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     if (!uv) return
     
     // Calculate project index from UV position
-    const aspect = 24 / (2.0 * 4/3)
+    const aspect = 30 / 3.3
     const tilesUV = uv.x * aspect * 1.2
     const tileIndex = Math.floor(tilesUV) % projects.length
+    
+    // Calculate global image index (assuming 10 images per project)
+    const globalImageIndex = tileIndex * 10
+    if (onImageSelect) {
+      onImageSelect(globalImageIndex)
+    }
     
     // Store current offset as start position
     fadeStartOffset.current = currentOffset.current
@@ -1021,96 +790,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
     material.updateTransition(isFading, fadeProgress, isMobile)
-    
-    // Update text meshes curve offset to match shader movement
-    if (textMeshesRef.current.length > 0) {
-      // Match shader tiling logic exactly
-      const aspect = 24 / 3.3
-      const tileSpacing = aspect * 1.2 // Same as shader tilesUV multiplier
-      
-      // Calculate movement like shader: globalUV = (vUv + vec2(1000. + time * 0.01, 0.))
-      const timeOffset = currentOffset.current * 0.01
-      const baseOffset = 1000.0 + timeOffset
-      
-      textMeshesRef.current.forEach((textMesh, textIndex) => {
-        if (!textMesh || !textMesh.userData.curvedMaterial) return
-        
-        // EXACT SYNC WITH IMAGE SHADER: Copy the exact same calculation as the fragment shader
-        
-        // Start with the exact same globalUV calculation as images
-        const globalUV = 0.5 + baseOffset; // Same as images: vec2 globalUV = (vUv + vec2(1000. + time * 0.01, 0.));
-        
-        // Same tiling calculation as images  
-        const tilesUV = globalUV * tileSpacing; // Same as images: vec2 tilesUV = globalUV * vec2(aspect * 1.2, 1.);
-        
-        // Much simpler approach: directly calculate text position like the original working version
-        const textTilePosition = textIndex - (tilesUV - Math.floor(tilesUV)); // REVERSED: subtract to move opposite direction
-        const textGlobalUV = textTilePosition / tileSpacing;
-        const leftAlignedUV = textGlobalUV + 0.2 / tileSpacing; // Left alignment offset (positive for left)
-        
-        // Convert to curve position
-        let curvePosition = leftAlignedUV % 1.0;
-        if (curvePosition < 0) curvePosition += 1.0;
-        
-        textMesh.userData.curvedMaterial.uniforms.curveOffset.value = curvePosition;
-      })
-    }
-    
-    // Update container text meshes - smart positioning to cover visible area
-    if (containerTextMeshes.length > 0) {
-      const aspect = 24 / 3.3
-      const tileSpacing = aspect * 1.2
-      const timeOffset = currentOffset.current * 0.01
-      const baseOffset = 1000.0 + timeOffset
-      
-      // Calculate which tiles are currently visible
-      const globalUV = 0.5 + baseOffset - 1000.0
-      const currentTilesUV = globalUV * tileSpacing
-      const centerTileIndex = Math.floor(currentTilesUV)
-      
-      // Track used tile indices to prevent duplicates
-      const usedTileIndices = new Set()
-      
-      containerTextMeshes.forEach((textMesh, meshIndex) => {
-        if (!textMesh || !textMesh.userData.curvedMaterial) return
-        
-        // Position this text mesh to cover one of the visible tiles
-        // Ensure each text mesh covers a unique tile position
-        const offset = meshIndex - Math.floor(containerTextMeshes.length / 2)
-        let targetTileIndex = Math.round(centerTileIndex + offset)
-        
-        // Ensure no duplicate tile indices - find next available if already used
-        while (usedTileIndices.has(targetTileIndex)) {
-          targetTileIndex += targetTileIndex > centerTileIndex ? 1 : -1
-        }
-        usedTileIndices.add(targetTileIndex)
-        
-        // Find which project this tile should show (using mod like the shader)
-        const projectIndex = ((targetTileIndex % projects.length) + projects.length) % projects.length
-        const targetProject = projects[projectIndex]
-        
-        // Update text content if needed
-        if (textMesh.text !== targetProject.title) {
-          textMesh.text = targetProject.title
-          textMesh.sync()
-        }
-        
-        // Calculate curve position for this tile
-        const tileWidth = 1.0 / tileSpacing
-        const centerOfTileUV = (targetTileIndex + 0.5) * tileWidth
-        const movingTileUV = centerOfTileUV - (baseOffset - 1000.0)
-        const curvePosition = ((movingTileUV % 1.0) + 1.0) % 1.0
-        
-        // Hide text meshes that are too far from center to prevent edge glitching
-        const distanceFromCenter = Math.abs(offset)
-        const shouldBeVisible = distanceFromCenter <= 6 // Show text within 6 positions from center
-        textMesh.visible = shouldBeVisible
-        
-        if (shouldBeVisible) {
-          textMesh.userData.curvedMaterial.uniforms.curveOffset.value = curvePosition
-        }
-      })
-    }
+    // No fog color update needed
   })
   
   // Create material with textures
@@ -1123,31 +803,15 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   if (!material) return null
   
   return (
-    <>
-      <mesh 
-        ref={meshRef} 
-        geometry={geometry} 
-        material={material} 
-        onClick={handleMeshClick}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      />
-
-      {/* WebGL text meshes positioned within container sections */}
-      {containerTextMeshes.map((textMesh, index) => {
-        // Ensure consistent rendering order and visibility
-        textMesh.renderOrder = 10000 // Render after water effects
-        textMesh.userData.skipWaterCapture = false // Ensure water shader can see it
-        return (
-          <primitive 
-            key={`container-text-${index}`}
-            object={textMesh}
-          />
-        )
-      })}
-      {/* Old troika text meshes removed - now using WebGL text in container */}
-    </>
+    <mesh 
+      ref={meshRef} 
+      geometry={geometry} 
+      material={material} 
+      onClick={handleMeshClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    />
   )
 }
 

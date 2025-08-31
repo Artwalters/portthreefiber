@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Perf } from 'r3f-perf'
-// import FilmStripSlider from './sliders/FilmStripSlider.jsx' // Temporarily disabled
+import FilmStripSlider from './sliders/FilmStripSlider.jsx'
 // import SimplePlaneSlider from './sliders/SimplePlaneSlider.jsx'
 // import SingleImageCurvedSlider from './sliders/SingleImageCurvedSlider.jsx'
 import SingleImageShaderSlider from './sliders/SingleImageShaderSlider.jsx'
@@ -47,6 +47,11 @@ function App() {
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     // Removed background color state - keeping everything white
+    
+    // Slider switching states
+    const [showFilmStrip, setShowFilmStrip] = useState(true)
+    const [showSingleImage, setShowSingleImage] = useState(false)  
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0)
     const waterRef = useRef()
     
     // Device capabilities detection
@@ -149,6 +154,16 @@ function App() {
     // Navigation throttling
     const [isNavigating, setIsNavigating] = useState(false)
     const navigationTimeout = useRef(null)
+    
+    // Handle image selection from FilmStripSlider
+    const handleImageSelect = (imageIndex) => {
+        setSelectedImageIndex(imageIndex)
+        // Wait for FilmStripSlider fade-out to complete, then switch
+        setTimeout(() => {
+            setShowFilmStrip(false)
+            setShowSingleImage(true)
+        }, 1000) // FilmStripSlider fade duration
+    }
 
     // Gallery navigation functions with throttling
     const navigateGallery = (direction) => {
@@ -439,13 +454,13 @@ function App() {
                 frameloop="always"
                 flat={false}
                 onCreated={({ scene, gl }) => {
-                    // FOG DISABLED FOR DEBUGGING
-                    // const isMobile = window.innerWidth <= 768
-                    // if (isMobile) {
-                    //     scene.fog = new THREE.Fog(0xffffff, 8, 18)
-                    // } else {
-                    //     scene.fog = new THREE.Fog(0xffffff, 5, 15)
-                    // }
+                    // Add fog - push back fog start for mobile to keep front images clear
+                    const isMobile = window.innerWidth <= 768
+                    if (isMobile) {
+                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                    } else {
+                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                    }
                     // Set initial clear color to white
                     gl.setClearColor('#ffffff')
                 }}
@@ -455,19 +470,24 @@ function App() {
                 {/* Layer 1: Fish (bottom) */}
                 <FishParticleSystem />
                 
-                {/* Layer 2: Film Strip Slider - TEMPORARILY DISABLED */}
-                {/* <FilmStripSlider 
-                    projects={projects}
-                    onHover={setHoveredProject}
-                    waterRef={waterRef}
-                    onTransitionStart={setIsTransitioning}
-                    onBackgroundColorChange={null}
-                /> */}
+                {/* Layer 2: Conditional Slider Rendering */}
+                {showFilmStrip && (
+                    <FilmStripSlider 
+                        projects={projects}
+                        onHover={setHoveredProject}
+                        waterRef={waterRef}
+                        onTransitionStart={setIsTransitioning}
+                        onBackgroundColorChange={null}
+                        onImageSelect={handleImageSelect}
+                    />
+                )}
                 
-                {/* Single Image Shader Slider */}
-                <SingleImageShaderSlider 
-                    imageUrl="./img/project/Screenshot 2025-06-17 at 00.14.52 1.png"
-                />
+                {showSingleImage && (
+                    <SingleImageShaderSlider 
+                        key={selectedImageIndex} // Force complete recreation
+                        initialImageIndex={selectedImageIndex}
+                    />
+                )}
                 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
                 {deviceCapabilities?.shouldUseMobileWater ? (
