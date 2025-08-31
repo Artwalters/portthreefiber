@@ -454,12 +454,12 @@ function App() {
                 frameloop="always"
                 flat={false}
                 onCreated={({ scene, gl }) => {
-                    // Add fog - push back fog start for mobile to keep front images clear
+                    // Add fog - subtle depth effect
                     const isMobile = window.innerWidth <= 768
                     if (isMobile) {
-                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                        scene.fog = new THREE.Fog(0xffffff, 7, 14)
                     } else {
-                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                        scene.fog = new THREE.Fog(0xffffff, 5, 12)
                     }
                     // Set initial clear color to white
                     gl.setClearColor('#ffffff')
@@ -489,12 +489,12 @@ function App() {
                     />
                 )}
                 
-                {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                {deviceCapabilities?.shouldUseMobileWater ? (
+                {/* Layer 3: Water (top) - DISABLED FOR TESTING */}
+                {/* {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )}
+                )} */}
                 
                 {/* Performance Monitor */}
                 <Perf position="bottom-right" />

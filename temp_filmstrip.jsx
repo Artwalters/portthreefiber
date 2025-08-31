@@ -5,7 +5,7 @@ import * as THREE from 'three'
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   const tilesCount = Math.max(tiles.length, 1)
-  const aspect = isMobile ? 24 / 3.3 : 30 / 3.3  // Mobile: original, Desktop: more square
+  const aspect = 24 / 3.3  // Slightly narrower for perfect square
   
   // Generate texture sampling loop
   const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
@@ -21,8 +21,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
-      fogNear: { value: isMobile ? 7 : 5 },
-      fogFar: { value: isMobile ? 14 : 12 },
+      fogNear: { value: isMobile ? 8 : 5 },
+      fogFar: { value: isMobile ? 18 : 15 },
       uIsTransitioning: { value: 0 },
       uSweepPosition: { value: -25 }
     },
@@ -213,7 +213,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange, onImageSelect }) => {
+const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -263,7 +263,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     // At screen center vUv.x = 0.5, so we want: (0.5 + 1000.0 + offset * 0.01) * aspect * 1.2
     // to align with a project boundary
     
-    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+    const aspect = 24 / 3.3
     const tileScaling = aspect * 1.2
     
     // Calculate which tile index is currently closest to screen center
@@ -318,7 +318,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   
   // Create curved geometry
   const geometry = useMemo(() => {
-    const splineSegments = isMobile ? 100 : 150 // Reduced segments for performance
+    const splineSegments = 300
     const filmWidth = isMobile ? 3.2 : 3.2 // Same size for both mobile and desktop
     
     let curve
@@ -340,22 +340,22 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       )
       curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
-      // Desktop curve - subtle extension
+      // Desktop curve - original size
       curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-20, 0, -7.5),   // Far left - slightly further off screen
+        new THREE.Vector3(-18, 0, -7.0),   // Far left - off screen
         new THREE.Vector3(-12, 0, -4.0),   // Left curve start
         new THREE.Vector3(-6, 0, -0.2),    // Left transition to flat
-        new THREE.Vector3(0, 0, 0.2),      // Center flat
+        new THREE.Vector3(0, 0, 0.2),     // Center flat
         new THREE.Vector3(6, 0, -0.2),     // Right transition from flat
         new THREE.Vector3(12, 0, -4.0),    // Right curve start
-        new THREE.Vector3(20, 0, -7.5)     // Far right - slightly further off screen
+        new THREE.Vector3(18, 0, -7.0)     // Far right - off screen
       ], false, "catmullrom", 0.5)
     }
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
-    // Create plane geometry with optimized subdivisions
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 16) // Reduced height segments
+    // Create plane geometry with more subdivisions for better quality
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 32)
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
@@ -406,14 +406,14 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
             tex.colorSpace = THREE.SRGBColorSpace
             tex.encoding = THREE.sRGBEncoding
             // Maximum quality texture settings
-            tex.generateMipmaps = true // Enable mipmaps for better performance
+            tex.generateMipmaps = false // Disable mipmaps for sharper images
             tex.wrapS = THREE.ClampToEdgeWrapping
             tex.wrapT = THREE.ClampToEdgeWrapping
             // Use nearest neighbor for pixel-perfect sharpness
             tex.minFilter = THREE.LinearFilter
             tex.magFilter = THREE.LinearFilter
             // Maximum anisotropic filtering for sharp textures at angles
-            tex.anisotropy = Math.min(isMobile ? 4 : 8, gl.capabilities.getMaxAnisotropy()) // Reduced for performance
+            tex.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy())
             // Ensure texture updates
             tex.needsUpdate = true
             resolve(tex)
@@ -642,15 +642,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     if (!uv) return
     
     // Calculate project index from UV position
-    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+    const aspect = 24 / (2.0 * 4/3)
     const tilesUV = uv.x * aspect * 1.2
     const tileIndex = Math.floor(tilesUV) % projects.length
-    
-    // Calculate global image index (assuming 10 images per project)
-    const globalImageIndex = tileIndex * 10
-    if (onImageSelect) {
-      onImageSelect(globalImageIndex)
-    }
     
     // Store current offset as start position
     fadeStartOffset.current = currentOffset.current
@@ -769,15 +763,11 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
         targetOffset.current += (continuousSnapTarget - targetOffset.current) * centeringForce
       }
       
-      // Fade deformation effect - stop updating when very small
-      if (Math.abs(sliderSpeed.current) > 0.01) {
-        if (isMobile) {
-          sliderSpeed.current *= 0.97  // Much slower fade out (was 0.92)
-        } else {
-          sliderSpeed.current *= 0.98  // Much slower fade out (was 0.96)
-        }
+      // Fade deformation effect - extremely smooth decay for gradual RGB fade
+      if (isMobile) {
+        sliderSpeed.current *= 0.97  // Much slower fade out (was 0.92)
       } else {
-        sliderSpeed.current = 0 // Stop updating when negligible
+        sliderSpeed.current *= 0.98  // Much slower fade out (was 0.96)
       }
       
       // Hover events

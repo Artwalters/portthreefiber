@@ -13,8 +13,8 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
-      fogNear: { value: isMobile ? 8 : 5 },
-      fogFar: { value: isMobile ? 18 : 15 }
+      fogNear: { value: isMobile ? 7 : 5 },
+      fogFar: { value: isMobile ? 14 : 12 }
     },
     vertexShader: `
       uniform float uVelo;
@@ -215,7 +215,7 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
   
   // Create curved geometry like FilmStripSlider
   const geometry = useMemo(() => {
-    const splineSegments = 300
+    const splineSegments = isMobile ? 100 : 150 // Reduced segments for performance
     const filmWidth = isMobile ? 3.2 : 3.2
     
     let curve
@@ -251,7 +251,7 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 32)
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 16) // Reduced height segments
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
@@ -299,12 +299,12 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace
         tex.encoding = THREE.sRGBEncoding
-        tex.generateMipmaps = false
+        tex.generateMipmaps = true // Enable mipmaps for better performance
         tex.wrapS = THREE.ClampToEdgeWrapping
         tex.wrapT = THREE.ClampToEdgeWrapping
         tex.minFilter = THREE.LinearFilter
         tex.magFilter = THREE.LinearFilter
-        tex.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy())
+        tex.anisotropy = Math.min(isMobile ? 4 : 8, gl.capabilities.getMaxAnisotropy()) // Reduced for performance
         tex.needsUpdate = true
         setTexture(tex)
         
@@ -377,11 +377,15 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
       currentOffset.current = 0
     }
     
-    // Fade deformation effect
-    if (isMobile) {
-      sliderSpeed.current *= 0.97
+    // Fade deformation effect - stop updating when very small
+    if (Math.abs(sliderSpeed.current) > 0.01) {
+      if (isMobile) {
+        sliderSpeed.current *= 0.97
+      } else {
+        sliderSpeed.current *= 0.98
+      }
     } else {
-      sliderSpeed.current *= 0.98
+      sliderSpeed.current = 0 // Stop updating when negligible
     }
     
     // Update material

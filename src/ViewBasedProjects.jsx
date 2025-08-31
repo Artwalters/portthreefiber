@@ -142,12 +142,12 @@ export default function ViewBasedProjects() {
                     {/* Layer 2: Barrel Distortion (middle) */}
                     <BarrelDistortionTemplate waterRef={waterRef} />
                     
-                    {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                    {deviceCapabilities?.shouldUseMobileWater ? (
+                    {/* Layer 3: Water (top) - DISABLED FOR TESTING */}
+                    {/* {deviceCapabilities?.shouldUseMobileWater ? (
                         <MobileWater ref={waterRef} scrollY={scrollY} />
                     ) : (
                         <SimpleWater ref={waterRef} scrollY={scrollY} />
-                    )}
+                    )} */}
                 </Canvas>}
 
             {/* Navigation UI */}
