@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 // Custom shader material for single repeating image
 const createSingleImageMaterial = (texture, isMobile = false) => {
-  const aspect = 30 / 3.3  // Same aspect as FilmStripSlider - more square
+  const aspect = isMobile ? 24 / 3.3 : 30 / 3.3  // Same aspect as FilmStripSlider
   
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -62,7 +62,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
         aberrationStrength = min(aberrationStrength, 0.006);
         
         // Define single image bounds (centered) - same as original tiles
-        // Original tiles had aspect ratio of 30/3.3 * 1.2 with gaps
+        // Original tiles had aspect ratio of (mobile: 24/3.3, desktop: 30/3.3) * 1.2 with gaps
         // After gaps (0.05 on each side), effective width was 0.9 of tile width
         // Each tile was 1/(aspect*1.2) = 1/(8.7) ≈ 0.115 of UV space
         // With gaps removed: 0.115 * 0.9 ≈ 0.103

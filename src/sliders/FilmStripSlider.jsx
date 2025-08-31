@@ -5,7 +5,7 @@ import * as THREE from 'three'
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   const tilesCount = Math.max(tiles.length, 1)
-  const aspect = 30 / 3.3  // More square/rectangular shape
+  const aspect = isMobile ? 24 / 3.3 : 30 / 3.3  // Mobile: original, Desktop: more square
   
   // Generate texture sampling loop
   const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
@@ -263,7 +263,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     // At screen center vUv.x = 0.5, so we want: (0.5 + 1000.0 + offset * 0.01) * aspect * 1.2
     // to align with a project boundary
     
-    const aspect = 30 / 3.3
+    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
     const tileScaling = aspect * 1.2
     
     // Calculate which tile index is currently closest to screen center
@@ -642,7 +642,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     if (!uv) return
     
     // Calculate project index from UV position
-    const aspect = 30 / 3.3
+    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
     const tilesUV = uv.x * aspect * 1.2
     const tileIndex = Math.floor(tilesUV) % projects.length
     
