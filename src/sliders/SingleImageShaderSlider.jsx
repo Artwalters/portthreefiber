@@ -299,10 +299,10 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace
         tex.encoding = THREE.sRGBEncoding
-        tex.generateMipmaps = true // Enable mipmaps for better performance
+        tex.generateMipmaps = isMobile ? false : true // Disable mipmaps on mobile for faster loading
         tex.wrapS = THREE.ClampToEdgeWrapping
         tex.wrapT = THREE.ClampToEdgeWrapping
-        tex.minFilter = THREE.LinearFilter
+        tex.minFilter = isMobile ? THREE.NearestFilter : THREE.LinearFilter // Faster filtering on mobile
         tex.magFilter = THREE.LinearFilter
         tex.anisotropy = Math.min(isMobile ? 4 : 8, gl.capabilities.getMaxAnisotropy()) // Reduced for performance
         tex.needsUpdate = true
@@ -324,10 +324,17 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
     )
   }, [currentImageIndex, projectImages, gl])
   
-  // Click handler to cycle through images
+  // Click handler to cycle through images - optimized for mobile
   useEffect(() => {
-    const handleClick = (e) => {
+    let touchStartTime = 0
+    let touchStartX = 0
+    let touchStartY = 0
+    
+    const handleInteraction = (e) => {
       if (projectImages.length === 0) return
+      
+      // Prevent default to avoid delays
+      e.preventDefault()
       
       // Cycle to next image
       setCurrentImageIndex((prevIndex) => {
@@ -338,11 +345,42 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
       })
     }
     
+    const handleTouchStart = (e) => {
+      touchStartTime = Date.now()
+      touchStartX = e.touches[0].clientX
+      touchStartY = e.touches[0].clientY
+    }
+    
+    const handleTouchEnd = (e) => {
+      const touchDuration = Date.now() - touchStartTime
+      const touchEndX = e.changedTouches[0].clientX
+      const touchEndY = e.changedTouches[0].clientY
+      const deltaX = Math.abs(touchEndX - touchStartX)
+      const deltaY = Math.abs(touchEndY - touchStartY)
+      
+      // Quick tap detection (faster than click event)
+      if (touchDuration < 300 && deltaX < 30 && deltaY < 30) {
+        handleInteraction(e)
+      }
+    }
+    
     const canvas = gl.domElement
-    canvas.addEventListener('click', handleClick)
+    
+    // Use pointerdown for desktop (faster than click)
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') {
+        handleInteraction(e)
+      }
+    })
+    
+    // Touch events for mobile (fastest response)
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false })
     
     return () => {
-      canvas.removeEventListener('click', handleClick)
+      canvas.removeEventListener('pointerdown', handleInteraction)
+      canvas.removeEventListener('touchstart', handleTouchStart)
+      canvas.removeEventListener('touchend', handleTouchEnd)
     }
   }, [gl, projectImages])
   
