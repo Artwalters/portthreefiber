@@ -4,7 +4,10 @@ import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Perf } from 'r3f-perf'
-import FilmStripSlider from './sliders/FilmStripSlider.jsx'
+// import FilmStripSlider from './sliders/FilmStripSlider.jsx' // Temporarily disabled
+// import SimplePlaneSlider from './sliders/SimplePlaneSlider.jsx'
+// import SingleImageCurvedSlider from './sliders/SingleImageCurvedSlider.jsx'
+import SingleImageShaderSlider from './sliders/SingleImageShaderSlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
@@ -452,13 +455,18 @@ function App() {
                 {/* Layer 1: Fish (bottom) */}
                 <FishParticleSystem />
                 
-                {/* Layer 2: Film Strip Slider */}
-                <FilmStripSlider 
+                {/* Layer 2: Film Strip Slider - TEMPORARILY DISABLED */}
+                {/* <FilmStripSlider 
                     projects={projects}
                     onHover={setHoveredProject}
                     waterRef={waterRef}
                     onTransitionStart={setIsTransitioning}
                     onBackgroundColorChange={null}
+                /> */}
+                
+                {/* Single Image Shader Slider */}
+                <SingleImageShaderSlider 
+                    imageUrl="./img/project/Screenshot 2025-06-17 at 00.14.52 1.png"
                 />
                 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
