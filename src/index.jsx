@@ -439,13 +439,13 @@ function App() {
                 frameloop="always"
                 flat={false}
                 onCreated={({ scene, gl }) => {
-                    // Add fog - push back fog start for mobile to keep front images clear
-                    const isMobile = window.innerWidth <= 768
-                    if (isMobile) {
-                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
-                    } else {
-                        scene.fog = new THREE.Fog(0xffffff, 5, 15)
-                    }
+                    // FOG DISABLED FOR DEBUGGING
+                    // const isMobile = window.innerWidth <= 768
+                    // if (isMobile) {
+                    //     scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                    // } else {
+                    //     scene.fog = new THREE.Fog(0xffffff, 5, 15)
+                    // }
                     // Set initial clear color to white
                     gl.setClearColor('#ffffff')
                 }}
@@ -477,7 +477,7 @@ function App() {
                 )}
                 
                 {/* Performance Monitor */}
-                <Perf position="top-left" />
+                <Perf position="bottom-right" />
             </Canvas>
             <UIOverlay 
                 highlightedProject={highlightedProject}

@@ -114,9 +114,10 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
           tileColor = texture2D(uTexture, tileUV);
         }
         
-        // Apply fog
-        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-        vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
+        // Apply fog - DISABLED FOR DEBUGGING
+        // float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        // vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
+        vec3 finalColor = tileColor.rgb; // No fog for debugging
         
         gl_FragColor = vec4(finalColor, tileColor.a);
         gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(1.0/2.2)); // Gamma correction
@@ -146,7 +147,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const SingleImageShaderSlider = () => {
+const SingleImageShaderSlider = ({ showDebugCurve = true }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -192,6 +193,9 @@ const SingleImageShaderSlider = () => {
   }, [])
   
   
+  // Store curve for debug visualization
+  const [debugCurve, setDebugCurve] = useState(null)
+  
   // Create curved geometry like FilmStripSlider
   const geometry = useMemo(() => {
     const splineSegments = 300
@@ -200,13 +204,13 @@ const SingleImageShaderSlider = () => {
     let curve
     if (isMobile) {
       const mobileCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-10, 0, -10.0),  // Moved closer to center and further back
-        new THREE.Vector3(-7, 0, -5.0),    // Adjusted proportionally
-        new THREE.Vector3(-3, 0, -0.2),    // Yellow - moved closer to center
-        new THREE.Vector3(0, 0, 0.2),
-        new THREE.Vector3(3, 0, -0.2),     // Cyan - moved closer to center
-        new THREE.Vector3(7, 0, -5.0),     // Adjusted proportionally
-        new THREE.Vector3(10, 0, -10.0)    // Moved closer to center and further back
+       new THREE.Vector3(-12, 0, -7.0),   // Far left - off screen (shorter)
+             new THREE.Vector3(-8, 0, -4.0),    // Left curve start
+             new THREE.Vector3(-4, 0, -0.2),    // Left transition to flat
+             new THREE.Vector3(0, 0, 0.2),      // Center flat
+             new THREE.Vector3(4, 0, -0.2),     // Right transition from flat
+             new THREE.Vector3(8, 0, -4.0),     // Right curve start
+             new THREE.Vector3(12, 0, -7.0)    // Moved closer to center and further back
       ], false, "catmullrom", 0.5)
       
       const rotatedPoints = mobileCurve.points.map(point => 
@@ -215,15 +219,20 @@ const SingleImageShaderSlider = () => {
       curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
       curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-14, 0, -10.0),  // Moved closer to center and further back
-        new THREE.Vector3(-10, 0, -5.0),   // Adjusted proportionally
-        new THREE.Vector3(-4, 0, -0.2),    // Yellow - moved closer to center
-        new THREE.Vector3(0, 0, 0.2),
-        new THREE.Vector3(4, 0, -0.2),     // Cyan - moved closer to center
-        new THREE.Vector3(10, 0, -5.0),    // Adjusted proportionally
-        new THREE.Vector3(14, 0, -10.0)    // Moved closer to center and further back
+        new THREE.Vector3(-3, 0, -10.0),   // RED - First outer point left back
+        new THREE.Vector3(-2, 0, -7.0),    // ORANGE - Second point left back
+        new THREE.Vector3(-6, 0, -4.0),    // YELLOW - Third point left mid
+        new THREE.Vector3(-3.5, 0, 0.4),   // GREEN - Fourth point left forward
+        new THREE.Vector3(0, 0, 1.1),      // CYAN - Center point (closest to camera)
+        new THREE.Vector3(3.5, 0, 0.4),    // BLUE - Sixth point right forward
+        new THREE.Vector3(6, 0, -4.0),     // PURPLE - Seventh point right mid
+        new THREE.Vector3(2, 0, -7.0),     // MAGENTA - Eighth point right back
+        new THREE.Vector3(3, 0, -10.0)     // DARKRED - Last outer point right back
       ], false, "catmullrom", 0.5)
     }
+    
+    // Store curve for debug visualization
+    setDebugCurve(curve)
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
     
@@ -384,76 +393,34 @@ const SingleImageShaderSlider = () => {
         onPointerOut={() => document.body.style.cursor = 'auto'}
       />
       
-      {/* Visual curve points for debugging */}
-      <group>
-        {/* Desktop curve points */}
-        {!isMobile && (
-          <>
-            <mesh position={[-14, 0, -10.0]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="red" />
-            </mesh>
-            <mesh position={[-10, 0, -5.0]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="orange" />
-            </mesh>
-            <mesh position={[-4, 0, -0.2]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="yellow" />
-            </mesh>
-            <mesh position={[0, 0, 0.2]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="green" />
-            </mesh>
-            <mesh position={[4, 0, -0.2]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="cyan" />
-            </mesh>
-            <mesh position={[10, 0, -5.0]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="blue" />
-            </mesh>
-            <mesh position={[14, 0, -10.0]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="purple" />
-            </mesh>
-          </>
-        )}
-        
-        {/* Mobile curve points (rotated) */}
-        {isMobile && (
-          <>
-            <mesh position={[0, -10, -10.0 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="red" />
-            </mesh>
-            <mesh position={[0, -7, -5.0 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="orange" />
-            </mesh>
-            <mesh position={[0, -3, -0.2 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="yellow" />
-            </mesh>
-            <mesh position={[0, 0, 0.2 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="green" />
-            </mesh>
-            <mesh position={[0, 3, -0.2 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="cyan" />
-            </mesh>
-            <mesh position={[0, 7, -5.0 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="blue" />
-            </mesh>
-            <mesh position={[0, 10, -10.0 + 0.5]}>
-              <sphereGeometry args={[0.2, 16, 16]} />
-              <meshBasicMaterial color="purple" />
-            </mesh>
-          </>
-        )}
-      </group>
+      {/* Automatic curve visualization */}
+      {showDebugCurve && debugCurve && (
+        <>
+          {/* Draw the curve line */}
+          <line>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                count={debugCurve.points.length}
+                array={new Float32Array(debugCurve.points.flatMap(p => [p.x, p.y, p.z]))}
+                itemSize={3}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color="#00ff00" linewidth={2} />
+          </line>
+          
+          {/* Draw spheres at each control point */}
+          {debugCurve.points.map((point, index) => {
+            const colors = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta', 'darkred']
+            return (
+              <mesh key={index} position={[point.x, point.y, point.z]}>
+                <sphereGeometry args={[0.15, 16, 16]} />
+                <meshBasicMaterial color={colors[index % colors.length]} />
+              </mesh>
+            )
+          })}
+        </>
+      )}
     </>
   )
 }

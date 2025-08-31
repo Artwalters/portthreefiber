@@ -149,9 +149,9 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         const edge = Math.floor(Math.random() * 4) // 0=top, 1=right, 2=bottom, 3=left
         let startPos, targetPos, initialRotation
         
-        // Random depth between -2 (close) and -20 (very far)
-        // Much more depth for stronger fog effect
-        const fishDepth = -2 - Math.random() * 18
+        // Random depth between -2 (close) and -10 (far) - optimal visibility range
+        // Adjusted depth range for better visibility without fog
+        const fishDepth = -2 - Math.random() * 8
         
         switch(edge) {
           case 0: // Top edge - spawn way above screen
@@ -378,8 +378,8 @@ export default function FishParticleSystem({ scrollY = 0 }) {
               const edge = Math.floor(Math.random() * 4)
               let startPos, targetPos
               
-              // Random depth between -2 (close) and -20 (very far)
-              const fishDepth = -2 - Math.random() * 18
+              // Random depth between -2 (close) and -10 (far) - optimal visibility range
+              const fishDepth = -2 - Math.random() * 8
               
               switch(edge) {
                 case 0: // Top - spawn way above screen
