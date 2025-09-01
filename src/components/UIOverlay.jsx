@@ -19,7 +19,7 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
               back
             </span>
           ) : (
-            <span className="studio-button">walters studio</span>
+            null  // Verwijder de logo uit top-left
           )}
         </div>
         <div className="ui-top-center">
@@ -71,7 +71,7 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
           )}
         </div>
         <div className="ui-bottom-right">
-          all rights reserved
+          <span className="studio-logo" id="webgl-logo" data-webgl-text>walters studio</span>
         </div>
       </div>
     </div>

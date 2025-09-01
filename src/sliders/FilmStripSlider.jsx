@@ -404,7 +404,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
           (tex) => {
             // Ensure correct color space for accurate colors
             tex.colorSpace = THREE.SRGBColorSpace
-            tex.encoding = THREE.sRGBEncoding
+            // tex.encoding = THREE.sRGBEncoding // Deprecated in Three.js r152+
             // Maximum quality texture settings
             tex.generateMipmaps = true // Enable mipmaps for better performance
             tex.wrapS = THREE.ClampToEdgeWrapping

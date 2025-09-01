@@ -9,6 +9,7 @@ import FilmStripSlider from './sliders/FilmStripSlider.jsx'
 // import SingleImageCurvedSlider from './sliders/SingleImageCurvedSlider.jsx'
 import SingleImageShaderSlider from './sliders/SingleImageShaderSlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
+import TextToWebGL from './components/TextToWebGL.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
@@ -23,6 +24,9 @@ function App() {
     // Check URL for template test
     const urlParams = new URLSearchParams(window.location.search)
     const templateTest = urlParams.get('template') === 'barrel-distortion'
+    
+    // Performance monitor visibility state
+    const [showPerf, setShowPerf] = useState(false)
     
     // If template test is requested, render the template instead of main app
     if (templateTest) {
@@ -489,16 +493,47 @@ function App() {
                     />
                 )}
                 
-                {/* Layer 3: Water (top) - DISABLED FOR TESTING */}
-                {/* {deviceCapabilities?.shouldUseMobileWater ? (
+                {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
+                {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )} */}
+                )}
                 
-                {/* Performance Monitor */}
-                <Perf position="bottom-right" />
+                {/* Text to WebGL converter - converts HTML text elements to WebGL meshes */}
+                {!isPostTransition && <TextToWebGL waterRef={waterRef} />}
+                
+                {/* Performance Monitor with visibility toggle */}
+                {showPerf && <Perf position="bottom-right" />}
             </Canvas>
+            
+            {/* Performance Monitor Toggle Button */}
+            <button
+                onClick={() => setShowPerf(!showPerf)}
+                style={{
+                    position: 'fixed',
+                    bottom: showPerf ? '250px' : '20px', // Move up when monitor is visible
+                    right: '20px',
+                    padding: '6px 10px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    color: showPerf ? '#00ff00' : '#888888',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontFamily: '"Helvetica Neue", -apple-system, sans-serif',
+                    fontWeight: '500',
+                    zIndex: 1000,
+                    opacity: 0.6,
+                    transition: 'all 0.3s',
+                    backdropFilter: 'blur(4px)'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '1'}
+                onMouseLeave={(e) => e.target.style.opacity = '0.6'}
+            >
+                {showPerf ? '◼ PERF' : '▶ PERF'}
+            </button>
+            
             <UIOverlay 
                 highlightedProject={highlightedProject}
                 isHighlightVisible={isHighlightVisible}

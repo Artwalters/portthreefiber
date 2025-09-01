@@ -298,7 +298,7 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
       currentImage.src,
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace
-        tex.encoding = THREE.sRGBEncoding
+        // tex.encoding = THREE.sRGBEncoding // Deprecated in Three.js r152+
         tex.generateMipmaps = isMobile ? false : true // Disable mipmaps on mobile for faster loading
         tex.wrapS = THREE.ClampToEdgeWrapping
         tex.wrapT = THREE.ClampToEdgeWrapping

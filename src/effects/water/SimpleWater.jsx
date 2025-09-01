@@ -318,8 +318,8 @@ const SimpleWater = forwardRef((props, ref) => {
                         barrelDistortionMeshes.push(child)
                         child.visible = true
                     }
-                    // Text meshes (troika Text objects)
-                    else if (child.isText || child.type === 'Text' || child.userData?.type === 'webgl-text') {
+                    // Text meshes (troika Text objects) - including logo
+                    else if (child.isText || child.type === 'Text' || child.userData?.type === 'webgl-text' || child.userData?.isLogo) {
                         barrelDistortionMeshes.push(child)
                         child.visible = true
                     }
