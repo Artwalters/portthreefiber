@@ -18,18 +18,24 @@ const WebGLLogo = ({ waterRef }) => {
 
   // Hide HTML logo when WebGL version is ready
   useEffect(() => {
+    if (!logoTexture) return // Wait for texture to load
+    
     const logoElement = document.getElementById('walters-logo-html')
     if (logoElement) {
       logoElement.style.display = 'none' // Completely hide instead of just opacity
+      logoElement.style.visibility = 'hidden' // Extra hiding
+      logoElement.style.pointerEvents = 'none' // Disable interaction
       console.log('HTML logo hidden for WebGL replacement')
     }
     
     return () => {
       if (logoElement) {
-        logoElement.style.display = '' // Restore on cleanup
+        logoElement.style.display = ''
+        logoElement.style.visibility = ''
+        logoElement.style.pointerEvents = ''
       }
     }
-  }, [])
+  }, [logoTexture])
 
   // Load PNG texture
   useEffect(() => {
@@ -50,19 +56,6 @@ const WebGLLogo = ({ waterRef }) => {
     )
   }, [])
 
-  // Calculate responsive positioning - match UIOverlay bottom-left positioning
-  const position = useMemo(() => {
-    // Match the CSS positioning from styles.css
-    // .ui-bottom-left is positioned with margin/padding
-    const xMargin = isMobile ? 0.28 : 0.21 // More margin = further right
-    const yMargin = isMobile ? 0.17 : 0.14 // More margin = higher from bottom
-    
-    const x = -viewport.width / 2 + (viewport.width * xMargin)
-    const y = -viewport.height / 2 + (viewport.height * yMargin)
-    
-    return [x, y, 1]
-  }, [viewport, isMobile])
-
   // Calculate plane size based on logo aspect ratio (1867x680 from SVG dimensions)
   const planeSize = useMemo(() => {
     if (!logoTexture) return [1, 1]
@@ -74,6 +67,19 @@ const WebGLLogo = ({ waterRef }) => {
     
     return [width, height]
   }, [logoTexture, isMobile])
+
+  // Calculate responsive positioning - match UIOverlay bottom-left positioning
+  const position = useMemo(() => {
+    // Match the CSS positioning from styles.css
+    // .ui-bottom-left is positioned with margin/padding
+    const xMargin = isMobile ? 0.20 : 0.15 // More margin = further right
+    const yMargin = isMobile ? 0.09 : 0.14 // More margin = higher from bottom
+    
+    const x = -viewport.width / 2 + (viewport.width * xMargin)
+    const y = -viewport.height / 2 + (viewport.height * yMargin)
+    
+    return [x, y, 1]
+  }, [viewport, isMobile])
 
   // Water animation that syncs with the actual water shader
   useFrame((state) => {

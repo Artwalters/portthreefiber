@@ -42,7 +42,7 @@ const TextToWebGL = ({ waterRef }) => {
         }
         
         // Font
-        textMesh.font = './fonts/HelveticaNeueLight.otf'
+        textMesh.font = './fonts/PSTimesTrial-Regular.otf'
         
         // Text alignment
         textMesh.textAlign = computedStyle.textAlign === 'center' ? 'center' : 
@@ -69,8 +69,21 @@ const TextToWebGL = ({ waterRef }) => {
         textMesh.visible = false
         textMesh.frustumCulled = false
         
-        // Position far away initially
-        textMesh.position.z = -1000
+        // Calculate initial position BEFORE adding to scene
+        const vFov = camera.fov * Math.PI / 180
+        const height = 2 * Math.tan(vFov / 2) * camera.position.z
+        const width = height * camera.aspect
+        
+        const x = ((bounds.left + bounds.width / 2) / window.innerWidth - 0.5) * width
+        const y = -((bounds.top + bounds.height / 2) / window.innerHeight - 0.5) * height
+        
+        // Set correct position immediately
+        textMesh.position.set(x, y, 0)
+        
+        // Set correct font size immediately
+        const pixelsPerUnit = window.innerHeight / height
+        const scaledFontSize = fontSizeNum / pixelsPerUnit * (isMobile ? 1.2 : 2.4)
+        textMesh.fontSize = scaledFontSize
         
         // Add to scene after sync
         textMesh.sync(() => {
@@ -114,7 +127,7 @@ const TextToWebGL = ({ waterRef }) => {
         }
       })
     }
-  }, [scene])
+  }, [scene, camera])
   
   // Update positions and handle window resize
   useFrame((state) => {
@@ -130,8 +143,15 @@ const TextToWebGL = ({ waterRef }) => {
       const width = height * camera.aspect
       
       // Position mesh based on HTML element position
-      const x = ((bounds.left + bounds.width / 2) / window.innerWidth - 0.5) * width
+      const isMobile = window.innerWidth <= 768
+      let x = ((bounds.left + bounds.width / 2) / window.innerWidth - 0.5) * width
       const y = -((bounds.top + bounds.height / 2) / window.innerHeight - 0.5) * height
+      
+      // Adjust position on mobile to move text more inward
+      if (isMobile) {
+        const inwardOffset = width * 0.05 // Move 5% of screen width inward (less than before)
+        x = Math.min(x - inwardOffset, width * 0.46) // Allow closer to right edge
+      }
       
       item.mesh.position.x = x
       item.mesh.position.y = y
@@ -139,10 +159,9 @@ const TextToWebGL = ({ waterRef }) => {
       
       // Update font size based on current window size
       const pixelsPerUnit = window.innerHeight / height
-      const isMobile = window.innerWidth <= 768
       const fontSizeNum = parseFloat(item.computedStyle.fontSize)
       // Maak de text groter en consistent met UI sizing
-      const newFontSize = fontSizeNum / pixelsPerUnit * (isMobile ? 0.8 : 1.2)
+      const newFontSize = fontSizeNum / pixelsPerUnit * (isMobile ? 1.2 : 2.4)
       item.mesh.fontSize = newFontSize
       
       // Keep hidden for main camera (water will make it visible during capture)
