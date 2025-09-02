@@ -712,22 +712,27 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   }
   
   // Simple animation loop
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!material) return
     
     // Handle fade animation (both slider and fade together)
     if (isFading) {
-      // Calculate eased progress for FADE
-      const fadeBaseSpeed = 0.02 // Original base speed
-      const fadeEasingFactor = fadeProgress * fadeProgress * fadeProgress * 2.5 // Cubic easing
-      const fadeSpeed = fadeBaseSpeed * (0.2 + fadeEasingFactor) // Start at 20% speed
-      const fadeDeltaProgress = Math.min(fadeSpeed, fadeBaseSpeed * 5) // Higher cap
+      // Time-based animation duration (consistent across all framerates)
+      // Both animations use SAME duration for perfect synchronization
+      const animationDuration = 533  // ~0.53 seconds - 1/3 faster than 800ms
       
-      // Calculate eased progress for SLIDER - same curve as fade
-      const sliderBaseSpeed = 0.0225 // Original slider speed
+      // Calculate base delta progress (time-independent)
+      const baseDelta = delta / (animationDuration / 1000)
+      
+      // Calculate eased progress for FADE
+      const fadeEasingFactor = fadeProgress * fadeProgress * fadeProgress * 2.5 // Cubic easing
+      const fadeSpeed = baseDelta * (0.2 + fadeEasingFactor) // Start at 20% speed
+      const fadeDeltaProgress = Math.min(fadeSpeed, baseDelta * 5) // Higher cap
+      
+      // Calculate eased progress for SLIDER - SAME timing as fade for perfect sync
       const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
-      const sliderSpeed = sliderBaseSpeed * (0.2 + sliderEasingFactor) // Start at 20% speed
-      const sliderDeltaProgress = Math.min(sliderSpeed, sliderBaseSpeed * 5) // Higher cap
+      const sliderSpeed = baseDelta * (0.2 + sliderEasingFactor) // Start at 20% speed
+      const sliderDeltaProgress = Math.min(sliderSpeed, baseDelta * 5) // Higher cap
       
       // Update fade progress
       setFadeProgress(prev => {
