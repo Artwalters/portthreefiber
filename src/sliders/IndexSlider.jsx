@@ -31,6 +31,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       fogFar: { value: isMobile ? 14 : 12 },
       uIsTransitioning: { value: 0 },
       uSweepPosition: { value: -25 },
+      uIsFlyingIn: { value: 0 },
+      uFlyInPosition: { value: -25 },
     },
     vertexShader: `
       uniform float uVelo;
@@ -80,6 +82,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uniform float fogFar;
       uniform float uIsTransitioning;
       uniform float uSweepPosition;
+      uniform float uIsFlyingIn;
+      uniform float uFlyInPosition;
       varying vec2 vUv;
       varying float vFogDepth;
       varying float vWorldX;
@@ -183,6 +187,24 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           }
         }
         
+        // Calculate fly-in transition (reverse leegloop effect)
+        if (uIsFlyingIn > 0.5) {
+          float fadeWidth = 3.0;
+          float flyInAlpha;
+          
+          if (uIsMobile > 0.5) {
+            // Mobile: top-to-bottom fly-in sweep (vertical) - REVERSE smoothstep
+            flyInAlpha = 1.0 - smoothstep(uFlyInPosition - fadeWidth, uFlyInPosition, vWorldY);
+          } else {
+            // Desktop: left-to-right fly-in sweep (horizontal) - REVERSE smoothstep
+            flyInAlpha = 1.0 - smoothstep(uFlyInPosition - fadeWidth, uFlyInPosition, vWorldX);
+          }
+          
+          if (flyInAlpha < 0.5) {  // Now pixels appear as sweep passes
+            discard;
+          }
+        }
+        
         // Apply fog
         float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
@@ -227,13 +249,30 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     }
   }
   
+  material.updateFlyIn = function(isFlyingIn, progress) {
+    this.uniforms.uIsFlyingIn.value = isFlyingIn ? 1.0 : 0.0
+    
+    // Determine if mobile based on existing uniform
+    const isMobile = this.uniforms.uIsMobile.value > 0.5
+    
+    if (isMobile) {
+      // Mobile: sweep from top (-15) to bottom (+15) for vertical orientation
+      const flyInPosition = -15 + (progress * 30)
+      this.uniforms.uFlyInPosition.value = flyInPosition
+    } else {
+      // Desktop: sweep from left (-25) to right (+25) for horizontal orientation  
+      const flyInPosition = -25 + (progress * 50)
+      this.uniforms.uFlyInPosition.value = flyInPosition
+    }
+  }
+  
   
   // Removed fog color update function
   
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -653,6 +692,20 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const fadeStartOffset = useRef(0)
   const hasCompletionFired = useRef(false)
   
+  // Fly-in animation state (reverse leegloop effect)
+  const [isFlyingIn, setIsFlyingIn] = useState(false)
+  const [flyInProgress, setFlyInProgress] = useState(0)
+  const flyInStartOffset = useRef(0)
+  
+  // Handle fly-in animation when returning from gallery
+  useEffect(() => {
+    if (isReturningFromGallery && !isFlyingIn) {
+      setIsFlyingIn(true)
+      setFlyInProgress(0)
+      flyInStartOffset.current = currentOffset.current
+    }
+  }, [isReturningFromGallery, isFlyingIn])
+  
   // Project colors - assign unique color to each project
   
   // Click detection state
@@ -802,6 +855,32 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
+    } else if (isFlyingIn) {
+      // Handle fly-in animation (reverse leegloop effect) - 2 seconds duration
+      const animationDuration = 2000 // 2 seconds to match gallery exit animation
+      const baseDelta = delta / (animationDuration / 1000)
+      
+      // Update fly-in progress with fast-in slow-out easing
+      setFlyInProgress(prev => {
+        // Fast start, slow end (ease-out cubic)
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+        const easingFactor = easeOutCubic(prev)
+        const easedSpeed = baseDelta * (2.0 - easingFactor) // Start fast (2x), end slow (1x)
+        
+        const newProgress = prev + easedSpeed
+        if (newProgress >= 1.0) {
+          setIsFlyingIn(false) // Animation complete
+          return 1.0
+        }
+        return newProgress
+      })
+      
+      // Add slider movement during fly-in (from left to right)
+      const slideDistance = 67
+      const animatedOffset = flyInStartOffset.current - (flyInProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
+      currentOffset.current = animatedOffset
+      targetOffset.current = animatedOffset
+      
     } else {
       // Always use smooth interpolation between current and target
       const lerpSpeed = isUserInteracting.current ? 0.15 : 0.08 // Faster during interaction, slower when settling
@@ -863,6 +942,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
     material.updateTransition(isFading, fadeProgress, isMobile)
+    material.updateFlyIn(isFlyingIn, flyInProgress)
     // No fog color update needed
   })
   

@@ -146,7 +146,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex }) => {
+const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex, shouldExit = false }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
   const [projectImages, setProjectImages] = useState([])
@@ -168,10 +168,12 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const currentOffset = useRef(-100) // Start off-screen to the left
   const sliderSpeed = useRef(0)
   
-  // Animation state for fly-in
+  // Animation states for fly-in and exit effects
   const [isAnimating, setIsAnimating] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
+  const [isExiting, setIsExiting] = useState(false)
   const animationProgress = useRef(0)
+  const exitProgress = useRef(0)
   
   // Update current image index when initial index changes and reset animation
   useEffect(() => {
@@ -200,6 +202,14 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       setProjectImages(selectedProject.images)
     }
   }, [selectedProject])
+  
+  // Handle exit animation trigger
+  useEffect(() => {
+    if (shouldExit && !isExiting) {
+      setIsExiting(true)
+      exitProgress.current = 0
+    }
+  }, [shouldExit, isExiting])
   
   
   
@@ -420,8 +430,28 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   useFrame((state, delta) => {
     if (!material) return
     
-    // Handle fly-in animation on page load
-    if (isAnimating) {
+    // Handle exit animation - plane completes curve to right
+    if (isExiting) {
+      exitProgress.current += delta * 0.5 // Same speed as fly-in (2 seconds)
+      
+      if (exitProgress.current >= 1) {
+        exitProgress.current = 1
+      }
+      
+      // Easing function (ease-in-out cubic for smooth curve completion)
+      const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+      const easedProgress = easeInOutCubic(exitProgress.current)
+      
+      // Animate from center (0) to right side (100) - completing the curve
+      const startPos = 0
+      const endPos = 100
+      currentOffset.current = startPos + (endPos - startPos) * easedProgress
+      
+      // Add velocity effect during exit for curve deformation
+      sliderSpeed.current = 150 * easedProgress // Increase deformation as it moves along curve
+      
+    } else if (isAnimating) {
+      // Handle fly-in animation on page load
       animationProgress.current += delta * 0.5 // Speed of animation (0.5 = 2 seconds)
       
       if (animationProgress.current >= 1) {
@@ -442,19 +472,19 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       if (animationProgress.current < 0.9) {
         sliderSpeed.current = 150 * (1 - animationProgress.current) // Deformation during fly-in
       }
-    } else {
+    } else if (!isExiting) {
       // After animation completes, keep at center position
       currentOffset.current = 0
     }
     
-    // Fade deformation effect - stop updating when very small
-    if (Math.abs(sliderSpeed.current) > 0.01) {
+    // Fade deformation effect - stop updating when very small (but not during exit)
+    if (!isExiting && Math.abs(sliderSpeed.current) > 0.01) {
       if (isMobile) {
         sliderSpeed.current *= 0.97
       } else {
         sliderSpeed.current *= 0.98
       }
-    } else {
+    } else if (!isExiting) {
       sliderSpeed.current = 0 // Stop updating when negligible
     }
     
