@@ -56,14 +56,24 @@ const MobileWater = forwardRef((props, ref) => {
             generateMipmaps: false // Disable mipmaps for performance
         }
         
-        // Adaptive resolution based on device pixel ratio and performance
+        // Aggressive mobile optimization - much lower resolution for better performance
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2) // Cap at 2x for performance
-        const baseResolution = hasFloatSupport ? 1024 : 512 // Verhoogd voor scherpere water edges
-        const resolution = Math.floor(baseResolution / pixelRatio) // Scale down for high DPI
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 768
         
-        // Scene buffer should match actual screen resolution for proper reflection/refraction
-        const sceneWidth = Math.floor(size.width * pixelRatio)
-        const sceneHeight = Math.floor(size.height * pixelRatio)
+        // Balanced resolution for quality vs performance
+        let baseResolution
+        if (isMobile) {
+            baseResolution = 512 // Higher for better texture quality, still optimized
+        } else {
+            baseResolution = hasFloatSupport ? 1024 : 512 // Good quality for desktop
+        }
+        
+        const resolution = Math.floor(baseResolution / Math.max(pixelRatio, 1.2)) // Less aggressive scaling
+        
+        // Scene buffer optimization - balanced for quality and performance
+        const sceneResolutionMultiplier = isMobile ? 0.8 : 0.9 // Better quality, still optimized
+        const sceneWidth = Math.floor(size.width * pixelRatio * sceneResolutionMultiplier)
+        const sceneHeight = Math.floor(size.height * pixelRatio * sceneResolutionMultiplier)
         
         
         return {
@@ -74,7 +84,7 @@ const MobileWater = forwardRef((props, ref) => {
                 magFilter: THREE.LinearFilter,
                 format: THREE.RGBAFormat,
                 type: THREE.UnsignedByteType, // Always safe for scene capture
-                samples: 2, // Less samples for mobile but still smoother edges
+                samples: isMobile ? 0 : 1, // No multisampling for mobile, minimal for desktop
                 generateMipmaps: false
             }),
             hasFloatSupport: hasFloatSupport,
@@ -87,6 +97,8 @@ const MobileWater = forwardRef((props, ref) => {
         const hasFloatSupport = buffers.hasFloatSupport
         const useValueMapping = !hasFloatSupport
         
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 768
+        
         return new THREE.ShaderMaterial({
             uniforms: {
                 uPrevious: { value: null },
@@ -94,7 +106,8 @@ const MobileWater = forwardRef((props, ref) => {
                 uMouse: { value: new THREE.Vector2(0.5, 0.5) },
                 uMouseDown: { value: 0 },
                 uDelta: { value: 1.0 },
-                uHasFloatSupport: { value: hasFloatSupport ? 1.0 : 0.0 }
+                uHasFloatSupport: { value: hasFloatSupport ? 1.0 : 0.0 },
+                uIsMobile: { value: isMobile ? 1.0 : 0.0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -110,6 +123,7 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform float uMouseDown;
                 uniform float uDelta;
                 uniform float uHasFloatSupport;
+                uniform float uIsMobile;
                 varying vec2 vUv;
                 
                 void main() {
@@ -170,16 +184,24 @@ const MobileWater = forwardRef((props, ref) => {
                         }
                     }
                     
-                    // Add idle waves like SimpleWater for continuous movement
+                    // Optimized idle waves - reduced complexity for mobile
                     float idleWaveStrength = 0.06;
                     float idleSpeed = 0.3;
+                    float idleDisturbance;
                     
-                    // Multiple sine waves at different frequencies
-                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
-                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
-                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                    if (uIsMobile > 0.5) {
+                        // Mobile: Only 2 simpler waves for better performance
+                        float wave1 = sin(vUv.x * 8.0 + uTime * idleSpeed) * 0.5;
+                        float wave2 = sin(vUv.y * 6.0 + uTime * idleSpeed * 0.8) * 0.5;
+                        idleDisturbance = (wave1 + wave2) * idleWaveStrength;
+                    } else {
+                        // Desktop: Keep 3 waves for quality
+                        float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
+                        float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
+                        float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                        idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                    }
                     
-                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
                     pressure += idleDisturbance;
                     
                     // Calculate gradients for normals
