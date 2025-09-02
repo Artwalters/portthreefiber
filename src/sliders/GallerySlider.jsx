@@ -13,8 +13,8 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
-      fogNear: { value: isMobile ? 7 : 5 },
-      fogFar: { value: isMobile ? 14 : 12 }
+      fogNear: { value: isMobile ? 8 : 5 },
+      fogFar: { value: isMobile ? 15 : 12 }
     },
     vertexShader: `
       uniform float uVelo;
@@ -91,8 +91,8 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
         if (uIsMobile > 0.5) {
           vec2 center = vec2(0.5, 0.5);
           tileUV -= center;
-          // Rotate 90 degrees counterclockwise
-          tileUV = vec2(-tileUV.y, tileUV.x);
+          // Rotate 90 degrees counterclockwise but flip X to fix mirroring
+          tileUV = vec2(tileUV.y, tileUV.x);
           tileUV += center;
         }
         
@@ -114,8 +114,10 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
           tileColor = texture2D(uTexture, tileUV);
         }
         
-        // Apply fog
+        // Apply fog with stronger curve - less fog in front, more in back
         float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        // Make fog curve more aggressive in the back
+        fogFactor = fogFactor * fogFactor; // Quadratic curve - less fog in front, stronger in back
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
         gl_FragColor = vec4(finalColor, tileColor.a);
@@ -174,6 +176,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const [isExiting, setIsExiting] = useState(false)
   const animationProgress = useRef(0)
   const exitProgress = useRef(0)
+  const exitStartPosition = useRef(0) // Track position when exit animation starts
   
   // Update current image index when initial index changes and reset animation
   useEffect(() => {
@@ -208,6 +211,10 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     if (shouldExit && !isExiting) {
       setIsExiting(true)
       exitProgress.current = 0
+      // Capture current position when exit starts (smooth transition)
+      exitStartPosition.current = currentOffset.current
+      // Stop fly-in animation if still running
+      setIsAnimating(false)
     }
   }, [shouldExit, isExiting])
   
@@ -231,7 +238,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       ], false, "catmullrom", 0.5)
       
       const rotatedPoints = mobileCurve.points.map(point => 
-        new THREE.Vector3(0, point.x, point.z + 0.5)
+        new THREE.Vector3(0, point.x, point.z + 0.8)
       )
       curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
@@ -240,7 +247,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
         new THREE.Vector3(-2, 0, -7.0),    // ORANGE - Second point left back
         new THREE.Vector3(-6, 0, -4.0),    // YELLOW - Third point left mid
         new THREE.Vector3(-3.5, 0, 0.4),   // GREEN - Fourth point left forward
-        new THREE.Vector3(0, 0, 1.1),      // CYAN - Center point (closest to camera)
+        new THREE.Vector3(0, 0, 1.4),      // CYAN - Center point (closest to camera)
         new THREE.Vector3(3.5, 0, 0.4),    // BLUE - Sixth point right forward
         new THREE.Vector3(6, 0, -4.0),     // PURPLE - Seventh point right mid
         new THREE.Vector3(2, 0, -7.0),     // MAGENTA - Eighth point right back
@@ -442,8 +449,8 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
       const easedProgress = easeInOutCubic(exitProgress.current)
       
-      // Animate from center (0) to right side (100) - completing the curve
-      const startPos = 0
+      // Animate from CURRENT position to right side (100) - smooth transition
+      const startPos = exitStartPosition.current // Use captured position instead of hardcoded 0
       const endPos = 100
       currentOffset.current = startPos + (endPos - startPos) * easedProgress
       
@@ -493,12 +500,21 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     material.updateVelocity(sliderSpeed.current)
   })
   
-  // Create material with texture
+  // Create material only once (without texture dependency)
   const material = useMemo(() => {
-    if (!texture) return null
-    const mat = createSingleImageMaterial(texture, isMobile)
+    const mat = createSingleImageMaterial(null, isMobile)
     return mat
-  }, [texture, isMobile])
+  }, [isMobile])
+  
+  // Update texture separately when it changes (without recreating material)
+  useEffect(() => {
+    if (material && texture) {
+      material.updateTexture(texture)
+      // Preserve current animation state when texture changes
+      material.updateTime(currentOffset.current)
+      material.updateVelocity(sliderSpeed.current)
+    }
+  }, [texture, material])
   
   if (!material) return null
   

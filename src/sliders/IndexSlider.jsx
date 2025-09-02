@@ -27,8 +27,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
-      fogNear: { value: isMobile ? 7 : 5 },
-      fogFar: { value: isMobile ? 14 : 12 },
+      fogNear: { value: isMobile ? 8 : 5 },
+      fogFar: { value: isMobile ? 15 : 12 },
       uIsTransitioning: { value: 0 },
       uSweepPosition: { value: -25 },
       uIsFlyingIn: { value: 0 },
@@ -131,8 +131,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           vec2 center = vec2(0.5, 0.5);
           tileUV -= center;
           
-          // Rotate 90 degrees counterclockwise
-          tileUV = vec2(-tileUV.y, tileUV.x);
+          // Rotate 90 degrees counterclockwise but flip X to fix mirroring
+          tileUV = vec2(tileUV.y, tileUV.x);
           
           tileUV += center;
         }
@@ -205,8 +205,10 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           }
         }
         
-        // Apply fog
+        // Apply fog with stronger curve - less fog in front, more in back
         float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        // Make fog curve more aggressive in the back
+        fogFactor = fogFactor * fogFactor; // Quadratic curve - less fog in front, stronger in back
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
         // Ensure proper gamma correction
@@ -396,9 +398,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         new THREE.Vector3(12, 0, -7.0)     // Far right - off screen (shorter)
       ], false, "catmullrom", 0.5)
       
-      // Rotate for mobile: 90 degrees and move forward slightly
+      // Rotate for mobile: 90 degrees and move forward subtly closer to camera
       const rotatedPoints = mobileCurve.points.map(point => 
-        new THREE.Vector3(0, point.x, point.z + 0.5) // X → Y, Y → 0, Z moved forward by 0.5 units
+        new THREE.Vector3(0, point.x, point.z + 0.8) // X → Y, Y → 0, Z moved forward by 0.8 units (subtly closer)
       )
       curve = new THREE.CatmullRomCurve3(rotatedPoints, false, "catmullrom", 0.5)
     } else {
@@ -540,21 +542,24 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Calculate momentum for natural continuation
       const prevOffset = targetOffset.current
       
+      let newTargetOffset
       if (isMobile) {
         // Mobile: vertical drag = scroll with increased responsiveness (inverted)
         const deltaY = clientY - startY
-        targetOffset.current = startOffset + deltaY * 0.05 // More responsive
+        newTargetOffset = startOffset + deltaY * 0.05 // More responsive
         // Gradual speed buildup for smoother RGB effect
         const targetSpeed = -deltaY * 0.6
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
-        targetOffset.current = startOffset - deltaX * 0.03
+        newTargetOffset = startOffset - deltaX * 0.03
         // Gradual speed buildup for smoother RGB effect
         const targetSpeed = -deltaX * 0.5
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
+      
+      targetOffset.current = newTargetOffset
       
       // Calculate momentum (velocity) for continuation effect
       momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
@@ -696,13 +701,25 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const [isFlyingIn, setIsFlyingIn] = useState(false)
   const [flyInProgress, setFlyInProgress] = useState(0)
   const flyInStartOffset = useRef(0)
+  const [isInitiallyVisible, setIsInitiallyVisible] = useState(true) // Track initial visibility
   
   // Handle fly-in animation when returning from gallery
   useEffect(() => {
     if (isReturningFromGallery && !isFlyingIn) {
-      setIsFlyingIn(true)
-      setFlyInProgress(0)
-      flyInStartOffset.current = currentOffset.current
+      // Hide mesh temporarily to prevent flicker
+      setIsInitiallyVisible(false)
+      
+      // Start fly-in animation on next frame (after mesh is hidden)
+      requestAnimationFrame(() => {
+        setIsFlyingIn(true)
+        setFlyInProgress(0)
+        flyInStartOffset.current = currentOffset.current
+        
+        // Make visible again once animation starts
+        requestAnimationFrame(() => {
+          setIsInitiallyVisible(true)
+        })
+      })
     }
   }, [isReturningFromGallery, isFlyingIn])
   
@@ -738,8 +755,8 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const center = { x: 0.5, y: 0.5 }
       tileUV.x -= center.x
       tileUV.y -= center.y
-      // Rotate 90 degrees counterclockwise: (x,y) -> (-y,x)  
-      const rotatedX = -tileUV.y
+      // Rotate 90 degrees counterclockwise but flip X: (x,y) -> (y,x)  
+      const rotatedX = tileUV.y
       const rotatedY = tileUV.x
       tileUV.x = rotatedX + center.x
       tileUV.y = rotatedY + center.y
@@ -875,9 +892,11 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         return newProgress
       })
       
-      // Add slider movement during fly-in (from left to right)
+      // Always continue fly-in animation (don't stop for user interaction)
       const slideDistance = 67
       const animatedOffset = flyInStartOffset.current - (flyInProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
+      
+      // Apply animation position, but allow smooth interpolation with user input
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
@@ -998,6 +1017,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       ref={meshRef} 
       geometry={geometry} 
       material={material} 
+      visible={isInitiallyVisible}
       onClick={handleMeshClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

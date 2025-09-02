@@ -124,27 +124,27 @@ body,
     }
     
     .ui-corner {
-        margin: 24px;
+        margin: 0; /* Remove margin for tighter positioning */
     }
     
     .ui-top-left {
-        top: 10px;
-        left: 10px;
+        top: 4px;
+        left: 4px;
     }
     
     .ui-top-right {
-        top: 10px;
-        right: 10px;
+        top: 4px;
+        right: 4px;
     }
     
     .ui-bottom-left {
-        bottom: 10px;
-        left: 10px;
+        bottom: 4px;
+        left: 4px;
     }
     
     .ui-bottom-right {
-        bottom: 10px;
-        right: 10px;
+        bottom: 4px;
+        right: 4px;
     }
     
     .walters-logo {

@@ -5,8 +5,6 @@ import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Perf } from 'r3f-perf'
 import IndexSlider from './sliders/IndexSlider.jsx'
-// import SimplePlaneSlider from './sliders/SimplePlaneSlider.jsx'
-// import SingleImageCurvedSlider from './sliders/SingleImageCurvedSlider.jsx'
 import GallerySlider from './sliders/GallerySlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
@@ -15,7 +13,6 @@ import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import ViewBasedProjects from './ViewBasedProjects.jsx'
 
-// No background color updater needed - keep everything white
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
@@ -50,7 +47,6 @@ function App() {
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     const [shouldExitGallery, setShouldExitGallery] = useState(false)
-    // Removed background color state - keeping everything white
     
     // Slider switching states
     const [showFilmStrip, setShowFilmStrip] = useState(true)
@@ -66,8 +62,6 @@ function App() {
         const capabilities = getDeviceCapabilities()
         setDeviceCapabilities(capabilities)
     }, [])
-
-    // Removed background color transition code
 
     // Load projects data from JSON
     useEffect(() => {
@@ -481,8 +475,6 @@ function App() {
                     gl.setClearColor('#ffffff')
                 }}
             >
-                {/* No background color updater needed */}
-                
                 {/* Layer 1: Fish (bottom) */}
                 <FishParticleSystem />
                 
