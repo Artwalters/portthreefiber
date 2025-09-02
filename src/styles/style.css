@@ -1,52 +1,10 @@
+/* Helvetica Neue Medium font */
 @font-face {
-    font-family: 'PSTimesTrial';
-    src: url('./fonts/PSTimesTrial-Regular.otf') format('opentype');
-    font-weight: normal;
-    font-style: normal;
-}
-
-/* Official Helvetica Neue OTF fonts */
-@font-face {
-    font-family: 'Helvetica Neue';
-    src: url('/fonts/HelveticaNeueRoman.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Helvetica Neue';
-    src: url('/fonts/HelveticaNeueBold.otf') format('opentype');
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Helvetica Neue';
+    font-family: 'Helvetica Neue Medium';
     src: url('/fonts/HelveticaNeueMedium.otf') format('opentype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
-}
-
-@font-face {
-    font-family: 'Helvetica Neue';
-    src: url('/fonts/HelveticaNeueLight.otf') format('opentype');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
-
-/* Modern font options */
-.helvetica-neue {
-    /* Option 1: System fonts (works on Mac/iOS) */
-    font-family: 'Helvetica Neue', 'HelveticaNeue', 'Helvetica', 'Arial', sans-serif;
-}
-
-.inter-font {
-    /* Option 2: Inter from Google Fonts (modern, clean, similar to Helvetica) */
-    font-family: 'Inter', 'Helvetica Neue', sans-serif;
 }
 
 html,
@@ -59,38 +17,31 @@ body,
     height: 100%;
     background: white !important;
     color: black;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
+    font-family: 'Helvetica Neue Medium', -apple-system, sans-serif;
     font-weight: 500;
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Prevent scrolling */
-    touch-action: none; /* Prevent mobile scroll/zoom gestures */
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    overflow: hidden;
+    touch-action: none;
+    -webkit-overflow-scrolling: touch;
 }
 
-
-/* UI Component Styles */
+/* UI Overlay */
 .ui-overlay {
     position: fixed;
     top: 0;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
-    font-weight: 500; /* Bold for UI */
     left: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
     z-index: 1000;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
+    font-family: 'Helvetica Neue Medium', -apple-system, sans-serif;
     font-weight: 500;
-    font-size: 12px;
+    font-size: 16px;
     color: black;
-    padding: 0; /* Geen padding - volledige scherm */
     box-sizing: border-box;
     opacity: 1;
     transition: opacity 0.6s ease-in-out;
-    will-change: opacity;
-    transform: translateZ(0); /* Force GPU layer */
-    -webkit-transform: translateZ(0);
 }
 
 .ui-overlay.transitioning {
@@ -105,62 +56,56 @@ body,
     opacity: 0;
 }
 
-.ui-top {
+/* Corner positioning */
+.ui-corner {
     position: absolute;
-    top: 0.5rem;
-    left: 1rem;
-    right: 1rem;
-    width: calc(100% - 2rem);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    pointer-events: auto;
 }
 
 .ui-top-left {
-    text-align: left;
-}
-
-.ui-top-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 12px;
+    left: 12px;
 }
 
 .ui-top-right {
-    text-align: right;
+    top: 12px;
+    right: 12px;
 }
 
-.ui-bottom {
-    position: absolute;
-    bottom: 0.5rem;
-    left: 1rem;
-    right: 1rem;
-    width: calc(100% - 2rem);
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-}
-
-
-.ui-bottom-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+.ui-bottom-left {
+    bottom: 12px;
+    left: 12px;
 }
 
 .ui-bottom-right {
-    text-align: right;
+    bottom: 12px;
+    right: 12px;
 }
 
-/* Walters Logo Styles */
+/* Text styling */
+.ui-text {
+    font-family: 'Helvetica Neue Medium', -apple-system, sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    color: black;
+    line-height: 1;
+}
+
+.ui-clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.ui-clickable:hover {
+    opacity: 0.7;
+}
+
+/* Logo styling */
 .walters-logo {
-    height: 24px; /* 2x larger - was 12px */
+    height: 96px;
     width: auto;
     opacity: 1;
-    filter: brightness(0); /* Make SVG black to match UI text color */
-    margin-left: -4px; /* Move closer to edge, matching text baseline */
-    margin-top: 2px; /* Move slightly down for better alignment */
-    position: relative;
+    filter: brightness(0);
     transition: opacity 0.2s ease;
 }
 
@@ -168,219 +113,49 @@ body,
     opacity: 0.7;
 }
 
-/* Touch target for logo - same pattern as other buttons */
-.walters-logo::before {
-    content: '';
-    position: absolute;
-    top: -12px;
-    left: -16px;
-    right: -16px;
-    bottom: -12px;
-    min-width: 44px;
-    min-height: 44px;
-}
-
-/* Index Section Styles */
-.index-section {
-    display: none; /* Hidden on mobile by default */
-    align-items: flex-start;
-    gap: 1rem;
-}
-
-.index-title {
-    margin: 0;
-}
-
-.project-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-}
-
-.project-name {
-    opacity: 0.5;
-    transition: opacity 0.4s ease-in-out;
-}
-
-.project-name.highlighted {
-    opacity: 1;
-}
-
-/* Bottom sections */
-.ui-bottom-left {
-    text-align: left;
-}
-
-.ui-bottom-center .project-description {
-    opacity: 0;
-    font-style: italic;
-    max-width: 300px;
-    transition: opacity 0.4s ease-in-out;
-    transform: translateY(0);
-    text-align: center;
-}
-
-.ui-bottom-center .project-description.visible {
-    opacity: 0.8;
-}
-
-.image-description {
-    opacity: 1;
-    font-style: italic;
-    max-width: 400px;
-    text-align: center;
-    transition: opacity 0.3s ease-in-out;
-}
-
-/* Post-transition styles */
-.photo-counter {
-    font-size: 12px;
-    color: black;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
-    font-weight: 500;
-}
-
-/* Gallery cursor styles */
-body.gallery-mode {
-    cursor: e-resize;
-}
-
-.back-button {
-    cursor: pointer;
-    pointer-events: auto;
-    position: relative;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
-    font-weight: 500;
-}
-
-.back-button::before {
-    content: '';
-    position: absolute;
-    top: -12px;
-    left: -16px;
-    right: -16px;
-    bottom: -12px;
-    min-width: 44px;
-    min-height: 44px;
-}
-
-/* Clickable text elements - larger touch targets */
-.studio-logo {
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
-    font-weight: 500;
-    pointer-events: none;
-    margin-right: -4.5rem; /* Perfect gepositioneerd */
-}
-
-.studio-button,
-.about-button {
-    cursor: pointer;
-    pointer-events: auto;
-    position: relative;
-    font-family: 'Helvetica Neue', -apple-system, sans-serif;
-    font-weight: 500;
-}
-
-.studio-button::before,
-.about-button::before {
-    content: '';
-    position: absolute;
-    top: -12px;
-    left: -16px;
-    right: -16px;
-    bottom: -12px;
-    min-width: 44px;
-    min-height: 44px;
-}
-
-/* Mobile-specific styles */
+/* Mobile responsive */
 @media (max-width: 768px) {
-    .ui-overlay.post-transition .ui-bottom-left,
-    .ui-overlay.post-transition .ui-bottom-right {
-        display: none;
+    .ui-overlay {
+        font-size: 16px;
     }
     
-    .ui-overlay.post-transition .ui-bottom-center {
-        width: 100%;
-        text-align: center;
+    .ui-text {
+        font-size: 16px;
     }
     
-    /* Ensure touch targets are appropriate for mobile */
-    .back-button::before,
-    .studio-button::before,
-    .about-button::before,
-    .walters-logo::before {
-        top: -16px;
-        left: -20px;
-        right: -20px;
-        bottom: -16px;
-        min-width: 48px;
-        min-height: 48px;
+    .ui-corner {
+        margin: 24px;
     }
     
-    .ui-overlay.post-transition .image-description {
-        text-align: center;
+    .ui-top-left {
+        top: 10px;
+        left: 10px;
     }
     
-    /* Mobile logo sizing */
+    .ui-top-right {
+        top: 10px;
+        right: 10px;
+    }
+    
+    .ui-bottom-left {
+        bottom: 10px;
+        left: 10px;
+    }
+    
+    .ui-bottom-right {
+        bottom: 10px;
+        right: 10px;
+    }
+    
     .walters-logo {
-        height: 25px; /* 25% larger - was 20px */
-        margin-left: -3px; /* Proportionally smaller negative margin for mobile */
-        margin-top: 1px; /* Slightly less downward movement for mobile */
+        height: 28px;
     }
 }
 
-/* GPU acceleration for canvas - no opacity transition to prevent flicker */
+/* Canvas GPU acceleration */
 canvas {
-    /* Removed opacity transition - was causing flicker on mobile */
-    transform: translateZ(0); /* Force GPU layer */
+    transform: translateZ(0);
     -webkit-transform: translateZ(0);
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-}
-
-/* Desktop-specific styles - 2x larger UI elements */
-@media (min-width: 769px) {
-    .ui-overlay {
-        font-size: 20px; /* Adjusted desktop size */
-        padding: 0.75rem 1.5rem; /* Reduced padding for more compact feel */
-    }
-    
-    .ui-top {
-        top: 0.75rem; /* Reduced spacing */
-        width: calc(100% - 3rem); /* Adjust for smaller padding */
-    }
-    
-    .ui-bottom {
-        bottom: 0.75rem; /* Reduced spacing */
-        width: calc(100% - 3rem); /* Adjust for smaller padding */
-    }
-    
-    .index-section {
-        display: flex; /* Show on desktop */
-        gap: 2rem; /* 2x larger gap */
-    }
-    
-    /* Desktop logo sizing - larger for better visibility */
-    .walters-logo {
-        height: 64px; /* 2x larger again - was 32px */
-        margin-left: -6px; /* Larger negative margin for desktop */
-        margin-top: 4px; /* More downward movement for desktop */
-    }
-    
-    .project-list {
-        gap: 0.2rem; /* 2x larger gap */
-    }
-    
-    .ui-bottom-center .project-description {
-        max-width: 600px; /* 2x larger max width */
-    }
-    
-    .image-description {
-        max-width: 700px; /* Larger max width for desktop */
-    }
-    
-    .photo-counter {
-        font-size: 20px; /* Adjusted desktop size */
-    }
 }

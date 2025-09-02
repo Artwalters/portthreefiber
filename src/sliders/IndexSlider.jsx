@@ -233,7 +233,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -703,11 +703,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     
     console.log('Clicked on tile:', tileIndex, 'out of', textures.length, 'textures')
     
-    // Calculate global image index based on project structure
-    // Each project has multiple images, use tileIndex to get the correct starting image
-    const globalImageIndex = tileIndex * 10 // Assuming 10 images per project
+    // Pass the project index (tileIndex is the project index)
     if (onImageSelect) {
-      onImageSelect(globalImageIndex)
+      onImageSelect(tileIndex)
     }
     
     // Store current offset as start position
@@ -928,4 +926,4 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   )
 }
 
-export default FilmStripSlider
+export default IndexSlider

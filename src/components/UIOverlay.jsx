@@ -1,79 +1,59 @@
 import React from 'react'
 
-function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, isVisible, projects, isPostTransition, isTransitioning, isReturningToSlider, selectedProject, currentImageIndex, onBackToSlider }) {
-  // Get current image data for selected project
-  const currentImage = selectedProject && selectedProject.images && selectedProject.images[currentImageIndex] 
-    ? selectedProject.images[currentImageIndex] 
-    : null
-  const totalImages = selectedProject && selectedProject.images ? selectedProject.images.length : 0
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex }) {
+  // Check if we're in gallery mode
+  const isGalleryMode = isPostTransition && selectedProject
+  
+  // Calculate photo counter
+  const totalImages = selectedProject?.images?.length || 0
+  const photoCounter = isGalleryMode ? `${currentImageIndex + 1}/${totalImages}` : 'index'
+  
   return (
     <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}>
-      {/* Top Section */}
-      <div className="ui-top">
-        <div className="ui-top-left">
-          {isPostTransition ? (
-            <span 
-              className="back-button"
-              onClick={onBackToSlider}
-            >
-              back
-            </span>
-          ) : (
-            null  // Verwijder de logo uit top-left
-          )}
-        </div>
-        <div className="ui-top-center">
-          {isPostTransition ? (
-            <div className="photo-counter">
-              {totalImages > 0 ? `${currentImageIndex + 1}/${totalImages}` : '1/1'}
-            </div>
-          ) : null}
-        </div>
-        <div className="ui-top-right">
-          <span 
-            className="about-button" 
-            onClick={() => {
-              // Add template parameter to current URL
-              const url = new URL(window.location);
-              url.searchParams.set('template', 'barrel-distortion');
-              window.location.href = url.toString();
-            }}
-            style={{ cursor: 'pointer' }}
-          >
-            barrel test
-          </span>
-          <span className="about-button">about</span>
-        </div>
+      {/* Top Left: Back (in gallery) or Walters Studio (in index) + Client + Photo Counter/Index */}
+      <div className="ui-corner ui-top-left" style={{ display: 'flex', alignItems: 'center', width: 'calc(100vw - 24px)' }}>
+        {isGalleryMode ? (
+          <span className="ui-text ui-clickable" onClick={onBackToSlider}>back</span>
+        ) : (
+          <span className="ui-text">walters studio</span>
+        )}
+        <span className="ui-text" style={{ position: 'absolute', left: '25vw' }}>
+          {isGalleryMode && selectedProject ? selectedProject.name : 'client'}
+        </span>
+        <span className="ui-text" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          {photoCounter}
+        </span>
       </div>
-
-      {/* Bottom Section */}
-      <div className="ui-bottom">
-        <div className="ui-bottom-left">
-          <img 
-            src="./img/logo/walters_logo.png" 
-            alt="Walters Studio" 
-            className="walters-logo"
-            id="walters-logo-html"
-            onClick={isPostTransition ? onBackToSlider : undefined}
-            style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
-          />
-        </div>
-        <div className="ui-bottom-center">
-          {isPostTransition && currentImage ? (
-            <span className="image-description">
-              {currentImage.description}
-            </span>
-          ) : (
-            displayedProject && (
-              <span className={`project-description ${isVisible ? 'visible' : ''}`}>
-                {displayedProject.description}
-              </span>
-            )
-          )}
-        </div>
-        <div className="ui-bottom-right">
-          <span className="studio-logo" id="webgl-logo" data-webgl-text>walters studio</span>
-        </div>
+      
+      {/* Top Right: About */}
+      <div className="ui-corner ui-top-right">
+        <span className="ui-text ui-clickable">about</span>
+      </div>
+      
+      {/* Bottom Left: Logo */}
+      <div className="ui-corner ui-bottom-left">
+        <img 
+          src="./img/logo/walters_logo.png" 
+          alt="Walters Studio" 
+          className="walters-logo"
+          onClick={isPostTransition ? onBackToSlider : undefined}
+          style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
+        />
+      </div>
+      
+      {/* Bottom Center: 2025 */}
+      <div style={{ position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+        <span className="ui-text">2025</span>
+      </div>
+      
+      {/* Bottom at client position: Information */}
+      <div style={{ position: 'absolute', bottom: '12px', left: '25vw', pointerEvents: 'auto' }}>
+        <span className="ui-text">information</span>
+      </div>
+      
+      {/* Bottom Right: All Rights Reserved */}
+      <div className="ui-corner ui-bottom-right">
+        <span className="ui-text">All Rights Reserved</span>
       </div>
     </div>
   )

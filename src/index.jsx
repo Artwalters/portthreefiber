@@ -4,13 +4,11 @@ import { Canvas } from '@react-three/fiber'
 import { useState, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { Perf } from 'r3f-perf'
-import FilmStripSlider from './sliders/FilmStripSlider.jsx'
+import IndexSlider from './sliders/IndexSlider.jsx'
 // import SimplePlaneSlider from './sliders/SimplePlaneSlider.jsx'
 // import SingleImageCurvedSlider from './sliders/SingleImageCurvedSlider.jsx'
-import SingleImageShaderSlider from './sliders/SingleImageShaderSlider.jsx'
+import GallerySlider from './sliders/GallerySlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
-import TextToWebGL from './components/TextToWebGL.jsx'
-import WebGLLogo from './components/WebGLLogo.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
@@ -161,8 +159,13 @@ function App() {
     const navigationTimeout = useRef(null)
     
     // Handle image selection from FilmStripSlider
-    const handleImageSelect = (imageIndex) => {
-        setSelectedImageIndex(imageIndex)
+    const handleImageSelect = (projectIndex) => {
+        setSelectedImageIndex(projectIndex) // This is actually the project index now
+        // projectIndex is the index of the selected project
+        if (projects[projectIndex]) {
+            setSelectedProject(projects[projectIndex])
+            setCurrentImageIndex(0) // Start at first image of the project
+        }
         // Don't switch immediately - wait for FilmStripSlider completion callback
     }
     
@@ -170,6 +173,8 @@ function App() {
     const handleFilmStripComplete = () => {
         setShowFilmStrip(false)
         setShowSingleImage(true)
+        setIsPostTransition(true) // Set to gallery mode
+        setIsTransitioning(false) // Transition complete
     }
 
     // Gallery navigation functions with throttling
@@ -479,7 +484,7 @@ function App() {
                 
                 {/* Layer 2: Conditional Slider Rendering */}
                 {showFilmStrip && (
-                    <FilmStripSlider 
+                    <IndexSlider 
                         projects={projects}
                         onHover={setHoveredProject}
                         waterRef={waterRef}
@@ -491,9 +496,13 @@ function App() {
                 )}
                 
                 {showSingleImage && (
-                    <SingleImageShaderSlider 
+                    <GallerySlider 
                         key={selectedImageIndex} // Force complete recreation
-                        initialImageIndex={selectedImageIndex}
+                        initialImageIndex={0} // Always start at first image of the selected project
+                        waterRef={waterRef}
+                        selectedProject={selectedProject}
+                        currentImageIndex={currentImageIndex}
+                        setCurrentImageIndex={setCurrentImageIndex}
                     />
                 )}
                 
@@ -504,11 +513,6 @@ function App() {
                     <SimpleWater ref={waterRef} />
                 )}
                 
-                {/* Text to WebGL converter - converts HTML text elements to WebGL meshes */}
-                {!isPostTransition && <TextToWebGL waterRef={waterRef} />}
-                
-                {/* WebGL Logo with water effect */}
-                {!isPostTransition && <WebGLLogo waterRef={waterRef} />}
                 
                 {/* Performance Monitor with visibility toggle */}
                 {showPerf && <Perf position="bottom-right" />}

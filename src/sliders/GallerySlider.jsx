@@ -146,10 +146,9 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
+const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
-  const [currentImageIndex, setCurrentImageIndex] = useState(initialImageIndex)
   const [projectImages, setProjectImages] = useState([])
   const { gl } = useThree()
   
@@ -176,13 +175,15 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
   
   // Update current image index when initial index changes and reset animation
   useEffect(() => {
-    setCurrentImageIndex(initialImageIndex)
+    if (setCurrentImageIndex && selectedProject) {
+      setCurrentImageIndex(0) // Always start at first image when component mounts
+    }
     setIsVisible(false) // Reset visibility
     // Reset animation state when initialImageIndex changes
     currentOffset.current = -100 // Reset to off-screen position
     animationProgress.current = 0 // Reset animation progress
     setIsAnimating(true) // Start animation again
-  }, [initialImageIndex])
+  }, [selectedProject]) // Only run when selected project changes
   
   // Make visible after short delay
   useEffect(() => {
@@ -191,25 +192,14 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
     }, 250) // 1/4 second delay before becoming visible
     
     return () => clearTimeout(timer)
-  }, [initialImageIndex]) // Reset timer when initialImageIndex changes
+  }, [selectedProject]) // Reset timer when selected project changes
   
-  // Load projects data
+  // Use images from selected project only
   useEffect(() => {
-    fetch('./data/projects.json')
-      .then(res => res.json())
-      .then(data => {
-        // Flatten all images from all projects into one array
-        const allImages = data.projects.flatMap(project => 
-          project.images.map(img => ({
-            ...img,
-            projectTitle: project.title,
-            projectId: project.id
-          }))
-        )
-        setProjectImages(allImages)
-      })
-      .catch(err => console.error('Failed to load projects:', err))
-  }, [])
+    if (selectedProject && selectedProject.images) {
+      setProjectImages(selectedProject.images)
+    }
+  }, [selectedProject])
   
   
   
@@ -326,61 +316,103 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
   
   // Click handler to cycle through images - optimized for mobile
   useEffect(() => {
-    let touchStartTime = 0
-    let touchStartX = 0
-    let touchStartY = 0
-    
-    const handleInteraction = (e) => {
-      if (projectImages.length === 0) return
-      
-      // Prevent default to avoid delays
-      e.preventDefault()
-      
-      // Cycle to next image
-      setCurrentImageIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % projectImages.length
-        const nextImage = projectImages[nextIndex]
-        console.log(`Next image [${nextIndex + 1}/${projectImages.length}]: ${nextImage?.title}`)
-        return nextIndex
-      })
-    }
-    
     const handleTouchStart = (e) => {
-      touchStartTime = Date.now()
-      touchStartX = e.touches[0].clientX
-      touchStartY = e.touches[0].clientY
+      // Only forward to water shader, navigation is handled in index.jsx
+      if (waterRef?.current?.updateMouse && e.touches.length > 0) {
+        waterRef.current.updateMouse(e.touches[0].clientX, e.touches[0].clientY, true)
+      }
     }
     
     const handleTouchEnd = (e) => {
-      const touchDuration = Date.now() - touchStartTime
-      const touchEndX = e.changedTouches[0].clientX
-      const touchEndY = e.changedTouches[0].clientY
-      const deltaX = Math.abs(touchEndX - touchStartX)
-      const deltaY = Math.abs(touchEndY - touchStartY)
+      // Only forward to water shader, navigation is handled in index.jsx
+      if (waterRef?.current?.updateMouse && e.changedTouches.length > 0) {
+        waterRef.current.updateMouse(e.changedTouches[0].clientX, e.changedTouches[0].clientY, false)
+      }
+    }
+    
+    // Drag state
+    let isDragging = false
+    let dragStartX = 0
+    let dragStartY = 0
+    let dragStartTime = 0
+    let hasDraggedForSwipe = false
+    
+    const handleMouseDown = (e) => {
+      isDragging = true
+      dragStartX = e.clientX
+      dragStartY = e.clientY
+      dragStartTime = Date.now()
+      hasDraggedForSwipe = false
       
-      // Quick tap detection (faster than click event)
-      if (touchDuration < 300 && deltaX < 30 && deltaY < 30) {
-        handleInteraction(e)
+      // Forward mouse down to water shader
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, true)
+      }
+    }
+    
+    const handleMouseUp = (e) => {
+      if (isDragging) {
+        const dragEndX = e.clientX
+        const dragEndY = e.clientY
+        const dragDuration = Date.now() - dragStartTime
+        const deltaX = dragEndX - dragStartX
+        const deltaY = dragEndY - dragStartY
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+        
+        // Navigation is handled in index.jsx, no navigation logic here
+      }
+      
+      isDragging = false
+      
+      // Forward mouse up to water shader
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, false)
+      }
+    }
+    
+    const handleMouseMove = (e) => {
+      // Forward mouse move events to water shader with drag state
+      if (waterRef?.current?.updateMouse) {
+        waterRef.current.updateMouse(e.clientX, e.clientY, isDragging)
+      }
+      
+      // Track if we've moved enough to count as a drag
+      if (isDragging) {
+        const deltaX = Math.abs(e.clientX - dragStartX)
+        const deltaY = Math.abs(e.clientY - dragStartY)
+        if (deltaX > 10 || deltaY > 10) {
+          hasDraggedForSwipe = true
+        }
+      }
+    }
+    
+    const handleTouchMove = (e) => {
+      // Forward touch move events to water shader for drag effect
+      if (waterRef?.current?.updateMouse && e.touches.length > 0) {
+        waterRef.current.updateMouse(e.touches[0].clientX, e.touches[0].clientY, true)
       }
     }
     
     const canvas = gl.domElement
     
-    // Use pointerdown for desktop (faster than click)
-    canvas.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse') {
-        handleInteraction(e)
-      }
-    })
+    
+    // Add mouse events for water shader drag effect (on window for proper drag detection)
+    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('mousemove', handleMouseMove)
     
     // Touch events for mobile (fastest response)
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false })
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
     
     return () => {
-      canvas.removeEventListener('pointerdown', handleInteraction)
+      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('mousemove', handleMouseMove)
       canvas.removeEventListener('touchstart', handleTouchStart)
       canvas.removeEventListener('touchend', handleTouchEnd)
+      canvas.removeEventListener('touchmove', handleTouchMove)
     }
   }, [gl, projectImages])
   
@@ -454,4 +486,4 @@ const SingleImageShaderSlider = ({ initialImageIndex = 0 }) => {
   )
 }
 
-export default SingleImageShaderSlider
+export default GallerySlider
