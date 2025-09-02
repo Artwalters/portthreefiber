@@ -105,8 +105,10 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         vec2 tileUV = fract(tilesUV);
         
-        // Create smaller gaps between images with better anti-aliased edges
-        float gapSize = 0.05;
+        // Dynamic gap size based on movement - smaller gaps when moving
+        float baseGapSize = 0.05;
+        float movementFactor = abs(uVelo) * 0.001; // Scale movement to gap reduction
+        float gapSize = baseGapSize * (1.0 - min(movementFactor, 0.9)); // Reduce gaps up to 90% during movement
         float edgeSmooth = 0.002; // Much smaller for sharper edges
         
         // Use fwidth for pixel-perfect edge smoothing
