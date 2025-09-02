@@ -5,6 +5,7 @@ import BarrelDistortionTemplate from './templates/BarrelDistortionTemplate'
 import FishParticleSystem from './effects/particles/FishParticleSystem'
 import MobileWater from './effects/water/MobileWater'
 import SimpleWater from './effects/water/SimpleWater'
+import WebGLLogo from './components/WebGLLogo'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import './styles/barrel-distortion.css'
 
@@ -148,6 +149,9 @@ export default function ViewBasedProjects() {
                     ) : (
                         <SimpleWater ref={waterRef} scrollY={scrollY} />
                     )}
+                    
+                    {/* WebGL Logo with water effect */}
+                    <WebGLLogo waterRef={waterRef} />
                 </Canvas>}
 
             {/* Navigation UI */}

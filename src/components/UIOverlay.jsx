@@ -50,9 +50,10 @@ function UIOverlay({ highlightedProject, isHighlightVisible, displayedProject, i
       <div className="ui-bottom">
         <div className="ui-bottom-left">
           <img 
-            src="./img/logo/walters_logo.svg" 
+            src="./img/logo/walters_logo.png" 
             alt="Walters Studio" 
-            className="walters-logo" 
+            className="walters-logo"
+            id="walters-logo-html"
             onClick={isPostTransition ? onBackToSlider : undefined}
             style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
           />

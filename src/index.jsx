@@ -10,6 +10,7 @@ import FilmStripSlider from './sliders/FilmStripSlider.jsx'
 import SingleImageShaderSlider from './sliders/SingleImageShaderSlider.jsx'
 import UIOverlay from './components/UIOverlay.jsx'
 import TextToWebGL from './components/TextToWebGL.jsx'
+import WebGLLogo from './components/WebGLLogo.jsx'
 import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
@@ -502,6 +503,9 @@ function App() {
                 
                 {/* Text to WebGL converter - converts HTML text elements to WebGL meshes */}
                 {!isPostTransition && <TextToWebGL waterRef={waterRef} />}
+                
+                {/* WebGL Logo with water effect */}
+                {!isPostTransition && <WebGLLogo waterRef={waterRef} />}
                 
                 {/* Performance Monitor with visibility toggle */}
                 {showPerf && <Perf position="bottom-right" />}
