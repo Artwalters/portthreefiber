@@ -633,39 +633,43 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const clickStartPos = useRef({ x: 0, y: 0 })
   const clickThreshold = 5 // pixels
   
-  // Click handler - only trigger if not dragging
+  // Click handler - only trigger if not dragging (mobile-safe)
   const handleMeshClick = (event) => {
     if (isFading || isClickDragging.current) return
     
-    // Calculate which project was clicked
-    const uv = event.uv
-    if (!uv) return
-    
-    // Calculate project index from UV position
-    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
-    const tilesUV = uv.x * aspect * 1.2
-    const tileIndex = Math.floor(tilesUV) % projects.length
-    
-    // Calculate global image index (assuming 10 images per project)
-    const globalImageIndex = tileIndex * 10
-    if (onImageSelect) {
-      onImageSelect(globalImageIndex)
+    try {
+      // Calculate which project was clicked
+      const uv = event.uv
+      if (!uv) return
+      
+      // Calculate project index from UV position
+      const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+      const tilesUV = uv.x * aspect * 1.2
+      const tileIndex = Math.floor(tilesUV) % projects.length
+      
+      // Calculate global image index (assuming 10 images per project)
+      const globalImageIndex = tileIndex * 10
+      if (onImageSelect) {
+        onImageSelect(globalImageIndex)
+      }
+      
+      // Store current offset as start position
+      fadeStartOffset.current = currentOffset.current
+      
+      // Start animation with mobile-safe initialization
+      setIsFading(true)
+      setFadeProgress(0)
+      setSliderProgress(0)
+      
+      // Notify parent to fade out UI (and never bring it back)
+      if (onTransitionStart) {
+        onTransitionStart(true)
+      }
+      
+    } catch (error) {
+      console.warn('Click handler failed on mobile:', error)
+      // Don't break the app
     }
-    
-    // Store current offset as start position
-    fadeStartOffset.current = currentOffset.current
-    
-    // Start both animations together (like before)
-    setIsFading(true)
-    setFadeProgress(0)
-    setSliderProgress(0)
-    
-    // Notify parent to fade out UI (and never bring it back)
-    if (onTransitionStart) {
-      onTransitionStart(true)
-    }
-    
-    // No background color change
   }
   
   // Pointer events to detect dragging
@@ -697,39 +701,31 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   useFrame((state) => {
     if (!material) return
     
-    // Handle fade animation (both slider and fade together)
+    // Handle fade animation (single progress tracking for mobile stability)
     if (isFading) {
-      // Calculate eased progress for FADE
-      const fadeBaseSpeed = 0.02 // Original base speed
-      const fadeEasingFactor = fadeProgress * fadeProgress * fadeProgress * 2.5 // Cubic easing
-      const fadeSpeed = fadeBaseSpeed * (0.2 + fadeEasingFactor) // Start at 20% speed
-      const fadeDeltaProgress = Math.min(fadeSpeed, fadeBaseSpeed * 5) // Higher cap
+      // Single progress system to avoid mobile timing conflicts
+      const baseSpeed = 0.018 // Slightly slower for mobile stability
+      const easingFactor = fadeProgress * fadeProgress * fadeProgress * 2.0 // Less aggressive easing
+      const currentSpeed = baseSpeed * (0.3 + easingFactor) // Higher starting speed
+      const deltaProgress = Math.min(currentSpeed, baseSpeed * 3) // Lower cap for consistency
       
-      // Calculate eased progress for SLIDER - same curve as fade
-      const sliderBaseSpeed = 0.0225 // Original slider speed
-      const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
-      const sliderSpeed = sliderBaseSpeed * (0.2 + sliderEasingFactor) // Start at 20% speed
-      const sliderDeltaProgress = Math.min(sliderSpeed, sliderBaseSpeed * 5) // Higher cap
-      
-      // Update fade progress
+      // Single progress update to avoid race conditions
       setFadeProgress(prev => {
-        const newProgress = prev + fadeDeltaProgress
+        const newProgress = prev + deltaProgress
         if (newProgress >= 1.0) {
-          // Fade complete - but DON'T reset UI (never comes back)
-          return 1.0 // Stay invisible
+          // Animation complete - ensure cleanup
+          setIsFading(false)
+          return 1.0
         }
         return newProgress
       })
       
-      // Update slider progress separately
-      setSliderProgress(prev => {
-        const newProgress = prev + sliderDeltaProgress
-        return newProgress // Don't cap slider
-      })
+      // Also update slider progress to match (synchronized)
+      setSliderProgress(fadeProgress)
       
-      // Use slider progress for movement
+      // Use fade progress for both effects (single source of truth)
       const slideDistance = 67
-      const animatedOffset = fadeStartOffset.current - (sliderProgress * slideDistance)
+      const animatedOffset = fadeStartOffset.current - (fadeProgress * slideDistance)
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
@@ -790,11 +786,17 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       }
     }
     
-    // Update material
-    material.updateTime(currentOffset.current)
-    material.updateVelocity(sliderSpeed.current)
-    material.updateTransition(isFading, fadeProgress, isMobile)
-    // No fog color update needed
+    // Update material with mobile safety checks
+    try {
+      if (material && material.uniforms) {
+        material.updateTime(currentOffset.current)
+        material.updateVelocity(sliderSpeed.current)
+        material.updateTransition(isFading, fadeProgress, isMobile)
+      }
+    } catch (error) {
+      console.warn('Material update failed (mobile compatibility):', error)
+      // Don't break the animation loop
+    }
   })
   
   // Create material with textures
