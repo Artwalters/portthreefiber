@@ -30,7 +30,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       fogNear: { value: isMobile ? 7 : 5 },
       fogFar: { value: isMobile ? 14 : 12 },
       uIsTransitioning: { value: 0 },
-      uSweepPosition: { value: -25 }
+      uSweepPosition: { value: -25 },
     },
     vertexShader: `
       uniform float uVelo;
@@ -133,6 +133,13 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           tileUV += center;
         }
         
+        // Zoom in on the texture to cover the entire plane and eliminate artifacts
+        vec2 center = vec2(0.5, 0.5);
+        tileUV -= center;
+        float baseZoom = 0.85; // Base zoom to cover plane - all images normal size
+        tileUV *= baseZoom;
+        tileUV += center;
+        
         vec4 tileColor = vec4(0);
         
         // Always apply chromatic aberration (base + velocity)
@@ -220,6 +227,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     }
   }
   
+  
   // Removed fog color update function
   
   return material
@@ -264,6 +272,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const swipeDirection = useRef(0) // -1 = left, 1 = right, 0 = no direction
   const isUserInteracting = useRef(false) // Track if user is actively dragging/scrolling
   const momentum = useRef(0) // Track momentum for natural continuation
+  
   
   // Center snapping functions
   const calculateNearestSnapPosition = (currentPos, direction = 0) => {
@@ -421,8 +430,8 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
             // tex.encoding = THREE.sRGBEncoding // Deprecated in Three.js r152+
             // Maximum quality texture settings
             tex.generateMipmaps = true // Enable mipmaps for better performance
-            tex.wrapS = THREE.ClampToEdgeWrapping
-            tex.wrapT = THREE.ClampToEdgeWrapping
+            tex.wrapS = THREE.RepeatWrapping // Allow texture to repeat and cover full plane
+            tex.wrapT = THREE.RepeatWrapping // Prevents edge artifacts
             // Use nearest neighbor for pixel-perfect sharpness
             tex.minFilter = THREE.LinearFilter
             tex.magFilter = THREE.LinearFilter
@@ -479,10 +488,12 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     }
     
     const handleMove = (e) => {
-      if (!dragging) return
-      
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
+      
+      // Mouse position updates are handled in handleMouseMove
+      
+      if (!dragging) return
       
       // Update interaction time
       lastInteractionTime.current = Date.now()
@@ -604,6 +615,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       }, 150) // Same delay as drag for natural feel
     }
     
+    
     const canvas = gl.domElement
     
     canvas.addEventListener('mousedown', handleStart)
@@ -656,13 +668,44 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     const uv = event.uv
     if (!uv) return
     
-    // Calculate project index from UV position
+    // Use exact same logic as fragment shader to calculate tile
     const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
-    const tilesUV = uv.x * aspect * 1.2
-    const tileIndex = Math.floor(tilesUV) % projects.length
+    const globalUV = uv.x + 1000.0 + currentOffset.current * 0.01
+    const tilesUV = globalUV * aspect * 1.2
+    const tileIndex = Math.floor(tilesUV) % Math.max(textures.length, 1)
     
-    // Calculate global image index (assuming 10 images per project)
-    const globalImageIndex = tileIndex * 10
+    // Check if we're actually clicking on a visible texture (not a gap)
+    let tileUV = { 
+      x: (tilesUV - Math.floor(tilesUV)), 
+      y: uv.y 
+    }
+    
+    // Apply mobile rotation if needed (same as shader)
+    if (isMobile) {
+      const center = { x: 0.5, y: 0.5 }
+      tileUV.x -= center.x
+      tileUV.y -= center.y
+      // Rotate 90 degrees counterclockwise: (x,y) -> (-y,x)  
+      const rotatedX = -tileUV.y
+      const rotatedY = tileUV.x
+      tileUV.x = rotatedX + center.x
+      tileUV.y = rotatedY + center.y
+    }
+    
+    // Same gap logic as shader
+    const gapSize = 0.05
+    const isInTexture = (tileUV.x >= gapSize && tileUV.x <= (1.0 - gapSize))
+    
+    // Only process click if we're actually on a texture (not a gap)
+    if (!isInTexture || tileIndex < 0 || tileIndex >= textures.length) {
+      return // Clicked on gap or invalid area
+    }
+    
+    console.log('Clicked on tile:', tileIndex, 'out of', textures.length, 'textures')
+    
+    // Calculate global image index based on project structure
+    // Each project has multiple images, use tileIndex to get the correct starting image
+    const globalImageIndex = tileIndex * 10 // Assuming 10 images per project
     if (onImageSelect) {
       onImageSelect(globalImageIndex)
     }
