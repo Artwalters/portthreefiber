@@ -225,7 +225,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onBackgroundColorChange, onImageSelect }) => {
+const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -639,6 +639,7 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const [fadeProgress, setFadeProgress] = useState(0)
   const [sliderProgress, setSliderProgress] = useState(0)
   const fadeStartOffset = useRef(0)
+  const hasCompletionFired = useRef(false)
   
   // Project colors - assign unique color to each project
   
@@ -668,6 +669,9 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
     
     // Store current offset as start position
     fadeStartOffset.current = currentOffset.current
+    
+    // Reset completion flag for new animation
+    hasCompletionFired.current = false
     
     // Start both animations together (like before)
     setIsFading(true)
@@ -729,6 +733,11 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       setFadeProgress(prev => {
         const newProgress = prev + fadeDeltaProgress
         if (newProgress >= 1.0) {
+          // Fade complete - trigger completion callback once
+          if (!hasCompletionFired.current && onTransitionComplete) {
+            hasCompletionFired.current = true
+            onTransitionComplete()
+          }
           // Fade complete - but DON'T reset UI (never comes back)
           return 1.0 // Stay invisible
         }

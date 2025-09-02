@@ -163,11 +163,13 @@ function App() {
     // Handle image selection from FilmStripSlider
     const handleImageSelect = (imageIndex) => {
         setSelectedImageIndex(imageIndex)
-        // Wait for FilmStripSlider fade-out to complete, then switch
-        setTimeout(() => {
-            setShowFilmStrip(false)
-            setShowSingleImage(true)
-        }, 1000) // FilmStripSlider fade duration
+        // Don't switch immediately - wait for FilmStripSlider completion callback
+    }
+    
+    // Handle FilmStripSlider fade completion (device-agnostic)
+    const handleFilmStripComplete = () => {
+        setShowFilmStrip(false)
+        setShowSingleImage(true)
     }
 
     // Gallery navigation functions with throttling
@@ -482,6 +484,7 @@ function App() {
                         onHover={setHoveredProject}
                         waterRef={waterRef}
                         onTransitionStart={setIsTransitioning}
+                        onTransitionComplete={handleFilmStripComplete}
                         onBackgroundColorChange={null}
                         onImageSelect={handleImageSelect}
                     />
