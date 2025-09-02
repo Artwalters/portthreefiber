@@ -1,11 +1,17 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { isMobileDevice } from '../utils/deviceDetection'
 
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
-  const tilesCount = Math.max(tiles.length, 1)
+  // Critical: Limit uniform array size for mobile Safari compatibility
+  const maxUniforms = isMobile ? 8 : 16 // Mobile Safari limit: ~64 fragment uniforms total
+  const tilesCount = Math.min(Math.max(tiles.length, 1), maxUniforms)
   const aspect = isMobile ? 24 / 3.3 : 30 / 3.3  // Mobile: original, Desktop: more square
+  
+  // Slice tiles array to respect mobile limits
+  const limitedTiles = tiles.slice(0, tilesCount)
   
   // Generate texture sampling loop
   const tilesLoop = Array.from({length: tilesCount}, (_, tID) => {
@@ -17,7 +23,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       time: { value: 0 },
-      tiles: { value: tiles.length > 0 ? tiles : [new THREE.Texture()] },
+      tiles: { value: limitedTiles.length > 0 ? limitedTiles : [new THREE.Texture()] },
       uVelo: { value: 0 },
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
@@ -59,6 +65,12 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       }
     `,
     fragmentShader: `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+      #else
+        precision mediump float;
+      #endif
+      
       uniform float time;
       uniform sampler2D tiles[${tilesCount}];
       uniform float uVelo;
@@ -218,12 +230,14 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
   
-  // Detect mobile
+  // Comprehensive mobile detection using deviceDetection utility
   const [isMobile, setIsMobile] = useState(false)
   
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768)
+      // Use comprehensive device detection instead of just screen width
+      const mobileDetected = isMobileDevice()
+      setIsMobile(mobileDetected)
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -633,43 +647,39 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   const clickStartPos = useRef({ x: 0, y: 0 })
   const clickThreshold = 5 // pixels
   
-  // Click handler - only trigger if not dragging (mobile-safe)
+  // Click handler - only trigger if not dragging
   const handleMeshClick = (event) => {
     if (isFading || isClickDragging.current) return
     
-    try {
-      // Calculate which project was clicked
-      const uv = event.uv
-      if (!uv) return
-      
-      // Calculate project index from UV position
-      const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
-      const tilesUV = uv.x * aspect * 1.2
-      const tileIndex = Math.floor(tilesUV) % projects.length
-      
-      // Calculate global image index (assuming 10 images per project)
-      const globalImageIndex = tileIndex * 10
-      if (onImageSelect) {
-        onImageSelect(globalImageIndex)
-      }
-      
-      // Store current offset as start position
-      fadeStartOffset.current = currentOffset.current
-      
-      // Start animation with mobile-safe initialization
-      setIsFading(true)
-      setFadeProgress(0)
-      setSliderProgress(0)
-      
-      // Notify parent to fade out UI (and never bring it back)
-      if (onTransitionStart) {
-        onTransitionStart(true)
-      }
-      
-    } catch (error) {
-      console.warn('Click handler failed on mobile:', error)
-      // Don't break the app
+    // Calculate which project was clicked
+    const uv = event.uv
+    if (!uv) return
+    
+    // Calculate project index from UV position
+    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+    const tilesUV = uv.x * aspect * 1.2
+    const tileIndex = Math.floor(tilesUV) % projects.length
+    
+    // Calculate global image index (assuming 10 images per project)
+    const globalImageIndex = tileIndex * 10
+    if (onImageSelect) {
+      onImageSelect(globalImageIndex)
     }
+    
+    // Store current offset as start position
+    fadeStartOffset.current = currentOffset.current
+    
+    // Start both animations together (like before)
+    setIsFading(true)
+    setFadeProgress(0)
+    setSliderProgress(0)
+    
+    // Notify parent to fade out UI (and never bring it back)
+    if (onTransitionStart) {
+      onTransitionStart(true)
+    }
+    
+    // No background color change
   }
   
   // Pointer events to detect dragging
@@ -701,31 +711,39 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
   useFrame((state) => {
     if (!material) return
     
-    // Handle fade animation (single progress tracking for mobile stability)
+    // Handle fade animation (both slider and fade together)
     if (isFading) {
-      // Single progress system to avoid mobile timing conflicts
-      const baseSpeed = 0.018 // Slightly slower for mobile stability
-      const easingFactor = fadeProgress * fadeProgress * fadeProgress * 2.0 // Less aggressive easing
-      const currentSpeed = baseSpeed * (0.3 + easingFactor) // Higher starting speed
-      const deltaProgress = Math.min(currentSpeed, baseSpeed * 3) // Lower cap for consistency
+      // Calculate eased progress for FADE
+      const fadeBaseSpeed = 0.02 // Original base speed
+      const fadeEasingFactor = fadeProgress * fadeProgress * fadeProgress * 2.5 // Cubic easing
+      const fadeSpeed = fadeBaseSpeed * (0.2 + fadeEasingFactor) // Start at 20% speed
+      const fadeDeltaProgress = Math.min(fadeSpeed, fadeBaseSpeed * 5) // Higher cap
       
-      // Single progress update to avoid race conditions
+      // Calculate eased progress for SLIDER - same curve as fade
+      const sliderBaseSpeed = 0.0225 // Original slider speed
+      const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
+      const sliderSpeed = sliderBaseSpeed * (0.2 + sliderEasingFactor) // Start at 20% speed
+      const sliderDeltaProgress = Math.min(sliderSpeed, sliderBaseSpeed * 5) // Higher cap
+      
+      // Update fade progress
       setFadeProgress(prev => {
-        const newProgress = prev + deltaProgress
+        const newProgress = prev + fadeDeltaProgress
         if (newProgress >= 1.0) {
-          // Animation complete - ensure cleanup
-          setIsFading(false)
-          return 1.0
+          // Fade complete - but DON'T reset UI (never comes back)
+          return 1.0 // Stay invisible
         }
         return newProgress
       })
       
-      // Also update slider progress to match (synchronized)
-      setSliderProgress(fadeProgress)
+      // Update slider progress separately
+      setSliderProgress(prev => {
+        const newProgress = prev + sliderDeltaProgress
+        return newProgress // Don't cap slider
+      })
       
-      // Use fade progress for both effects (single source of truth)
+      // Use slider progress for movement
       const slideDistance = 67
-      const animatedOffset = fadeStartOffset.current - (fadeProgress * slideDistance)
+      const animatedOffset = fadeStartOffset.current - (sliderProgress * slideDistance)
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
@@ -786,25 +804,57 @@ const FilmStripSlider = ({ projects = [], onHover, waterRef, onTransitionStart, 
       }
     }
     
-    // Update material with mobile safety checks
-    try {
-      if (material && material.uniforms) {
-        material.updateTime(currentOffset.current)
-        material.updateVelocity(sliderSpeed.current)
-        material.updateTransition(isFading, fadeProgress, isMobile)
-      }
-    } catch (error) {
-      console.warn('Material update failed (mobile compatibility):', error)
-      // Don't break the animation loop
-    }
+    // Update material
+    material.updateTime(currentOffset.current)
+    material.updateVelocity(sliderSpeed.current)
+    material.updateTransition(isFading, fadeProgress, isMobile)
+    // No fog color update needed
   })
   
-  // Create material with textures
+  // Create material with textures and context loss recovery
   const material = useMemo(() => {
     if (textures.length === 0) return null
-    const mat = createFilmStripMaterial(textures, isMobile)
-    return mat
-  }, [textures, isMobile])
+    
+    try {
+      const mat = createFilmStripMaterial(textures, isMobile)
+      
+      // Add context loss recovery for mobile stability
+      if (isMobile && gl.domElement) {
+        const handleContextLost = (event) => {
+          event.preventDefault()
+          console.warn('WebGL context lost - attempting recovery')
+        }
+        
+        const handleContextRestored = () => {
+          console.warn('WebGL context restored - reloading material')
+          // Material will be recreated by the dependency change
+        }
+        
+        gl.domElement.addEventListener('webglcontextlost', handleContextLost)
+        gl.domElement.addEventListener('webglcontextrestored', handleContextRestored)
+        
+        // Store cleanup function on material
+        mat._contextCleanup = () => {
+          gl.domElement.removeEventListener('webglcontextlost', handleContextLost)
+          gl.domElement.removeEventListener('webglcontextrestored', handleContextRestored)
+        }
+      }
+      
+      return mat
+    } catch (error) {
+      console.error('Failed to create FilmStripSlider material:', error)
+      return null
+    }
+  }, [textures, isMobile, gl])
+  
+  // Cleanup context listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (material?._contextCleanup) {
+        material._contextCleanup()
+      }
+    }
+  }, [material])
   
   if (!material) return null
   
