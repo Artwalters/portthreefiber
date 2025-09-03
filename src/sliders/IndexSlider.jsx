@@ -271,12 +271,10 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   }
   
   
-  // Removed fog color update function
-  
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onImageSelect, isReturningFromGallery = false }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -295,17 +293,15 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
   
-  // Use refs for real-time values like WebGLSlider
-  const isDragging = useRef(false)
-  const dragStart = useRef({ x: 0, y: 0, offset: 0 })
+  // Use refs for real-time values
   const targetOffset = useRef(0)
   const currentOffset = useRef(0)
-  const velocity = useRef(0)
   const sliderSpeed = useRef(0)
-  const smoothedSpeed = useRef(0) // Extra smoothing layer like WebGLSlider
-  const lastOffset = useRef(0)
-  const lastMouseY = useRef(0)
-  const lastMoveTime = useRef(0)
+  
+  // Mouse tracking voor desktop parallax position effect
+  const mousePosition = useRef({ x: 0, y: 0 })
+  const targetPosition = useRef({ x: 0, y: 0 })
+  const currentPosition = useRef({ x: 0, y: 0 })
   
   // Center snapping state
   const isSnapping = useRef(false)
@@ -691,8 +687,33 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     }
   }, [gl, waterRef, isMobile])
   
+  // Mouse tracking voor desktop rotation effect
+  useEffect(() => {
+    if (isMobile) return // Alleen voor desktop
+    
+    const handleMouseMove = (e) => {
+      const centerX = window.innerWidth / 2
+      const centerY = window.innerHeight / 2
+      
+      // Normalize mouse position (-1 to 1)
+      const normalizedX = (e.clientX - centerX) / (window.innerWidth / 2)
+      const normalizedY = (e.clientY - centerY) / (window.innerHeight / 2)
+      
+      mousePosition.current = { x: normalizedX, y: normalizedY }
+      
+      // Zichtbare parallax movement
+      const maxOffset = 0.105 // 30% minder sterk (0.15 * 0.7)
+      targetPosition.current = {
+        x: -normalizedX * maxOffset,  // Mouse rechts = mesh naar links
+        y: normalizedY * maxOffset    // Mouse omhoog = mesh naar beneden
+      }
+    }
+    
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [isMobile])
+  
   // Animation state
-  const [isAnimating, setIsAnimating] = useState(false)
   const [isFading, setIsFading] = useState(false)
   const [fadeProgress, setFadeProgress] = useState(0)
   const [sliderProgress, setSliderProgress] = useState(0)
@@ -773,7 +794,6 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       return // Clicked on gap or invalid area
     }
     
-    console.log('Clicked on tile:', tileIndex, 'out of', textures.length, 'textures')
     
     // Pass the project index (tileIndex is the project index)
     if (onImageSelect) {
@@ -842,10 +862,10 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const fadeSpeed = baseDelta * (0.2 + fadeEasingFactor) // Start at 20% speed
       const fadeDeltaProgress = Math.min(fadeSpeed, baseDelta * 5) // Higher cap
       
-      // Calculate eased progress for SLIDER - SAME timing as fade for perfect sync
-      const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
-      const sliderSpeed = baseDelta * (0.2 + sliderEasingFactor) // Start at 20% speed
-      const sliderDeltaProgress = Math.min(sliderSpeed, baseDelta * 5) // Higher cap
+      // Calculate eased progress for SLIDER - normale ease-in (quadratic)
+      const sliderEasingFactor = sliderProgress * sliderProgress * 1.5 // Quadratic ease-in - normaal naar snel
+      const sliderAnimSpeed = baseDelta * (0.4 + sliderEasingFactor) // Start at 40% speed (niet zo langzaam)
+      const sliderDeltaProgress = Math.min(sliderAnimSpeed, baseDelta * 3) // Lagere cap
       
       // Update fade progress
       setFadeProgress(prev => {
@@ -879,12 +899,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const animationDuration = 2000 // 2 seconds to match gallery exit animation
       const baseDelta = delta / (animationDuration / 1000)
       
-      // Update fly-in progress with fast-in slow-out easing
+      // Update fly-in progress with power2.out easing (zachte landing)
       setFlyInProgress(prev => {
-        // Fast start, slow end (ease-out cubic)
-        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
-        const easingFactor = easeOutCubic(prev)
-        const easedSpeed = baseDelta * (2.0 - easingFactor) // Start fast (2x), end slow (1x)
+        // Power2.out: start fast, land soft (zoals GSAP)
+        const power2Out = (t) => 1 - Math.pow(1 - t, 2)
+        const easingFactor = power2Out(prev)
+        const easedSpeed = baseDelta * (1.8 - easingFactor) // Start fast (1.8x), end soft (0.8x)
         
         const newProgress = prev + easedSpeed
         if (newProgress >= 1.0) {
@@ -896,7 +916,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       
       // Always continue fly-in animation (don't stop for user interaction)
       const slideDistance = 67
-      const animatedOffset = flyInStartOffset.current - (flyInProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
+      
+      // Apply power2.out easing to the final position (zachte landing)
+      const power2Out = (t) => 1 - Math.pow(1 - t, 2)
+      const easedProgress = power2Out(flyInProgress)
+      
+      const animatedOffset = flyInStartOffset.current - (easedProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
       
       // Apply animation position, but allow smooth interpolation with user input
       currentOffset.current = animatedOffset
@@ -962,8 +987,39 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
-    material.updateTransition(isFading, fadeProgress, isMobile)
-    material.updateFlyIn(isFlyingIn, flyInProgress)
+    
+    // Calculate sweep progress to match actual slider speed calculation  
+    if (isFading) {
+      // Sweep krijgt dezelfde easing als de slider speed calculation gebruikt
+      const currentSliderEasing = sliderProgress * sliderProgress * 1.5 // Same als rule 835
+      const sliderSpeedFactor = 0.4 + currentSliderEasing // Same als rule 836  
+      const proportionalSweepProgress = sliderProgress * sliderSpeedFactor
+      material.updateTransition(isFading, Math.min(proportionalSweepProgress, 1.0), isMobile)
+    } else {
+      material.updateTransition(isFading, sliderProgress, isMobile)
+    }
+    
+    // Use eased progress for sweep timing to match position animation
+    if (isFlyingIn) {
+      const power2Out = (t) => 1 - Math.pow(1 - t, 2)
+      const easedSweepProgress = power2Out(flyInProgress) // Same power2.out als slider movement
+      material.updateFlyIn(isFlyingIn, easedSweepProgress)
+    } else {
+      material.updateFlyIn(isFlyingIn, flyInProgress)
+    }
+    
+    // Apply subtle mouse tracking position offset (desktop with mouse only)
+    if (!isMobile && meshRef.current && !('ontouchstart' in window) && window.matchMedia('(hover: hover)').matches) {
+      // Langzamere interpolation voor smoother parallax effect
+      const lerpSpeed = 0.02 // Veel langzamer voor smoother effect
+      currentPosition.current.x += (targetPosition.current.x - currentPosition.current.x) * lerpSpeed
+      currentPosition.current.y += (targetPosition.current.y - currentPosition.current.y) * lerpSpeed
+      
+      // Apply position offset to mesh
+      meshRef.current.position.x = currentPosition.current.x
+      meshRef.current.position.y = currentPosition.current.y
+    }
+    
     // No fog color update needed
   })
   

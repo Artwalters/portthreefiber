@@ -8,6 +8,11 @@ const MobileWater = forwardRef((props, ref) => {
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
     const mouseDown = useRef(false)
     
+    // Mouse tracking voor subtiele parallax position effect
+    const mousePosition = useRef({ x: 0, y: 0 })
+    const targetPosition = useRef({ x: 0, y: 0 })
+    const currentPosition = useRef({ x: 0, y: 0 })
+    
     // Expose update function for external components (like slider)
     useImperativeHandle(ref, () => ({
         updateMouse: (x, y, isDown) => {
@@ -332,6 +337,8 @@ const MobileWater = forwardRef((props, ref) => {
         const handleMouseMove = (e) => {
             mouse.current.x = e.clientX / window.innerWidth
             mouse.current.y = 1.0 - (e.clientY / window.innerHeight)
+            
+            // Parallax removed from water layer
         }
         
         const handleMouseDown = () => {
@@ -472,6 +479,8 @@ const MobileWater = forwardRef((props, ref) => {
         } catch (error) {
             console.warn('Display material error, continuing...', error)
         }
+        
+        // Parallax removed from water layer
         
         gl.setRenderTarget(currentTarget)
     })

@@ -29,7 +29,6 @@ function App() {
         return <ViewBasedProjects />
     }
 
-    const [currentProject, setCurrentProject] = useState(0)
     const [hoveredProject, setHoveredProject] = useState(null)
     const [displayedProject, setDisplayedProject] = useState(null)
     const [isVisible, setIsVisible] = useState(false)
@@ -38,7 +37,6 @@ function App() {
     const [isPostTransition, setIsPostTransition] = useState(false)
     const [selectedProject, setSelectedProject] = useState(null)
     const [sliderKey, setSliderKey] = useState(0) // Key to force complete slider recreation
-    const [isScalingDownForReset, setIsScalingDownForReset] = useState(false)
     const [initialOffset, setInitialOffset] = useState(0)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [isReturningToSlider, setIsReturningToSlider] = useState(false)
@@ -486,7 +484,6 @@ function App() {
                         waterRef={waterRef}
                         onTransitionStart={setIsTransitioning}
                         onTransitionComplete={handleFilmStripComplete}
-                        onBackgroundColorChange={null}
                         onImageSelect={handleImageSelect}
                         isReturningFromGallery={isReturningFromGallery}
                     />
