@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { isMobileDevice } from '../utils/deviceDetection'
+import { gsap } from 'gsap'
 
 // Custom shader material for the film strip effect
 const createFilmStripMaterial = (tiles = [], isMobile = false) => {
@@ -276,7 +277,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -698,11 +699,13 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const [sliderProgress, setSliderProgress] = useState(0)
   const fadeStartOffset = useRef(0)
   const hasCompletionFired = useRef(false)
+  const isAnimationEnding = useRef(false) // For smooth velocity fade-out after animations
   
-  // Fly-in animation state (reverse leegloop effect)
+  // Fly-in animation state with GSAP
   const [isFlyingIn, setIsFlyingIn] = useState(false)
   const [flyInProgress, setFlyInProgress] = useState(0)
   const flyInStartOffset = useRef(0)
+  const flyInTween = useRef(null) // GSAP tween reference
   const [isInitiallyVisible, setIsInitiallyVisible] = useState(true) // Track initial visibility
   
   // Handle fly-in animation when returning from gallery
@@ -714,16 +717,64 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Start fly-in animation on next frame (after mesh is hidden)
       requestAnimationFrame(() => {
         setIsFlyingIn(true)
-        setFlyInProgress(0)
         flyInStartOffset.current = currentOffset.current
+        
+        // Cancel any existing snapping during fly-in to prevent bounce-back
+        clearSnapTimeout()
+        isSnapping.current = false
         
         // Make visible again once animation starts
         requestAnimationFrame(() => {
           setIsInitiallyVisible(true)
         })
+        
+        // Kill any existing tween
+        if (flyInTween.current) {
+          flyInTween.current.kill()
+        }
+        
+        // Create GSAP animation for perfect smooth fly-in
+        const animObj = { progress: 0, velocity: 0 }
+        flyInTween.current = gsap.timeline()
+          .to(animObj, {
+            progress: 1,
+            duration: 4,
+            ease: "power3.out", // Super smooth ease-out
+            onUpdate: () => {
+              setFlyInProgress(animObj.progress)
+            }
+          })
+          .to(animObj, {
+            velocity: 0,
+            duration: 4,
+            ease: "power2.inOut",
+            onUpdate: () => {
+              // Update velocity for barrel distortion effects
+              const targetVelocity = (1 - animObj.progress) * 400
+              sliderSpeed.current += (targetVelocity - sliderSpeed.current) * 0.2
+            },
+            onComplete: () => {
+              setIsFlyingIn(false)
+              flyInTween.current = null
+              sliderSpeed.current = 0
+              // Notify parent that fly-in is complete
+              if (onFlyInComplete) {
+                onFlyInComplete()
+              }
+            }
+          }, 0) // Start at same time as progress animation
       })
     }
   }, [isReturningFromGallery, isFlyingIn])
+  
+  // Cleanup GSAP on unmount
+  useEffect(() => {
+    return () => {
+      if (flyInTween.current) {
+        flyInTween.current.kill()
+      }
+    }
+  }, [])
   
   // Project colors - assign unique color to each project
   
@@ -844,8 +895,8 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       
       // Calculate eased progress for SLIDER - SAME timing as fade for perfect sync
       const sliderEasingFactor = sliderProgress * sliderProgress * sliderProgress * 2.5 // Cubic easing
-      const sliderSpeed = baseDelta * (0.2 + sliderEasingFactor) // Start at 20% speed
-      const sliderDeltaProgress = Math.min(sliderSpeed, baseDelta * 5) // Higher cap
+      const sliderAnimSpeed = baseDelta * (0.2 + sliderEasingFactor) // Start at 20% speed
+      const sliderDeltaProgress = Math.min(sliderAnimSpeed, baseDelta * 5) // Higher cap
       
       // Update fade progress
       setFadeProgress(prev => {
@@ -856,7 +907,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
             hasCompletionFired.current = true
             onTransitionComplete()
           }
-          // Fade complete - but DON'T reset UI (never comes back)
+          // Start smooth velocity fade-out
+          isAnimationEnding.current = true
+          setIsFading(false) // Stop animation, allow smooth velocity fade-out
           return 1.0 // Stay invisible
         }
         return newProgress
@@ -871,32 +924,28 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Use slider progress for movement
       const slideDistance = 67
       const animatedOffset = fadeStartOffset.current - (sliderProgress * slideDistance)
+      
+      // Calculate velocity for barrel distortion and RGB effects during animation
+      const offsetDelta = animatedOffset - currentOffset.current
+      const targetAnimSpeed = offsetDelta * 400 // Reduced intensity + Target animation speed
+      
+      // Gradually build up to target speed instead of instant (smoother barrel distortion)
+      sliderSpeed.current += (targetAnimSpeed - sliderSpeed.current) * 0.15
+      
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
     } else if (isFlyingIn) {
-      // Handle fly-in animation (reverse leegloop effect) - 2 seconds duration
-      const animationDuration = 2000 // 2 seconds to match gallery exit animation
-      const baseDelta = delta / (animationDuration / 1000)
-      
-      // Update fly-in progress with fast-in slow-out easing
-      setFlyInProgress(prev => {
-        // Fast start, slow end (ease-out cubic)
-        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
-        const easingFactor = easeOutCubic(prev)
-        const easedSpeed = baseDelta * (2.0 - easingFactor) // Start fast (2x), end slow (1x)
-        
-        const newProgress = prev + easedSpeed
-        if (newProgress >= 1.0) {
-          setIsFlyingIn(false) // Animation complete
-          return 1.0
-        }
-        return newProgress
-      })
-      
-      // Always continue fly-in animation (don't stop for user interaction)
+      // GSAP-driven fly-in animation - smooth professional easing
       const slideDistance = 67
       const animatedOffset = flyInStartOffset.current - (flyInProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
+      
+      // Calculate velocity for barrel distortion and RGB effects during animation
+      const offsetDelta = animatedOffset - currentOffset.current
+      const targetAnimSpeed = offsetDelta * 400 // Reduced intensity + Target animation speed
+      
+      // Gradually build up to target speed instead of instant (smoother barrel distortion)
+      sliderSpeed.current += (targetAnimSpeed - sliderSpeed.current) * 0.15
       
       // Apply animation position, but allow smooth interpolation with user input
       currentOffset.current = animatedOffset
@@ -947,6 +996,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         }
       } else {
         sliderSpeed.current = 0 // Stop updating when negligible
+        isAnimationEnding.current = false // Animation fade-out complete
+        
+        // Natural momentum system handles coast-down automatically
       }
       
       // Hover events

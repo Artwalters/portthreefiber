@@ -1,6 +1,9 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
+import { gsap } from 'gsap'
 
-function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex }) {
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete }) {
+  const overlayRef = useRef(null)
+  
   // Check if we're in gallery mode
   const isGalleryMode = isPostTransition && selectedProject
   
@@ -11,8 +14,56 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
   // Check if mobile
   const isMobile = window.innerWidth <= 768
   
+  // Initialize overlay as visible on mount
+  useEffect(() => {
+    if (overlayRef.current) {
+      gsap.set(overlayRef.current, { opacity: 1 })
+    }
+  }, [])
+  
+  // Handle GSAP animations based on state changes
+  useEffect(() => {
+    if (!overlayRef.current) return
+    
+    if (isTransitioning) {
+      // Fade out when transitioning
+      gsap.to(overlayRef.current, {
+        opacity: 0,
+        duration: 0.6,
+        ease: "power2.inOut"
+      })
+    } else if (isReturningToSlider) {
+      // Fade out when returning to slider
+      gsap.to(overlayRef.current, {
+        opacity: 0,
+        duration: 0.6,
+        ease: "power2.inOut"
+      })
+    } else if (isPostTransition) {
+      // Fade in when in gallery mode
+      gsap.to(overlayRef.current, {
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.inOut"
+      })
+    } else if (isSliderAnimationComplete) {
+      // Default state - fully visible only after slider animation is complete
+      gsap.to(overlayRef.current, {
+        opacity: 1,
+        duration: 0.8,
+        ease: "power2.out"
+      })
+    } else {
+      // Keep invisible while slider is animating
+      gsap.set(overlayRef.current, { opacity: 0 })
+    }
+  }, [isTransitioning, isPostTransition, isReturningToSlider, isSliderAnimationComplete])
+  
   return (
-    <div className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}>
+    <div 
+      ref={overlayRef}
+      className={`ui-overlay ${isTransitioning ? 'transitioning' : ''} ${isPostTransition ? 'post-transition' : ''} ${isReturningToSlider ? 'returning-to-slider' : ''}`}
+    >
       
       {isMobile ? (
         // Mobile UI - Simplified layout

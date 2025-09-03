@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import * as THREE from 'three'
+import { gsap } from 'gsap'
 
 // Custom shader material for single repeating image
 const createSingleImageMaterial = (texture, isMobile = false) => {
@@ -178,6 +179,10 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const exitProgress = useRef(0)
   const exitStartPosition = useRef(0) // Track position when exit animation starts
   
+  // GSAP animation refs
+  const flyInTween = useRef(null)
+  const exitTween = useRef(null)
+  
   // Update current image index when initial index changes and reset animation
   useEffect(() => {
     if (setCurrentImageIndex && selectedProject) {
@@ -188,6 +193,25 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     currentOffset.current = -100 // Reset to off-screen position
     animationProgress.current = 0 // Reset animation progress
     setIsAnimating(true) // Start animation again
+    
+    // Kill any existing fly-in animation
+    if (flyInTween.current) {
+      flyInTween.current.kill()
+    }
+    
+    // Start GSAP fly-in animation
+    const animObj = { progress: 0 }
+    flyInTween.current = gsap.to(animObj, {
+      progress: 1,
+      duration: 2,
+      ease: "power3.out",
+      onUpdate: () => {
+        animationProgress.current = animObj.progress
+      },
+      onComplete: () => {
+        setIsAnimating(false)
+      }
+    })
   }, [selectedProject]) // Only run when selected project changes
   
   // Make visible after short delay
@@ -215,6 +239,22 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       exitStartPosition.current = currentOffset.current
       // Stop fly-in animation if still running
       setIsAnimating(false)
+      
+      // Kill any existing fly-in animation
+      if (flyInTween.current) {
+        flyInTween.current.kill()
+      }
+      
+      // Start GSAP exit animation
+      const animObj = { progress: 0 }
+      exitTween.current = gsap.to(animObj, {
+        progress: 1,
+        duration: 1.5,
+        ease: "power2.in",
+        onUpdate: () => {
+          exitProgress.current = animObj.progress
+        }
+      })
     }
   }, [shouldExit, isExiting])
   
@@ -437,43 +477,22 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   useFrame((state, delta) => {
     if (!material) return
     
-    // Handle exit animation - plane completes curve to right
+    // Handle GSAP-driven exit animation - plane completes curve to right
     if (isExiting) {
-      exitProgress.current += delta * 0.5 // Same speed as fly-in (2 seconds)
-      
-      if (exitProgress.current >= 1) {
-        exitProgress.current = 1
-      }
-      
-      // Easing function (ease-in-out cubic for smooth curve completion)
-      const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-      const easedProgress = easeInOutCubic(exitProgress.current)
-      
       // Animate from CURRENT position to right side (100) - smooth transition
       const startPos = exitStartPosition.current // Use captured position instead of hardcoded 0
       const endPos = 100
-      currentOffset.current = startPos + (endPos - startPos) * easedProgress
+      currentOffset.current = startPos + (endPos - startPos) * exitProgress.current
       
       // Add velocity effect during exit for curve deformation
-      sliderSpeed.current = 150 * easedProgress // Increase deformation as it moves along curve
+      sliderSpeed.current = 150 * exitProgress.current // Increase deformation as it moves along curve
       
     } else if (isAnimating) {
-      // Handle fly-in animation on page load
-      animationProgress.current += delta * 0.5 // Speed of animation (0.5 = 2 seconds)
-      
-      if (animationProgress.current >= 1) {
-        animationProgress.current = 1
-        setIsAnimating(false)
-      }
-      
-      // Easing function (ease-out cubic)
-      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
-      const easedProgress = easeOutCubic(animationProgress.current)
-      
+      // Handle GSAP-driven fly-in animation on page load
       // Animate from left (-100) to center (0)
       const startPos = -100
       const endPos = 0
-      currentOffset.current = startPos + (endPos - startPos) * easedProgress
+      currentOffset.current = startPos + (endPos - startPos) * animationProgress.current
       
       // Add some velocity effect during animation for deformation
       if (animationProgress.current < 0.9) {
@@ -518,6 +537,18 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   
   if (!material) return null
   
+  // Cleanup GSAP animations on unmount
+  useEffect(() => {
+    return () => {
+      if (flyInTween.current) {
+        flyInTween.current.kill()
+      }
+      if (exitTween.current) {
+        exitTween.current.kill()
+      }
+    }
+  }, [])
+
   return (
     <>
       <mesh 

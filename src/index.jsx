@@ -47,6 +47,7 @@ function App() {
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     const [shouldExitGallery, setShouldExitGallery] = useState(false)
+    const [isSliderAnimationComplete, setIsSliderAnimationComplete] = useState(true) // Start as true for initial state
     
     // Slider switching states
     const [showFilmStrip, setShowFilmStrip] = useState(true)
@@ -386,6 +387,11 @@ function App() {
         setIsTransitioning(true)
     }
 
+    // Handle fly-in animation completion
+    const handleFlyInComplete = () => {
+        setIsSliderAnimationComplete(true)
+    }
+
     // Handle back button click to return to slider - 4 phase transition with plane curve completion
     const handleBackToSlider = () => {
         // Calculate initial offset to center the selected project
@@ -419,6 +425,7 @@ function App() {
             // Recreate slider to ensure proper positioning
             setSliderKey(prev => prev + 1) // Force complete slider recreation
             setIsReturningFromGallery(true) // Mark that we're returning from gallery
+            setIsSliderAnimationComplete(false) // Mark that slider animation is starting
         }, 2000)
         
         // PHASE 4 (2400ms): Fade UI back in and clean up
@@ -489,6 +496,7 @@ function App() {
                         onBackgroundColorChange={null}
                         onImageSelect={handleImageSelect}
                         isReturningFromGallery={isReturningFromGallery}
+                        onFlyInComplete={handleFlyInComplete}
                     />
                 )}
                 
@@ -555,6 +563,7 @@ function App() {
                 selectedProject={selectedProject}
                 currentImageIndex={currentImageIndex}
                 onBackToSlider={handleBackToSlider}
+                isSliderAnimationComplete={isSliderAnimationComplete}
             />
         </>
     )
