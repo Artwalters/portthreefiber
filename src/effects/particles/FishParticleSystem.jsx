@@ -139,6 +139,11 @@ export default function FishParticleSystem({ scrollY = 0 }) {
   const fishActions = useRef([])
   const mousePosition = useRef(new THREE.Vector2(0, 0))
   
+  // Mouse tracking voor parallax position effect (desktop only)
+  const mousePositionParallax = useRef({ x: 0, y: 0 })
+  const targetPosition = useRef({ x: 0, y: 0 })
+  const currentPosition = useRef({ x: 0, y: 0 })
+  
   
   // Initialize fish data
   const fishData = useMemo(() => {
@@ -208,6 +213,25 @@ export default function FishParticleSystem({ scrollY = 0 }) {
       // Convert mouse position to world coordinates
       mousePosition.current.x = (event.clientX / window.innerWidth) * 2 - 1
       mousePosition.current.y = -(event.clientY / window.innerHeight) * 2 + 1
+      
+      // Update mouse tracking voor parallax effect (desktop with mouse only)
+      if (window.innerWidth > 768 && !('ontouchstart' in window) && window.matchMedia('(hover: hover)').matches) {
+        const centerX = window.innerWidth / 2
+        const centerY = window.innerHeight / 2
+        
+        // Normalize mouse position (-1 to 1)
+        const normalizedX = (event.clientX - centerX) / (window.innerWidth / 2)
+        const normalizedY = (event.clientY - centerY) / (window.innerHeight / 2)
+        
+        mousePositionParallax.current = { x: normalizedX, y: normalizedY }
+        
+        // Subtiele parallax movement voor fish
+        const maxOffset = 0.28 // 20% minder zichtbaar (0.35 * 0.8)
+        targetPosition.current = {
+          x: -normalizedX * maxOffset,  // Mouse rechts = fish naar links
+          y: normalizedY * maxOffset    // Mouse omhoog = fish naar beneden
+        }
+      }
     }
     
     const handleMouseDown = () => {
@@ -258,6 +282,14 @@ export default function FishParticleSystem({ scrollY = 0 }) {
   useFrame((state, delta) => {
     const worldMouseX = mousePosition.current.x * 16 // Scale to world coordinates
     const worldMouseY = mousePosition.current.y * 8
+    
+    // Apply subtle parallax position effect (desktop with mouse only)
+    if (window.innerWidth > 768 && !('ontouchstart' in window) && window.matchMedia('(hover: hover)').matches) {
+      // Zeer langzame interpolation voor smoother fish parallax
+      const lerpSpeed = 0.015 // Veel langzamer voor smoother effect
+      currentPosition.current.x += (targetPosition.current.x - currentPosition.current.x) * lerpSpeed
+      currentPosition.current.y += (targetPosition.current.y - currentPosition.current.y) * lerpSpeed
+    }
     
     fishData.forEach((fish, index) => {
       const fishRef = fishRefs.current[index]
@@ -432,9 +464,19 @@ export default function FishParticleSystem({ scrollY = 0 }) {
       
       fish.rotation += rotationDiff * delta * 3 // Smooth rotation
       
-      // Apply position and rotation to mesh with parallax effect
-      const parallaxY = scrollY * (0.001 * (1 + fish.position.z * -0.05)) // Parallax based on depth
-      fishRef.position.set(fish.position.x, fish.position.y + parallaxY, fish.position.z)
+      // Apply position and rotation to mesh with parallax effects
+      const parallaxY = scrollY * (0.001 * (1 + fish.position.z * -0.05)) // Scroll-based parallax
+      
+      // Mouse-based parallax (desktop with mouse only)
+      const hasMouseSupport = window.innerWidth > 768 && !('ontouchstart' in window) && window.matchMedia('(hover: hover)').matches
+      const mouseParallaxX = hasMouseSupport ? currentPosition.current.x : 0
+      const mouseParallaxY = hasMouseSupport ? currentPosition.current.y : 0
+      
+      fishRef.position.set(
+        fish.position.x + mouseParallaxX, 
+        fish.position.y + parallaxY + mouseParallaxY, 
+        fish.position.z
+      )
       // Keep top-down view: X-rotation for top-down, Z-rotation for direction
       fishRef.rotation.set(0, 0, fish.rotation)
     })

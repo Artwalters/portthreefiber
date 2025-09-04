@@ -171,6 +171,11 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const currentOffset = useRef(-100) // Start off-screen to the left
   const sliderSpeed = useRef(0)
   
+  // Mouse tracking voor desktop rotation effect
+  const mousePosition = useRef({ x: 0, y: 0 })
+  const targetPosition = useRef({ x: 0, y: 0 })
+  const currentPosition = useRef({ x: 0, y: 0 })
+  
   // Animation states for fly-in and exit effects
   const [isAnimating, setIsAnimating] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
@@ -354,9 +359,6 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
         tex.anisotropy = Math.min(isMobile ? 4 : 8, gl.capabilities.getMaxAnisotropy()) // Reduced for performance
         tex.needsUpdate = true
         setTexture(tex)
-        
-        // Log current image info
-        console.log(`Showing: ${currentImage.title} - ${currentImage.description}`)
       },
       undefined,
       () => {
@@ -473,6 +475,32 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     }
   }, [gl, projectImages])
   
+  // Mouse tracking voor desktop rotation effect
+  useEffect(() => {
+    if (isMobile) return // Alleen voor desktop
+    
+    const handleMouseMove = (e) => {
+      const centerX = window.innerWidth / 2
+      const centerY = window.innerHeight / 2
+      
+      // Normalize mouse position (-1 to 1)
+      const normalizedX = (e.clientX - centerX) / (window.innerWidth / 2)
+      const normalizedY = (e.clientY - centerY) / (window.innerHeight / 2)
+      
+      mousePosition.current = { x: normalizedX, y: normalizedY }
+      
+      // Zichtbare parallax movement
+      const maxOffset = 0.105 // 30% minder sterk (0.15 * 0.7)
+      targetPosition.current = {
+        x: -normalizedX * maxOffset,  // Mouse rechts = mesh naar links
+        y: normalizedY * maxOffset    // Mouse omhoog = mesh naar beneden
+      }
+    }
+    
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [isMobile])
+  
   // Animation loop
   useFrame((state, delta) => {
     if (!material) return
@@ -517,6 +545,18 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
+    
+    // Apply subtle mouse tracking position offset (desktop only)
+    if (!isMobile && meshRef.current) {
+      // Langzamere interpolation voor smoother parallax effect
+      const lerpSpeed = 0.02 // Veel langzamer voor smoother effect
+      currentPosition.current.x += (targetPosition.current.x - currentPosition.current.x) * lerpSpeed
+      currentPosition.current.y += (targetPosition.current.y - currentPosition.current.y) * lerpSpeed
+      
+      // Apply position offset to mesh
+      meshRef.current.position.x = currentPosition.current.x
+      meshRef.current.position.y = currentPosition.current.y
+    }
   })
   
   // Create material only once (without texture dependency)
