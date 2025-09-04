@@ -97,8 +97,8 @@ const SimpleWater = forwardRef((props, ref) => {
                     // Mouse interaction - gentle underwater-style disturbance
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.25; // Balanced distortion
-                        float rippleRadius = 0.1; // Medium radius for visible but subtle ripples
+                        float rippleStrength = 0.35; // More visible mouse interaction
+                        float rippleRadius = 0.12; // Slightly larger radius for more visible interaction
                         
                         if (dist < rippleRadius) {
                             // Smooth falloff for gentle underwater current feel
@@ -108,8 +108,8 @@ const SimpleWater = forwardRef((props, ref) => {
                     }
                     
                     // Stronger idle deformation for better plane movement
-                    float idleWaveStrength = 0.06; // Higher for more noticeable deformation
-                    float idleSpeed = 0.3; // Keep slow, calmer movement
+                    float idleWaveStrength = 0.08; // 20% less intense variation
+                    float idleSpeed = 0.16; // 20% slower animation
                     
                     // Multiple sine waves at different frequencies for natural movement
                     float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
@@ -174,7 +174,7 @@ const SimpleWater = forwardRef((props, ref) => {
                     vec2 distortedUv = vUv + distortion;
                     
                     // Chromatic aberration - sample RGB channels with slight offset
-                    float aberrationStrength = 0.004; // More noticeable
+                    float aberrationStrength = 0.002; // Less intense RGB effect
                     vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
                     
                     // Sample each color channel with different offsets
@@ -215,14 +215,14 @@ const SimpleWater = forwardRef((props, ref) => {
                     
                     // Reduced visual effect strength - keep deformation but less visible water effects
                     // float effectStrength = 0.3; // Disabled with specular
-                    float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
+                    float pressureStrength = 0.027; // 10% less color variation
                     
                     // finalColor += vec3(spec) * effectStrength; // DISABLED - no more glare
                     finalColor += pressure * pressureStrength;
                     
                     // Add simple grain effect
                     float grainValue = grain(vUv, uTime);
-                    float grainStrength = 0.12; // 20% stronger grain effect
+                    float grainStrength = 0.096; // 20% less intense grain effect
                     
                     // Mix grain with final color
                     finalColor += (grainValue - 0.5) * grainStrength;

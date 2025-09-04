@@ -90,8 +90,8 @@ function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }
       const breathingVariation = Math.sin(time * 1.5 + fishIndex * 0.5) * 0.08 + 1 // Slower, more subtle breathing
       targetAnimationSpeed.current = baseAnimationMultiplier * speedVariation.current * breathingVariation
       
-      // Ultra-smooth ease transition with cubic easing
-      const transitionSpeed = fleeState ? 4.0 : 1.5 // Slower, more gradual transitions
+      // Ultra-smooth ease transition with cubic easing - always smooth, never instant
+      const transitionSpeed = fleeState ? 6.0 : 1.5 // Faster but still smooth for flee state
       const speedDifference = targetAnimationSpeed.current - currentAnimationSpeed.current
       
       // Apply cubic easing for smoother transitions
@@ -125,8 +125,8 @@ function FishWithAnimation({ scene, animations, fishIndex, fleeState, velocity }
     <group ref={group}>
       <primitive 
         object={clonedScene} 
-        scale={0.192}  // Fixed scale - let camera perspective handle size
-        rotation={[-Math.PI / 2, 0, Math.PI]}
+        scale={0.192}  // Fixed scale - let camera perspective handle size  
+        rotation={[0, 0, 0]} // No initial model rotation, let movement handle direction
       />
     </group>
   )
@@ -159,27 +159,27 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         const fishDepth = -2 - Math.random() * 8
         
         switch(edge) {
-          case 0: // Top edge - spawn way above screen
-            startPos = new THREE.Vector3(Math.random() * 60 - 30, 18, fishDepth)
-            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
+          case 0: // Left to right - swim horizontally across screen
+            startPos = new THREE.Vector3(-25, Math.random() * 8 - 4, fishDepth)
+            targetPos = new THREE.Vector3(25, Math.random() * 8 - 4, fishDepth) // Same depth, cross horizontally
             break
-          case 1: // Right edge - spawn way right of screen
-            startPos = new THREE.Vector3(35, Math.random() * 20 - 10, fishDepth)
-            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
+          case 1: // Right to left - swim horizontally across screen  
+            startPos = new THREE.Vector3(25, Math.random() * 8 - 4, fishDepth)
+            targetPos = new THREE.Vector3(-25, Math.random() * 8 - 4, fishDepth) // Same depth, cross horizontally
             break
-          case 2: // Bottom edge - spawn way below screen
-            startPos = new THREE.Vector3(Math.random() * 60 - 30, -18, fishDepth)
-            targetPos = new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 4 - 2, fishDepth)
+          case 2: // Left to right (diagonal up/down)
+            startPos = new THREE.Vector3(-25, Math.random() * 6 - 3, fishDepth)
+            targetPos = new THREE.Vector3(25, Math.random() * 6 - 3, fishDepth + Math.random() * 2 - 1) // Slight depth variation
             break
-          case 3: // Left edge - spawn way left of screen
-            startPos = new THREE.Vector3(-35, Math.random() * 20 - 10, fishDepth)
-            targetPos = new THREE.Vector3(Math.random() * 15 - 5, Math.random() * 6 - 3, fishDepth)
+          case 3: // Right to left (diagonal up/down)
+            startPos = new THREE.Vector3(25, Math.random() * 6 - 3, fishDepth)
+            targetPos = new THREE.Vector3(-25, Math.random() * 6 - 3, fishDepth + Math.random() * 2 - 1) // Slight depth variation
             break
         }
         
         const directionToTarget = targetPos.clone().sub(startPos).normalize()
-        // Adjust initial rotation with same offset as movement rotation
-        initialRotation = Math.atan2(directionToTarget.y, directionToTarget.x) + Math.PI
+        // Simple left-right rotation: right=0, left=PI
+        initialRotation = directionToTarget.x > 0 ? 0 : Math.PI
         
         return { startPos, targetPos, initialRotation }
       }
@@ -191,11 +191,13 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         position: spawn.startPos.clone(),
         startPosition: spawn.startPos.clone(),
         targetPosition: spawn.targetPos.clone(),
-        velocity: spawn.targetPos.clone().sub(spawn.startPos).normalize().multiplyScalar(0.3), // Slow speed
+        velocity: spawn.targetPos.clone().sub(spawn.startPos).normalize().multiplyScalar(0.3 + Math.random() * 0.06), // Variable speed: 0.3-0.36 (up to 20% more)
+        targetVelocity: spawn.targetPos.clone().sub(spawn.startPos).normalize().multiplyScalar(0.3 + Math.random() * 0.06), // Target velocity for smooth transitions
         rotation: spawn.initialRotation,
         targetRotation: spawn.initialRotation,
         fleeState: false,
         fleeTimer: 0,
+        backwardAnimTimer: 0, // Timer for backward animation
         phase: 'entering', // entering, swimming, exiting
         phaseTimer: 5 + Math.random() * 10, // Time to spend in center before exiting
         hasReachedTarget: false,
@@ -314,21 +316,44 @@ export default function FishParticleSystem({ scrollY = 0 }) {
       const fleeRadius = 5
       if (mouseDown.current && distanceToMouse < fleeRadius && !fish.fleeState) {
         fish.fleeState = true
-        fish.fleeTimer = 3 // Longer flee time
+        // Variable flee duration: 2-6 seconds (wisselvallig)
+        fish.fleeTimer = 2 + Math.random() * 4
+        // Start backward animation timer (short burst)
+        fish.backwardAnimTimer = 0.3 + Math.random() * 0.2 // 0.3-0.5 seconds backward movement
         
-        const fleeDirection = new THREE.Vector3(
-          fish.position.x - worldMouseX,
-          fish.position.y - worldMouseY,
-          0
-        ).normalize()
+        // Determine if mouse is in front or behind fish
+        const fishDirection = fish.velocity.x > 0 ? 1 : -1 // Fish current direction
+        const mouseRelativeToFish = worldMouseX - fish.position.x
+        const mouseInFront = (fishDirection > 0 && mouseRelativeToFish > 0) || (fishDirection < 0 && mouseRelativeToFish < 0)
         
-        // Much faster flee speed
-        fish.velocity.copy(fleeDirection.multiplyScalar(2.0))
+        // Variable speed: base 2.0 + up to 20% more (2.0 - 2.4)
+        const fleeSpeed = 2.0 + Math.random() * 0.4
+        
+        let fleeDirection
+        if (mouseInFront) {
+          // Mouse clicked in front of fish - fish turns around and swims back
+          fleeDirection = -fishDirection
+        } else {
+          // Mouse clicked behind fish - fish continues in same direction but faster
+          fleeDirection = fishDirection
+        }
+        
+        // Set target velocity for smooth acceleration
+        fish.targetVelocity.set(
+          fleeDirection * fleeSpeed,    // Smart directional fleeing
+          fish.velocity.y * 0.5,        // Reduce vertical movement
+          fish.velocity.z * 0.8 - 0.3   // Subtle backward movement (deeper)
+        )
       }
       
       // Handle flee state across all phases
       if (fish.fleeState) {
         fish.fleeTimer -= delta
+        
+        // Handle backward animation timer
+        if (fish.backwardAnimTimer > 0) {
+          fish.backwardAnimTimer -= delta
+        }
         if (fish.fleeTimer <= 0) {
           fish.fleeState = false
           // Return to normal behavior based on current phase
@@ -337,9 +362,11 @@ export default function FishParticleSystem({ scrollY = 0 }) {
             fish.velocity.copy(direction.multiplyScalar(0.3))
           } else if (fish.phase === 'swimming') {
             const angle = Math.random() * Math.PI * 2
+            // Variable swimming speed: 0.15 base + up to 20% more
+            const swimSpeed = 0.15 + Math.random() * 0.03
             fish.velocity.set(
-              Math.cos(angle) * 0.15,
-              Math.sin(angle) * 0.1,
+              Math.cos(angle) * swimSpeed,
+              Math.sin(angle) * (swimSpeed * 0.67), // Keep Y movement proportional
               0
             )
           }
@@ -356,9 +383,11 @@ export default function FishParticleSystem({ scrollY = 0 }) {
             fish.phase = 'swimming'
             // Start gentle random swimming in center area
             const angle = Math.random() * Math.PI * 2
+            // Variable swimming speed: 0.15 base + up to 20% more
+            const swimSpeed = 0.15 + Math.random() * 0.03
             fish.velocity.set(
-              Math.cos(angle) * 0.15,
-              Math.sin(angle) * 0.1,
+              Math.cos(angle) * swimSpeed,
+              Math.sin(angle) * (swimSpeed * 0.67), // Keep Y movement proportional
               0
             )
           } else {
@@ -374,9 +403,11 @@ export default function FishParticleSystem({ scrollY = 0 }) {
           // Gentle direction changes (only when not fleeing)
           if (Math.random() < delta * 0.3) { // 30% chance per second
             const angle = Math.random() * Math.PI * 2
+            // Variable swimming speed: 0.15 base + up to 20% more
+            const swimSpeed = 0.15 + Math.random() * 0.03
             fish.velocity.set(
-              Math.cos(angle) * 0.15,
-              Math.sin(angle) * 0.1,
+              Math.cos(angle) * swimSpeed,
+              Math.sin(angle) * (swimSpeed * 0.67), // Keep Y movement proportional
               0
             )
           }
@@ -447,14 +478,23 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         }
       }
       
+      // Smooth velocity interpolation for natural easing
+      const velocityLerpSpeed = fish.fleeState ? 0.15 : 0.08 // Faster transition during flee, slower normally
+      fish.velocity.lerp(fish.targetVelocity, velocityLerpSpeed)
+      
+      // Add subtle backward movement during initial flee response
+      if (fish.backwardAnimTimer > 0) {
+        const backwardStrength = fish.backwardAnimTimer / 0.5 // Fade out over 0.5 seconds
+        fish.velocity.z -= backwardStrength * 0.5 // Subtle backward push
+      }
+      
       // Update position
       fish.position.add(fish.velocity.clone().multiplyScalar(delta))
       
-      // Calculate target rotation based on velocity
+      // Calculate target rotation based on velocity (left-right only)
       if (fish.velocity.length() > 0.01) {
-        // Adjust rotation to ensure fish always swims head-first
-        // Add PI because we rotated the model 180 degrees
-        fish.targetRotation = Math.atan2(fish.velocity.y, fish.velocity.x) + Math.PI
+        // If moving right (positive X), face right (0). If moving left (negative X), face left (PI)
+        fish.targetRotation = fish.velocity.x > 0 ? 0 : Math.PI
       }
       
       // Smooth rotation
@@ -477,8 +517,8 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         fish.position.y + parallaxY + mouseParallaxY, 
         fish.position.z
       )
-      // Keep top-down view: X-rotation for top-down, Z-rotation for direction
-      fishRef.rotation.set(0, 0, fish.rotation)
+      // Side view: Y-rotation for direction, keep fish upright
+      fishRef.rotation.set(0, fish.rotation, 0)
     })
   })
   
