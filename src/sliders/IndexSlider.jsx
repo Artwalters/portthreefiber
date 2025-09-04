@@ -49,13 +49,13 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       void main() {
         vec3 pos = position;
         
-        // Simple global deformation like original WebGLSlider
+        // Simple global deformation like original WebGLSlider - 50% less intense
         if (uIsMobile > 0.5) {
-          // Mobile: increased deformation for better visual feedback
-          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.0015);
+          // Mobile: reduced deformation intensity
+          pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.00075);
         } else {
-          // Desktop: normal deformation
-          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0016);
+          // Desktop: reduced deformation intensity  
+          pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0008);
         }
         
         vUv = uv;
@@ -107,7 +107,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         vec2 tileUV = fract(tilesUV);
         
         // Dynamic gap size based on movement - smaller gaps when moving
-        float baseGapSize = 0.05;
+        float baseGapSize = 0.035; // Reduced from 0.05 for tighter spacing
         float movementFactor = abs(uVelo) * 0.001; // Scale movement to gap reduction
         float gapSize = baseGapSize * (1.0 - min(movementFactor, 0.9)); // Reduce gaps up to 90% during movement
         float edgeSmooth = 0.002; // Much smaller for sharper edges
@@ -566,16 +566,16 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         const deltaY = clientY - startY
         dragDelta = deltaY * 0.05
         newTargetOffset = startOffset + dragDelta // More responsive
-        // Gradual speed buildup for smoother RGB effect
-        const targetSpeed = -deltaY * 0.6
+        // Gradual speed buildup for smoother RGB effect - 50% less intense
+        const targetSpeed = -deltaY * 0.3
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
         dragDelta = -deltaX * 0.03
         newTargetOffset = startOffset + dragDelta
-        // Gradual speed buildup for smoother RGB effect
-        const targetSpeed = -deltaX * 0.5
+        // Gradual speed buildup for smoother RGB effect - 50% less intense
+        const targetSpeed = -deltaX * 0.25
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
       
@@ -652,7 +652,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         // Mobile: use deltaY for vertical scrolling with increased responsiveness (inverted)
         scrollDelta = -wheelDelta * 0.012
         targetOffset.current += scrollDelta // Always update, even during animations
-        sliderSpeed.current = wheelDelta * 0.7 // More deformation for mobile (corrected direction)
+        sliderSpeed.current = wheelDelta * 0.35 // 50% less intense barrel distortion
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
         scrollDelta = wheelDelta * 0.008
@@ -679,14 +679,14 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         scrollAmount = -wheelDelta * 0.012
         // Only update sliderSpeed if not during fly-in animation
         if (!isFlyingIn) {
-          sliderSpeed.current = wheelDelta * 0.7 // More deformation for mobile (corrected direction)
+          sliderSpeed.current = wheelDelta * 0.35 // 50% less intense barrel distortion
         }
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
         scrollAmount = wheelDelta * 0.008
         // Only update sliderSpeed if not during fly-in animation
         if (!isFlyingIn) {
-          sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
+          sliderSpeed.current = wheelDelta * 0.4 // 50% less intense barrel distortion
         }
       }
       
@@ -945,7 +945,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     }
     
     // Same gap logic as shader
-    const gapSize = 0.05
+    const gapSize = 0.035
     const isInTexture = (tileUV.x >= gapSize && tileUV.x <= (1.0 - gapSize))
     
     // Only process click if we're actually on a texture (not a gap)

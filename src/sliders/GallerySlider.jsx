@@ -208,8 +208,8 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     const animObj = { progress: 0 }
     flyInTween.current = gsap.to(animObj, {
       progress: 1,
-      duration: 2,
-      ease: "power3.out",
+      duration: 1.6, // Faster timing
+      ease: "power4.out", // Ultra extreme fast start → soft landing
       onUpdate: () => {
         animationProgress.current = animObj.progress
       },
@@ -254,8 +254,8 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       const animObj = { progress: 0 }
       exitTween.current = gsap.to(animObj, {
         progress: 1,
-        duration: 1.5,
-        ease: "power2.in",
+        duration: 1.2, // Faster timing
+        ease: "power4.in", // Ultra slow start → extremely fast end
         onUpdate: () => {
           exitProgress.current = animObj.progress
         }

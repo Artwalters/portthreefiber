@@ -51,8 +51,8 @@ vec3 deformationCurve(vec3 position, vec2 uv) {
   // Starts at 0.2 (more sensitive), becomes more intense up to 3.0
   float intensity = smoothstep(0.2, 3.0, absVelocity);
   
-  // Apply easing to make the effect more natural - increased from -0.008 to -0.02
-  float distortion = sin(uv.x * PI) * intensity * sign(velocity) * -0.02;
+  // Apply easing to make the effect more natural - reduced by 30% from -0.02
+  float distortion = sin(uv.x * PI) * intensity * sign(velocity) * -0.014;
   
   position.y = position.y - distortion;
   

@@ -83,25 +83,27 @@ const SimpleWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation
+                    // Wave equation - subtle ripple propagation
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // 0.25 * 0.75 = 0.1875
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.12; // Moderate propagation
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.12;
                     
-                    pressure += delta * velocity;
+                    pressure += delta * velocity * 0.8; // Moderate pressure changes
                     
-                    // Damping
-                    velocity *= 0.995;
-                    pressure *= 0.998;
+                    // Balanced damping for subtle ripples
+                    velocity *= 0.992; // Less damping for ripple visibility
+                    pressure *= 0.997; // Less damping for ripple visibility
                     
-                    // Mouse interaction - smaller ripples on mobile for better visibility
+                    // Mouse interaction - gentle underwater-style disturbance
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.5;
-                        float rippleRadius = 0.075; // 25% smaller
+                        float rippleStrength = 0.25; // Balanced distortion
+                        float rippleRadius = 0.1; // Medium radius for visible but subtle ripples
                         
                         if (dist < rippleRadius) {
-                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
+                            // Smooth falloff for gentle underwater current feel
+                            float falloff = smoothstep(rippleRadius, 0.0, dist);
+                            pressure += falloff * falloff * rippleStrength; // Squared falloff for gentleness
                         }
                     }
                     
@@ -172,7 +174,7 @@ const SimpleWater = forwardRef((props, ref) => {
                     vec2 distortedUv = vUv + distortion;
                     
                     // Chromatic aberration - sample RGB channels with slight offset
-                    float aberrationStrength = 0.002; // Very subtle
+                    float aberrationStrength = 0.004; // More noticeable
                     vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
                     
                     // Sample each color channel with different offsets
@@ -205,22 +207,22 @@ const SimpleWater = forwardRef((props, ref) => {
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
                     vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
                     
-                    // Specular highlight
-                    float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
+                    // Specular highlight - DISABLED
+                    // float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
                     
                     // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
                     // Reduced visual effect strength - keep deformation but less visible water effects
-                    float effectStrength = 0.3; // Reduced from 0.8 for less specular highlights
+                    // float effectStrength = 0.3; // Disabled with specular
                     float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
                     
-                    finalColor += vec3(spec) * effectStrength;
+                    // finalColor += vec3(spec) * effectStrength; // DISABLED - no more glare
                     finalColor += pressure * pressureStrength;
                     
                     // Add simple grain effect
                     float grainValue = grain(vUv, uTime);
-                    float grainStrength = 0.1;
+                    float grainStrength = 0.12; // 20% stronger grain effect
                     
                     // Mix grain with final color
                     finalColor += (grainValue - 0.5) * grainStrength;
