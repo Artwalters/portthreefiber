@@ -7,6 +7,8 @@ const MobileWater = forwardRef((props, ref) => {
     const meshRef = useRef()
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
     const mouseDown = useRef(false)
+    const lastInteractionTime = useRef(Date.now()) // Track last interaction
+    const isInactive = useRef(false) // Track if we should pause simulation
     
     // Mouse tracking voor subtiele parallax position effect
     const mousePosition = useRef({ x: 0, y: 0 })
@@ -337,12 +339,14 @@ const MobileWater = forwardRef((props, ref) => {
         const handleMouseMove = (e) => {
             mouse.current.x = e.clientX / window.innerWidth
             mouse.current.y = 1.0 - (e.clientY / window.innerHeight)
-            
-            // Parallax removed from water layer
+            lastInteractionTime.current = Date.now()
+            isInactive.current = false
         }
         
         const handleMouseDown = () => {
             mouseDown.current = true
+            lastInteractionTime.current = Date.now()
+            isInactive.current = false
         }
         
         const handleMouseUp = () => {
@@ -353,6 +357,8 @@ const MobileWater = forwardRef((props, ref) => {
             if (e.touches.length > 0) {
                 mouse.current.x = e.touches[0].clientX / window.innerWidth
                 mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
+                lastInteractionTime.current = Date.now()
+                isInactive.current = false
             }
         }
         
@@ -361,6 +367,8 @@ const MobileWater = forwardRef((props, ref) => {
                 mouse.current.x = e.touches[0].clientX / window.innerWidth
                 mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
                 mouseDown.current = true
+                lastInteractionTime.current = Date.now()
+                isInactive.current = false
             }
         }
         
@@ -385,17 +393,57 @@ const MobileWater = forwardRef((props, ref) => {
         }
     }, [])
     
+    // Add WebGL context loss recovery for mobile stability
+    useEffect(() => {
+        const canvas = gl.domElement
+        
+        const handleContextLost = (event) => {
+            event.preventDefault()
+            console.warn('WebGL context lost - MobileWater')
+        }
+        
+        const handleContextRestored = () => {
+            console.warn('WebGL context restored - MobileWater')
+            // Reset interaction time to restart simulation properly
+            lastInteractionTime.current = Date.now()
+            isInactive.current = false
+        }
+        
+        canvas.addEventListener('webglcontextlost', handleContextLost, false)
+        canvas.addEventListener('webglcontextrestored', handleContextRestored, false)
+        
+        return () => {
+            canvas.removeEventListener('webglcontextlost', handleContextLost)
+            canvas.removeEventListener('webglcontextrestored', handleContextRestored)
+        }
+    }, [gl])
+    
     useFrame((state, delta) => {
+        // Check for inactivity to prevent mobile memory/precision issues
+        const now = Date.now()
+        const timeSinceLastInteraction = now - lastInteractionTime.current
+        
+        // After 90 seconds of inactivity, reduce simulation frequency on mobile
+        if (timeSinceLastInteraction > 90000) { // 90 seconds
+            isInactive.current = true
+            // Skip every other frame during inactivity to reduce mobile load
+            if (Math.floor(state.clock.elapsedTime * 30) % 2 === 0) {
+                return
+            }
+        }
+        
         // Clamp delta to prevent simulation instability
         const clampedDelta = Math.min(delta * 60, 1.4)
         
         const currentTarget = gl.getRenderTarget()
         
-        // 1. ALWAYS update water simulation - this MUST never stop
+        // 1. Water simulation with mobile safety checks
         try {
             if (simMaterial.uniforms && buffers.read && buffers.write) {
                 simMaterial.uniforms.uPrevious.value = buffers.read.texture
-                simMaterial.uniforms.uTime.value = state.clock.elapsedTime
+                // Use modulo to prevent floating point precision issues on mobile
+                const safeTime = (state.clock.elapsedTime * 0.3) % 1000 // Cycle every 1000 seconds
+                simMaterial.uniforms.uTime.value = safeTime
                 simMaterial.uniforms.uMouse.value.copy(mouse.current)
                 simMaterial.uniforms.uMouseDown.value = mouseDown.current ? 1.0 : 0.0
                 simMaterial.uniforms.uDelta.value = clampedDelta

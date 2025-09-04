@@ -389,6 +389,17 @@ function App() {
     const handleFlyInComplete = () => {
         setIsSliderAnimationComplete(true)
     }
+    
+    // Also set complete when slider becomes visible but before fly-in finishes
+    useEffect(() => {
+        if (isReturningFromGallery && showFilmStrip) {
+            // Mark as complete immediately when slider becomes visible
+            // This allows UI interaction during fly-in animation
+            setTimeout(() => {
+                setIsSliderAnimationComplete(true)
+            }, 100) // Small delay to let slider initialize
+        }
+    }, [isReturningFromGallery, showFilmStrip])
 
     // Handle back button click to return to slider - 4 phase transition with plane curve completion
     const handleBackToSlider = () => {

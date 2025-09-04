@@ -298,6 +298,10 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const targetOffset = useRef(0)
   const currentOffset = useRef(0)
   const sliderSpeed = useRef(0)
+  const userInfluenceFactor = useRef(1) // Gradual build-up of user control (0 = no control, 1 = full control)
+  const animationEndTime = useRef(0) // When animation ended for gradual build-up
+  const animationSpeedMultiplier = useRef(1) // Speed multiplier for GSAP timeline
+  const dragVelocityTracker = useRef(0) // Track drag velocity during animation
   
   // Mouse tracking voor desktop parallax position effect
   const mousePosition = useRef({ x: 0, y: 0 })
@@ -541,24 +545,43 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Calculate momentum for natural continuation
       const prevOffset = targetOffset.current
       
+      // During fly-in animation, only track drag velocity for animation speed control
+      if (isFlyingIn) {
+        // Calculate drag velocity for animation speed influence
+        const dragVelocity = isMobile ? 
+          (clientY - startY) * 0.002 : // Mobile: vertical drag
+          -(clientX - startX) * 0.002   // Desktop: horizontal drag (inverted)
+        
+        dragVelocityTracker.current = dragVelocity
+        // Don't update sliderSpeed or targetOffset during fly-in
+        return
+      }
+      
+      // Normal drag handling when not in fly-in animation
       let newTargetOffset
+      let dragDelta = 0
+      
       if (isMobile) {
         // Mobile: vertical drag = scroll with increased responsiveness (inverted)
         const deltaY = clientY - startY
-        newTargetOffset = startOffset + deltaY * 0.05 // More responsive
+        dragDelta = deltaY * 0.05
+        newTargetOffset = startOffset + dragDelta // More responsive
         // Gradual speed buildup for smoother RGB effect
         const targetSpeed = -deltaY * 0.6
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       } else {
         // Desktop: horizontal drag = scroll  
         const deltaX = clientX - startX
-        newTargetOffset = startOffset - deltaX * 0.03
+        dragDelta = -deltaX * 0.03
+        newTargetOffset = startOffset + dragDelta
         // Gradual speed buildup for smoother RGB effect
         const targetSpeed = -deltaX * 0.5
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
       
-      targetOffset.current = newTargetOffset
+      // Apply user influence factor for gradual control build-up
+      const offsetDelta = newTargetOffset - targetOffset.current
+      targetOffset.current += offsetDelta * userInfluenceFactor.current
       
       // Calculate momentum (velocity) for continuation effect
       momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
@@ -572,6 +595,11 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     const handleEnd = () => {
       dragging = false
       isUserInteracting.current = false
+      
+      // Reset drag velocity tracker when user stops interacting
+      if (isFlyingIn) {
+        dragVelocityTracker.current = 0
+      }
       
       // Use momentum to determine direction and add continuation
       if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
@@ -618,16 +646,52 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
       
       const prevOffset = targetOffset.current
+      let scrollDelta = 0
       
       if (isMobile) {
         // Mobile: use deltaY for vertical scrolling with increased responsiveness (inverted)
-        targetOffset.current -= wheelDelta * 0.012 // More responsive, inverted direction
+        scrollDelta = -wheelDelta * 0.012
+        targetOffset.current += scrollDelta // Always update, even during animations
         sliderSpeed.current = wheelDelta * 0.7 // More deformation for mobile (corrected direction)
       } else {
         // Desktop: use deltaY for horizontal scrolling - smoother
-        targetOffset.current += wheelDelta * 0.008
+        scrollDelta = wheelDelta * 0.008
+        targetOffset.current += scrollDelta // Always update, even during animations
         sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
       }
+      
+      // During fly-in animation, track scroll for animation speed control
+      if (isFlyingIn) {
+        // Track scroll velocity for animation speed influence
+        const scrollVelocity = isMobile ? 
+          wheelDelta * 0.01 : // Mobile: scroll up/down
+          -wheelDelta * 0.01  // Desktop: scroll (inverted)
+        
+        dragVelocityTracker.current = scrollVelocity
+        // Don't update sliderSpeed during fly-in to prevent barrel distortion
+        // sliderSpeed will only be controlled by the animation
+        return // Don't update targetOffset during fly-in
+      }
+      
+      let scrollAmount = 0
+      if (isMobile) {
+        // Mobile: use deltaY for vertical scrolling with increased responsiveness (inverted)
+        scrollAmount = -wheelDelta * 0.012
+        // Only update sliderSpeed if not during fly-in animation
+        if (!isFlyingIn) {
+          sliderSpeed.current = wheelDelta * 0.7 // More deformation for mobile (corrected direction)
+        }
+      } else {
+        // Desktop: use deltaY for horizontal scrolling - smoother
+        scrollAmount = wheelDelta * 0.008
+        // Only update sliderSpeed if not during fly-in animation
+        if (!isFlyingIn) {
+          sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
+        }
+      }
+      
+      // Apply user influence factor for gradual control build-up
+      targetOffset.current += scrollAmount * userInfluenceFactor.current
       
       // Calculate momentum (velocity) for continuation effect like drag
       momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
@@ -729,6 +793,14 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const flyInTween = useRef(null) // GSAP tween reference
   const [isInitiallyVisible, setIsInitiallyVisible] = useState(true) // Track initial visibility
   
+  // Initialize user influence for normal usage (not after animation)
+  useEffect(() => {
+    if (!isReturningFromGallery && !isFlyingIn) {
+      userInfluenceFactor.current = 1 // Full control for normal usage
+      animationEndTime.current = 0
+    }
+  }, [isReturningFromGallery, isFlyingIn])
+  
   // Handle fly-in animation when returning from gallery
   useEffect(() => {
     if (isReturningFromGallery && !isFlyingIn) {
@@ -754,12 +826,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
           flyInTween.current.kill()
         }
         
-        // Create GSAP animation for perfect smooth fly-in
+        // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
         const animObj = { progress: 0, velocity: 0 }
         flyInTween.current = gsap.timeline()
           .to(animObj, {
             progress: 1,
-            duration: 4,
+            duration: 2, // Perfect balance - not too fast, not too slow
             ease: "power3.out", // Super smooth ease-out
             onUpdate: () => {
               setFlyInProgress(animObj.progress)
@@ -767,7 +839,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
           })
           .to(animObj, {
             velocity: 0,
-            duration: 4,
+            duration: 2, // Same 2 seconds duration
             ease: "power2.inOut",
             onUpdate: () => {
               // Update velocity for barrel distortion effects
@@ -775,9 +847,22 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
               sliderSpeed.current += (targetVelocity - sliderSpeed.current) * 0.2
             },
             onComplete: () => {
+              // Mark animation as complete
               setIsFlyingIn(false)
               flyInTween.current = null
               sliderSpeed.current = 0
+              isAnimationEnding.current = false
+              
+              // Start gradual user influence build-up
+              animationEndTime.current = Date.now()
+              userInfluenceFactor.current = 0 // Start with no user control
+              
+              // Reset any accumulated momentum/movement and animation speed
+              momentum.current = 0
+              swipeDirection.current = 0
+              animationSpeedMultiplier.current = 1
+              dragVelocityTracker.current = 0
+              
               // Notify parent that fly-in is complete
               if (onFlyInComplete) {
                 onFlyInComplete()
@@ -804,9 +889,32 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const clickStartPos = useRef({ x: 0, y: 0 })
   const clickThreshold = 5 // pixels
   
-  // Click handler - only trigger if not dragging
+  // Click handler - allow clicks during fly-in but interrupt animation
   const handleMeshClick = (event) => {
     if (isFading || isClickDragging.current) return
+    
+    // If clicking during fly-in, interrupt the animation first
+    if (isFlyingIn) {
+      // Stop GSAP animation immediately
+      if (flyInTween.current) {
+        flyInTween.current.kill()
+        flyInTween.current = null
+      }
+      
+      // Clean up fly-in state
+      setIsFlyingIn(false)
+      animationSpeedMultiplier.current = 1
+      dragVelocityTracker.current = 0
+      animationEndTime.current = 0
+      userInfluenceFactor.current = 1 // Full control immediately
+      sliderSpeed.current = 0
+      
+      // Reset any momentum
+      momentum.current = 0
+      swipeDirection.current = 0
+      
+      // Continue with click processing after interruption
+    }
     
     // Calculate which project was clicked
     const uv = event.uv
@@ -956,8 +1064,33 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       targetOffset.current = animatedOffset
       
     } else if (isFlyingIn) {
-      // GSAP-driven fly-in animation - smooth professional easing
+      // GSAP-driven fly-in animation with user speed control
       const slideDistance = 67
+      
+      // Calculate animation speed based on user drag/scroll during animation
+      if (Math.abs(dragVelocityTracker.current) > 0.01) {
+        // User is dragging - determine direction relative to animation
+        const animationDirection = -1 // Animation goes in negative direction (left/up)
+        const userDirection = Math.sign(dragVelocityTracker.current)
+        
+        if (userDirection === animationDirection) {
+          // Same direction - speed up animation (max 3x speed)
+          const speedBoost = Math.min(Math.abs(dragVelocityTracker.current) * 20, 2) // Scale drag to speed boost
+          animationSpeedMultiplier.current = 1 + speedBoost
+        } else {
+          // Opposite direction - slow down animation (min 0.2x speed)
+          const slowDown = Math.min(Math.abs(dragVelocityTracker.current) * 20, 0.8)
+          animationSpeedMultiplier.current = Math.max(0.2, 1 - slowDown)
+        }
+      } else {
+        // No user input - gradually return to normal speed with smooth easing
+        animationSpeedMultiplier.current += (1 - animationSpeedMultiplier.current) * 0.05
+      }
+      
+      // Apply speed multiplier to GSAP timeline with smooth interpolation
+      if (flyInTween.current) {
+        flyInTween.current.timeScale(animationSpeedMultiplier.current)
+      }
       
       // Apply power2.out easing to the final position (zachte landing)
       const power2Out = (t) => 1 - Math.pow(1 - t, 2)
@@ -965,18 +1098,32 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       
       const animatedOffset = flyInStartOffset.current - (easedProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
       
-      // Calculate velocity for barrel distortion and RGB effects during animation
-      const offsetDelta = animatedOffset - currentOffset.current
-      const targetAnimSpeed = offsetDelta * 400 // Reduced intensity + Target animation speed
+      // During fly-in animation, don't update sliderSpeed to prevent any barrel distortion
+      // The animation looks cleaner without the warping effect
+      // sliderSpeed.current remains at 0 during fly-in animation
       
-      // Gradually build up to target speed instead of instant (smoother barrel distortion)
-      sliderSpeed.current += (targetAnimSpeed - sliderSpeed.current) * 0.15
-      
-      // Apply animation position, but allow smooth interpolation with user input
+      // Apply animation position
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
     } else {
+      // Handle gradual user influence build-up after fly-in animation
+      if (animationEndTime.current > 0) {
+        const timeSinceAnimationEnd = (Date.now() - animationEndTime.current) / 1000 // Convert to seconds
+        const buildUpDuration = 2 // 2 seconds build-up
+        
+        if (timeSinceAnimationEnd < buildUpDuration) {
+          // Gradual build-up using easeOut curve (fast start, slow end)
+          const progress = timeSinceAnimationEnd / buildUpDuration
+          const easeOutProgress = 1 - Math.pow(1 - progress, 3) // Cubic ease-out
+          userInfluenceFactor.current = easeOutProgress
+        } else {
+          // Build-up complete - full user control
+          userInfluenceFactor.current = 1
+          animationEndTime.current = 0 // Stop the build-up process
+        }
+      }
+      
       // Always use smooth interpolation between current and target
       const lerpSpeed = isUserInteracting.current ? 0.15 : 0.08 // Faster during interaction, slower when settling
       currentOffset.current += (targetOffset.current - currentOffset.current) * lerpSpeed
@@ -1038,7 +1185,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     
     // Update material
     material.updateTime(currentOffset.current)
-    material.updateVelocity(sliderSpeed.current)
+    // Disable barrel distortion during animations completely
+    const velocityToApply = (isFading || isFlyingIn) ? 0 : sliderSpeed.current
+    material.updateVelocity(velocityToApply)
     
     // Calculate sweep progress to match actual slider speed calculation  
     if (isFading) {
