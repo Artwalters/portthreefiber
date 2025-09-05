@@ -6,12 +6,9 @@ const SimpleWater = forwardRef((props, ref) => {
     const { gl, size, scene, camera } = useThree()
     const meshRef = useRef()
     const mouse = useRef(new THREE.Vector2(0.5, 0.5))
+    const mousePrev = useRef(new THREE.Vector2(0.5, 0.5))
+    const mouseVelocity = useRef(new THREE.Vector2(0, 0))
     const mouseDown = useRef(false)
-    
-    // Mouse tracking voor subtiele parallax position effect
-    const mousePosition = useRef({ x: 0, y: 0 })
-    const targetPosition = useRef({ x: 0, y: 0 })
-    const currentPosition = useRef({ x: 0, y: 0 })
     
     // Expose update function for external components (like slider)
     useImperativeHandle(ref, () => ({
@@ -51,6 +48,7 @@ const SimpleWater = forwardRef((props, ref) => {
                 uPrevious: { value: null },
                 uTime: { value: 0 },
                 uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+                uMouseVelocity: { value: new THREE.Vector2(0, 0) },
                 uMouseDown: { value: 0 },
                 uDelta: { value: 1.0 }
             },
@@ -65,6 +63,7 @@ const SimpleWater = forwardRef((props, ref) => {
                 uniform sampler2D uPrevious;
                 uniform float uTime;
                 uniform vec2 uMouse;
+                uniform vec2 uMouseVelocity;
                 uniform float uMouseDown;
                 uniform float uDelta;
                 varying vec2 vUv;
@@ -83,33 +82,51 @@ const SimpleWater = forwardRef((props, ref) => {
                     float up = texture2D(uPrevious, vUv + vec2(0.0, texel.y)).x;
                     float down = texture2D(uPrevious, vUv - vec2(0.0, texel.y)).x;
                     
-                    // Wave equation - subtle ripple propagation
+                    // Wave equation
                     float delta = min(uDelta, 1.0);
-                    velocity += delta * (-2.0 * pressure + left + right) * 0.12; // Moderate propagation
-                    velocity += delta * (-2.0 * pressure + up + down) * 0.12;
+                    velocity += delta * (-2.0 * pressure + left + right) * 0.1875; // 0.25 * 0.75 = 0.1875
+                    velocity += delta * (-2.0 * pressure + up + down) * 0.1875;
                     
-                    pressure += delta * velocity * 0.8; // Moderate pressure changes
+                    pressure += delta * velocity;
                     
-                    // Balanced damping for subtle ripples
-                    velocity *= 0.992; // Less damping for ripple visibility
-                    pressure *= 0.997; // Less damping for ripple visibility
+                    // Underwater damping - slower dissipation
+                    velocity *= 0.998;
+                    pressure *= 0.999;
                     
-                    // Mouse interaction - gentle underwater-style disturbance
+                    // Underwater hand-swipe interaction
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.35; // More visible mouse interaction
-                        float rippleRadius = 0.12; // Slightly larger radius for more visible interaction
+                        float swipeRadius = 0.12; // Larger interaction area
+                        float swipeStrength = 0.3;
                         
-                        if (dist < rippleRadius) {
-                            // Smooth falloff for gentle underwater current feel
-                            float falloff = smoothstep(rippleRadius, 0.0, dist);
-                            pressure += falloff * falloff * rippleStrength; // Squared falloff for gentleness
+                        // Calculate flow direction from velocity
+                        vec2 flowDir = normalize(uMouseVelocity + vec2(0.001)); // Avoid zero
+                        float velocityMagnitude = length(uMouseVelocity) * 10.0;
+                        
+                        if (dist < swipeRadius) {
+                            // Elongated pressure zone in movement direction
+                            vec2 toMouse = vUv - uMouse;
+                            float alongFlow = dot(toMouse, flowDir);
+                            
+                            // Create trailing effect
+                            float trailFactor = smoothstep(-swipeRadius * 0.5, swipeRadius * 1.5, -alongFlow);
+                            float falloff = smoothstep(swipeRadius, 0.0, dist);
+                            
+                            // Add turbulent flow
+                            float turbulence = sin(vUv.x * 30.0 + uTime) * cos(vUv.y * 30.0 - uTime) * 0.2;
+                            
+                            // Combined underwater effect
+                            float effect = falloff * trailFactor * swipeStrength * (1.0 + velocityMagnitude);
+                            pressure += effect * (1.0 + turbulence);
+                            
+                            // Add directional velocity
+                            velocity += effect * dot(toMouse, flowDir) * 0.3;
                         }
                     }
                     
                     // Stronger idle deformation for better plane movement
-                    float idleWaveStrength = 0.08; // 20% less intense variation
-                    float idleSpeed = 0.16; // 20% slower animation
+                    float idleWaveStrength = 0.06; // Higher for more noticeable deformation
+                    float idleSpeed = 0.3; // Keep slow, calmer movement
                     
                     // Multiple sine waves at different frequencies for natural movement
                     float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
@@ -167,14 +184,14 @@ const SimpleWater = forwardRef((props, ref) => {
                     float gradX = water.z;
                     float gradY = water.w;
                     
-                    // Stronger distortion so images react more
-                    float distortionStrength = 0.04;
+                    // More visible distortion for underwater effect
+                    float distortionStrength = 0.055;
                     
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
                     
                     // Chromatic aberration - sample RGB channels with slight offset
-                    float aberrationStrength = 0.002; // Less intense RGB effect
+                    float aberrationStrength = 0.001; // Even more subtle
                     vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
                     
                     // Sample each color channel with different offsets
@@ -207,22 +224,41 @@ const SimpleWater = forwardRef((props, ref) => {
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
                     vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
                     
-                    // Specular highlight - DISABLED
-                    // float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
+                    // Depth calculation using pressure values as proxy
+                    float depth = abs(pressure) * 2.0 + 0.1; // Base depth + variation
+                    float depthAttenuation = exp(-depth * 0.5); // Exponential falloff
+                    
+                    // Cleaner, single-layer specular with depth
+                    float spec = pow(max(dot(normal, lightDir), 0.0), 50.0) * depthAttenuation;
+                    
+                    // Subtle volumetric scattering
+                    float volumetricScatter = 1.0 - exp(-depth * 0.5);
+                    vec3 scatterColor = vec3(0.95, 0.97, 1.0); // Very subtle blue tint
+                    
+                    // Cleaner, slower caustics
+                    float causticScale = 6.0;
+                    float caustic = sin(vUv.x * causticScale + uTime * 0.3) * sin(vUv.y * causticScale + uTime * 0.2);
+                    caustic *= exp(-depth * 1.0) * 0.15; // More subtle caustics
                     
                     // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
                     
-                    // Reduced visual effect strength - keep deformation but less visible water effects
-                    // float effectStrength = 0.3; // Disabled with specular
-                    float pressureStrength = 0.027; // 10% less color variation
+                    // Add subtle volumetric scattering
+                    finalColor = mix(finalColor, scatterColor, volumetricScatter * 0.05);
                     
-                    // finalColor += vec3(spec) * effectStrength; // DISABLED - no more glare
+                    // Add clean caustics
+                    finalColor += vec3(caustic) * 0.1;
+                    
+                    // Reduced visual effect strength - keep deformation but less visible water effects
+                    float effectStrength = 0.11; // Slightly more visible glare
+                    float pressureStrength = 0.03; // Reduced from 0.1 for less pressure visibility
+                    
+                    finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
                     
                     // Add simple grain effect
                     float grainValue = grain(vUv, uTime);
-                    float grainStrength = 0.096; // 20% less intense grain effect
+                    float grainStrength = 0.1;
                     
                     // Mix grain with final color
                     finalColor += (grainValue - 0.5) * grainStrength;
@@ -236,13 +272,20 @@ const SimpleWater = forwardRef((props, ref) => {
         })
     }, [size])
     
-    // Simple mouse tracking
+    // Enhanced mouse tracking with velocity
     useEffect(() => {
         const handleMouseMove = (e) => {
-            mouse.current.x = e.clientX / window.innerWidth
-            mouse.current.y = 1.0 - (e.clientY / window.innerHeight)
+            const newX = e.clientX / window.innerWidth
+            const newY = 1.0 - (e.clientY / window.innerHeight)
             
-            // Parallax removed from water layer
+            // Calculate velocity
+            mouseVelocity.current.x = newX - mouse.current.x
+            mouseVelocity.current.y = newY - mouse.current.y
+            
+            // Update positions
+            mousePrev.current.copy(mouse.current)
+            mouse.current.x = newX
+            mouse.current.y = newY
         }
         
         const handleMouseDown = () => {
@@ -255,8 +298,17 @@ const SimpleWater = forwardRef((props, ref) => {
         
         const handleTouchMove = (e) => {
             if (e.touches.length > 0) {
-                mouse.current.x = e.touches[0].clientX / window.innerWidth
-                mouse.current.y = 1.0 - (e.touches[0].clientY / window.innerHeight)
+                const newX = e.touches[0].clientX / window.innerWidth
+                const newY = 1.0 - (e.touches[0].clientY / window.innerHeight)
+                
+                // Calculate velocity
+                mouseVelocity.current.x = newX - mouse.current.x
+                mouseVelocity.current.y = newY - mouse.current.y
+                
+                // Update positions
+                mousePrev.current.copy(mouse.current)
+                mouse.current.x = newX
+                mouse.current.y = newY
             }
         }
         
@@ -301,8 +353,12 @@ const SimpleWater = forwardRef((props, ref) => {
                 simMaterial.uniforms.uPrevious.value = buffers.read.texture
                 simMaterial.uniforms.uTime.value = state.clock.elapsedTime
                 simMaterial.uniforms.uMouse.value.copy(mouse.current)
+                simMaterial.uniforms.uMouseVelocity.value.copy(mouseVelocity.current)
                 simMaterial.uniforms.uMouseDown.value = mouseDown.current ? 1.0 : 0.0
                 simMaterial.uniforms.uDelta.value = clampedDelta
+                
+                // Decay velocity over time for smooth stop
+                mouseVelocity.current.multiplyScalar(0.95)
                 
                 // Render simulation to write buffer - this MUST always happen
                 gl.setRenderTarget(buffers.write)
@@ -384,8 +440,6 @@ const SimpleWater = forwardRef((props, ref) => {
         } catch (error) {
             console.warn('Display material error, continuing...', error)
         }
-        
-        // Parallax removed from water layer
         
         gl.setRenderTarget(currentTarget)
     })

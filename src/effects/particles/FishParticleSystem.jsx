@@ -197,7 +197,6 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         targetRotation: spawn.initialRotation,
         fleeState: false,
         fleeTimer: 0,
-        backwardAnimTimer: 0, // Timer for backward animation
         phase: 'entering', // entering, swimming, exiting
         phaseTimer: 5 + Math.random() * 10, // Time to spend in center before exiting
         hasReachedTarget: false,
@@ -318,8 +317,6 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         fish.fleeState = true
         // Variable flee duration: 2-6 seconds (wisselvallig)
         fish.fleeTimer = 2 + Math.random() * 4
-        // Start backward animation timer (short burst)
-        fish.backwardAnimTimer = 0.3 + Math.random() * 0.2 // 0.3-0.5 seconds backward movement
         
         // Determine if mouse is in front or behind fish
         const fishDirection = fish.velocity.x > 0 ? 1 : -1 // Fish current direction
@@ -342,18 +339,13 @@ export default function FishParticleSystem({ scrollY = 0 }) {
         fish.targetVelocity.set(
           fleeDirection * fleeSpeed,    // Smart directional fleeing
           fish.velocity.y * 0.5,        // Reduce vertical movement
-          fish.velocity.z * 0.8 - 0.3   // Subtle backward movement (deeper)
+          fish.velocity.z * 0.8         // Slight depth movement
         )
       }
       
       // Handle flee state across all phases
       if (fish.fleeState) {
         fish.fleeTimer -= delta
-        
-        // Handle backward animation timer
-        if (fish.backwardAnimTimer > 0) {
-          fish.backwardAnimTimer -= delta
-        }
         if (fish.fleeTimer <= 0) {
           fish.fleeState = false
           // Return to normal behavior based on current phase
@@ -481,12 +473,6 @@ export default function FishParticleSystem({ scrollY = 0 }) {
       // Smooth velocity interpolation for natural easing
       const velocityLerpSpeed = fish.fleeState ? 0.15 : 0.08 // Faster transition during flee, slower normally
       fish.velocity.lerp(fish.targetVelocity, velocityLerpSpeed)
-      
-      // Add subtle backward movement during initial flee response
-      if (fish.backwardAnimTimer > 0) {
-        const backwardStrength = fish.backwardAnimTimer / 0.5 // Fade out over 0.5 seconds
-        fish.velocity.z -= backwardStrength * 0.5 // Subtle backward push
-      }
       
       // Update position
       fish.position.add(fish.velocity.clone().multiplyScalar(delta))
