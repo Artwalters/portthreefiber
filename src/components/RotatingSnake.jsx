@@ -2,11 +2,12 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import InstancedDragons from './InstancedDragons.jsx'
 
 // Import Flow modifier (you might need to install this or include the files)
 // import { Flow } from 'three/addons/modifiers/CurveModifier.js'
 
-export default function RotatingSnake() {
+export default function RotatingSnake({ useInstanced = false, instanceCount = 3 }) {
     const groupRef = useRef()
     const flowRef = useRef()
     const curveProgress = useRef(0)
@@ -14,8 +15,8 @@ export default function RotatingSnake() {
     // Load the dragon GLB model
     const { scene: dragonScene } = useGLTF('./models/dragon basev.glb')
 
-    // Create a smooth, simple curve with high resolution
-    const curve = useMemo(() => {
+    // Create a smooth, simple curve with high resolution + CACHED LOOKUP
+    const { curve, curveCache } = useMemo(() => {
         const points = []
         const numPoints = 16 // More points but simpler shape
         const radius = 3
@@ -32,7 +33,21 @@ export default function RotatingSnake() {
 
         const curve = new THREE.CatmullRomCurve3(points, true) // closed curve
         curve.curveType = 'centripetal' // Like in the example
-        return curve
+
+        // 🚀 OPTIMIZATION 1: Pre-compute curve lookup table
+        const cacheSize = 1000 // High resolution cache
+        const curveCache = {
+            points: [],
+            tangents: []
+        }
+
+        for (let i = 0; i < cacheSize; i++) {
+            const t = i / (cacheSize - 1)
+            curveCache.points[i] = curve.getPointAt(t)
+            curveCache.tangents[i] = curve.getTangentAt(t).normalize()
+        }
+
+        return { curve, curveCache }
     }, [])
 
     // Simple Flow-like system based on THREE.js example
@@ -73,6 +88,22 @@ export default function RotatingSnake() {
     }, [dragonScene])
 
     const snakeProgress = useRef(0)
+    const workerRef = useRef(null)
+    const pendingUpdate = useRef(false)
+    const updateQueue = useRef([])
+    const lastUpdateTime = useRef(0)
+
+    // 🚀 OPTIMIZATION 3: Initialize WebWorker
+    useMemo(() => {
+        if (typeof Worker !== 'undefined') {
+            workerRef.current = new Worker('/deformationWorker.js')
+            workerRef.current.onmessage = (e) => {
+                const { newPositions } = e.data
+                updateQueue.current.push(newPositions)
+                pendingUpdate.current = false
+            }
+        }
+    }, [])
 
     useFrame(({ clock }) => {
         // Even slower movement along curve for very relaxed animation
@@ -80,61 +111,88 @@ export default function RotatingSnake() {
 
         const time = clock.getElapsedTime()
 
-        // Optimize: Update at 30fps instead of 60fps for better performance
-        if (Math.floor(time * 30) % 1 === 0 && flowObject && originalGeometry) {
-            const positionAttribute = flowObject.geometry.attributes.position
-            const originalPositions = originalGeometry.attributes.position
-
+        // 🚀 OPTIMIZATION 2 + 3: Batched Updates + WebWorker with Fallback
+        if (Math.floor(time * 60) % 1 === 0 && flowObject && originalGeometry && !pendingUpdate.current) {
             // Get geometry bounds for normalization
             originalGeometry.computeBoundingBox()
             const box = originalGeometry.boundingBox
             const length = box.max.z - box.min.z
 
-            // Apply curve deformation to each vertex
-            for (let i = 0; i < positionAttribute.count; i++) {
-                // Get original position
-                const originalPoint = new THREE.Vector3(
-                    originalPositions.getX(i),
-                    originalPositions.getY(i),
-                    originalPositions.getZ(i)
-                )
+            if (false && workerRef.current && typeof Worker !== 'undefined') {
+                // Send work to WebWorker
+                console.log('Using WebWorker for deformation')
+                pendingUpdate.current = true
+                workerRef.current.postMessage({
+                    originalPositions: originalGeometry.attributes.position.array,
+                    curveCache: {
+                        points: curveCache.points.map(p => ({ x: p.x, y: p.y, z: p.z })),
+                        tangents: curveCache.tangents.map(t => ({ x: t.x, y: t.y, z: t.z }))
+                    },
+                    curveProgress: curveProgress.current,
+                    time: time,
+                    boundingBox: {
+                        min: { x: box.min.x, y: box.min.y, z: box.min.z },
+                        max: { x: box.max.x, y: box.max.y, z: box.max.z }
+                    },
+                    length: length
+                })
+            } else {
+                // Fallback to main thread processing
+                const positionAttribute = flowObject.geometry.attributes.position
+                const originalPositions = originalGeometry.attributes.position
 
-                // Normalize Z position to curve parameter (0-1)
-                const normalizedZ = (originalPoint.z - box.min.z) / length
+                for (let i = 0; i < positionAttribute.count; i++) {
+                    const originalPoint = new THREE.Vector3(
+                        originalPositions.getX(i),
+                        originalPositions.getY(i),
+                        originalPositions.getZ(i)
+                    )
 
-                // Calculate curve parameter for this vertex (reduced stretching)
-                let t = (curveProgress.current + normalizedZ * 0.15) % 1 // Reduced from 0.3 to 0.15
+                    const normalizedZ = (originalPoint.z - box.min.z) / length
+                    let t = (curveProgress.current + normalizedZ * 0.15) % 1
 
-                // Get curve point and direction using uniform spacing
-                const curvePoint = curve.getPointAt(t) // getPointAt for uniform arc-length parameterization
-                const tangent = curve.getTangentAt(t).normalize() // getTangentAt for consistent direction
+                    // Use cached curve data
+                    const cacheIndex = Math.floor(t * (curveCache.points.length - 1))
+                    const curvePoint = curveCache.points[cacheIndex]
+                    const tangent = curveCache.tangents[cacheIndex]
 
-                // Create coordinate system at curve point
-                const normal = new THREE.Vector3(0, 1, 0)
-                const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize()
-                normal.crossVectors(binormal, tangent).normalize()
+                    // Create coordinate system
+                    const normal = new THREE.Vector3(0, 1, 0)
+                    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize()
+                    normal.crossVectors(binormal, tangent).normalize()
 
-                // Add snake-like zigzag movement
-                const snakeWaveFrequency = 10 // Even more waves for very compact zigzag
-                const snakeWaveAmplitude = 0.15 // Very small amplitude for tight zigzag
-                const snakeWaveSpeed = 4.5 // Moderate speed for natural zigzag
+                    // Snake zigzag movement
+                    const snakeWaveFrequency = 10
+                    const snakeWaveAmplitude = 0.15
+                    const snakeWaveSpeed = 4.5
 
-                // Calculate snake wave offset based on position along dragon and time
-                const wavePhase = normalizedZ * snakeWaveFrequency + time * snakeWaveSpeed
-                const sideOffset = Math.sin(wavePhase) * snakeWaveAmplitude
+                    const wavePhase = normalizedZ * snakeWaveFrequency + time * snakeWaveSpeed
+                    const sideOffset = Math.sin(wavePhase) * snakeWaveAmplitude
+                    const amplitudeVariation = 0.05 + 0.8 * Math.sin(normalizedZ * Math.PI)
 
-                // Vary amplitude - head subtle, body snakes more, tail still
-                const amplitudeVariation = 0.05 + 0.8 * Math.sin(normalizedZ * Math.PI) // Peak snaking in middle body, quiet at head and tail
+                    const newPosition = curvePoint.clone()
+                    newPosition.addScaledVector(binormal, (originalPoint.x * 0.8) + (sideOffset * amplitudeVariation))
+                    newPosition.addScaledVector(normal, originalPoint.y * 0.8)
 
-                // Transform point to curve space (with snake movement)
-                const newPosition = curvePoint.clone()
-                newPosition.addScaledVector(binormal, (originalPoint.x * 0.8) + (sideOffset * amplitudeVariation))
-                newPosition.addScaledVector(normal, originalPoint.y * 0.8)
+                    positionAttribute.setXYZ(i, newPosition.x, newPosition.y, newPosition.z)
+                }
 
-                positionAttribute.setXYZ(i, newPosition.x, newPosition.y, newPosition.z)
+                positionAttribute.needsUpdate = true
+                flowObject.geometry.computeVertexNormals()
             }
+        }
 
+        // 🚀 OPTIMIZATION 2: Process batched updates from WebWorker - DISABLED
+        if (false && updateQueue.current.length > 0 && flowObject) {
+            console.log('Processing WebWorker update from queue')
+            const newPositions = updateQueue.current.shift()
+            const positionAttribute = flowObject.geometry.attributes.position
+
+            // Batch update all vertices at once
+            positionAttribute.array.set(newPositions)
             positionAttribute.needsUpdate = true
+
+            // Only compute normals when needed
             flowObject.geometry.computeVertexNormals()
         }
     })
@@ -149,8 +207,13 @@ export default function RotatingSnake() {
                 )}
             />
 
-            {/* Flow Object - like scene.add(flow.object3D) in example */}
-            {flowObject && <primitive object={flowObject} ref={flowRef} />}
+            {/* 🚀 OPTIMIZATION 4: Choose between single dragon with deformation or multiple instanced dragons */}
+            {useInstanced ? (
+                <InstancedDragons count={instanceCount} />
+            ) : (
+                /* Flow Object - like scene.add(flow.object3D) in example */
+                flowObject && <primitive object={flowObject} ref={flowRef} />
+            )}
 
             {/* Lighting setup like in example */}
             <directionalLight position={[-10, 10, 10]} intensity={1} color={0xffaa33} />
