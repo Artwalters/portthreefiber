@@ -27,7 +27,7 @@ const SimpleWater = forwardRef((props, ref) => {
             format: THREE.RGBAFormat,
             type: THREE.FloatType
         }
-        const resolution = 1024 // Verhoogd van 512 voor scherpere water edges
+        const resolution = 2048 // Verhoogd voor hogere resolutie water
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),
@@ -169,13 +169,6 @@ const SimpleWater = forwardRef((props, ref) => {
                 uniform vec2 uResolution;
                 varying vec2 vUv;
                 
-                // Simple grain function
-                float grain(vec2 uv, float time) {
-                    vec2 coords = uv * 800.0 + time * 0.1;
-                    float noise1 = fract(sin(dot(coords, vec2(12.9898, 78.233))) * 43758.5453);
-                    float noise2 = fract(sin(dot(coords * 1.3, vec2(93.9898, 67.233))) * 23758.5453);
-                    return (noise1 + noise2) * 0.5;
-                }
                 
                 void main() {
                     // Sample water simulation
@@ -256,12 +249,6 @@ const SimpleWater = forwardRef((props, ref) => {
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
                     
-                    // Add simple grain effect
-                    float grainValue = grain(vUv, uTime);
-                    float grainStrength = 0.1;
-                    
-                    // Mix grain with final color
-                    finalColor += (grainValue - 0.5) * grainStrength;
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }

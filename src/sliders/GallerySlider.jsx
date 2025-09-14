@@ -15,7 +15,10 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
       uIsMobile: { value: isMobile ? 1.0 : 0.0 },
       fogColor: { value: new THREE.Color(0xffffff) },
       fogNear: { value: isMobile ? 8 : 5 },
-      fogFar: { value: isMobile ? 15 : 12 }
+      fogFar: { value: isMobile ? 15 : 12 },
+      fogIntensity: { value: 1.0 }, // Dynamic fog intensity multiplier
+      dynamicFogNear: { value: isMobile ? 8 : 5 }, // Dynamic fog near plane
+      dynamicFogFar: { value: isMobile ? 15 : 12 } // Dynamic fog far plane
     },
     vertexShader: `
       uniform float uVelo;
@@ -52,15 +55,18 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
       uniform vec3 fogColor;
       uniform float fogNear;
       uniform float fogFar;
+      uniform float fogIntensity;
+      uniform float dynamicFogNear;
+      uniform float dynamicFogFar;
       varying vec2 vUv;
       varying float vFogDepth;
       
       void main() {
         // Calculate chromatic aberration
-        float baseAberration = 0.003;
-        float velocityAberration = abs(uVelo) * 0.001;
+        float baseAberration = 0.0021; // 30% less: 0.003 * 0.7
+        float velocityAberration = abs(uVelo) * 0.0007; // 30% less: 0.001 * 0.7
         float aberrationStrength = baseAberration + velocityAberration;
-        aberrationStrength = min(aberrationStrength, 0.006);
+        aberrationStrength = min(aberrationStrength, 0.0042); // 30% less: 0.006 * 0.7
         
         // Define single image bounds (centered) - same as original tiles
         // Original tiles had aspect ratio of (mobile: 24/3.3, desktop: 30/3.3) * 1.2 with gaps
@@ -115,10 +121,15 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
           tileColor = texture2D(uTexture, tileUV);
         }
         
-        // Apply fog with stronger curve - less fog in front, more in back
-        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        // Apply fog with dynamic near/far planes for transition effects
+        float fogFactor = smoothstep(dynamicFogNear, dynamicFogFar, vFogDepth);
         // Make fog curve more aggressive in the back
         fogFactor = fogFactor * fogFactor; // Quadratic curve - less fog in front, stronger in back
+        
+        // Apply dynamic fog intensity during transitions
+        fogFactor = fogFactor * fogIntensity;
+        fogFactor = min(fogFactor, 0.98); // Cap at 98% for extreme fog
+        
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
         gl_FragColor = vec4(finalColor, tileColor.a);
@@ -144,6 +155,15 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
     if (texture) {
       this.uniforms.uTexture.value = texture
     }
+  }
+  
+  material.updateFogIntensity = function(intensity) {
+    this.uniforms.fogIntensity.value = intensity
+  }
+  
+  material.updateDynamicFog = function(nearValue, farValue) {
+    this.uniforms.dynamicFogNear.value = nearValue
+    this.uniforms.dynamicFogFar.value = farValue
   }
   
   return material
@@ -183,6 +203,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const animationProgress = useRef(0)
   const exitProgress = useRef(0)
   const exitStartPosition = useRef(0) // Track position when exit animation starts
+  const [fogIntensity, setFogIntensity] = useState(3.0) // Start with 3x fog intensity for fly-in
   
   // GSAP animation refs
   const flyInTween = useRef(null)
@@ -250,11 +271,11 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
         flyInTween.current.kill()
       }
       
-      // Start GSAP exit animation
+      // Start GSAP exit animation - match IndexSlider fly-in timing
       const animObj = { progress: 0 }
       exitTween.current = gsap.to(animObj, {
         progress: 1,
-        duration: 1.2, // Faster timing
+        duration: 2.0, // Match the 2-second phase timing from index.jsx
         ease: "power4.in", // Ultra slow start → extremely fast end
         onUpdate: () => {
           exitProgress.current = animObj.progress
@@ -505,6 +526,50 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   useFrame((state, delta) => {
     if (!material) return
     
+    // Update fog intensity and position based on animation states
+    if (isAnimating) {
+      // Start with 3x fog, decrease smoothly during fly-in
+      // Use easeOut curve for natural fog retreat (same as IndexSlider fly-in)
+      const easedProgress = 1 - Math.pow(1 - animationProgress.current, 2) // EaseOut curve
+      const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
+      setFogIntensity(targetFogIntensity)
+      
+      // Fog starts close and moves back to normal position
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back
+      const dynamicFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back
+      
+      if (material) {
+        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+    } else if (isExiting) {
+      // Accelerate fog increase during exit - reach peak quickly to match IndexSlider timing
+      const acceleratedProgress = Math.min(exitProgress.current * 1.5, 1.0) // Faster acceleration for better timing
+      const targetFogIntensity = 1.0 + (acceleratedProgress * 2.0) // From 1x up to 3x
+      setFogIntensity(targetFogIntensity)
+      
+      // Move fog closer to camera during exit - matches IndexSlider fade timing
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      const dynamicFogNear = baseFogNear - (acceleratedProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      const dynamicFogFar = baseFogFar - (acceleratedProgress * 6) // Far plane comes forward
+      
+      if (material) {
+        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+    } else {
+      // Gradually return to normal fog when not animating
+      setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
+      
+      // Return fog planes to normal
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      if (material) {
+        material.updateDynamicFog(baseFogNear, baseFogFar)
+      }
+    }
+    
     // Handle GSAP-driven exit animation - plane completes curve to right
     if (isExiting) {
       // Animate from CURRENT position to right side (100) - smooth transition
@@ -545,6 +610,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     // Update material
     material.updateTime(currentOffset.current)
     material.updateVelocity(sliderSpeed.current)
+    material.updateFogIntensity(fogIntensity)
     
     // Apply subtle mouse tracking position offset (desktop only)
     if (!isMobile && meshRef.current) {

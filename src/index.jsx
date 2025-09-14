@@ -12,6 +12,8 @@ import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import ViewBasedProjects from './ViewBasedProjects.jsx'
+import CameraController from './components/CameraController.jsx'
+import RotatingSnake from './components/RotatingSnake.jsx'
 
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
@@ -491,12 +493,24 @@ function App() {
                     gl.setClearColor('#ffffff')
                 }}
             >
+                {/* Camera Controller */}
+                <CameraController />
+
+                {/* Rotating Snake */}
+                <RotatingSnake />
+
+                {/* Test cube */}
+                <mesh position={[0, 0, 0]}>
+                    <boxGeometry args={[2, 2, 2]} />
+                    <meshBasicMaterial color="red" />
+                </mesh>
+
                 {/* Layer 1: Fish (bottom) */}
-                <FishParticleSystem />
-                
+                {/* <FishParticleSystem /> */}
+
                 {/* Layer 2: Conditional Slider Rendering */}
-                {showFilmStrip && (
-                    <IndexSlider 
+                {/* {showFilmStrip && (
+                    <IndexSlider
                         projects={projects}
                         onHover={setHoveredProject}
                         waterRef={waterRef}
@@ -506,10 +520,10 @@ function App() {
                         isReturningFromGallery={isReturningFromGallery}
                         onFlyInComplete={handleFlyInComplete}
                     />
-                )}
-                
-                {showSingleImage && (
-                    <GallerySlider 
+                )} */}
+
+                {/* {showSingleImage && (
+                    <GallerySlider
                         key={selectedImageIndex} // Force complete recreation
                         initialImageIndex={0} // Always start at first image of the selected project
                         waterRef={waterRef}
@@ -518,16 +532,16 @@ function App() {
                         setCurrentImageIndex={setCurrentImageIndex}
                         shouldExit={shouldExitGallery}
                     />
-                )}
-                
+                )} */}
+
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                {deviceCapabilities?.shouldUseMobileWater ? (
+                {/* {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )}
-                
-                
+                )} */}
+
+
                 {/* Performance Monitor with visibility toggle */}
                 {showPerf && <Perf position="bottom-right" />}
             </Canvas>

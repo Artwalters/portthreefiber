@@ -14,9 +14,10 @@ export default function ViewBasedProjects() {
     const [scrollY, setScrollY] = useState(0)
     const [fontsReady, setFontsReady] = useState(false)
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
-    
+
     // Device capabilities detection
     const [deviceCapabilities, setDeviceCapabilities] = useState(null)
+
 
     // Detect device capabilities on mount
     useEffect(() => {
@@ -139,17 +140,17 @@ export default function ViewBasedProjects() {
                 >
                     {/* Layer 1: Fish (bottom) */}
                     <FishParticleSystem scrollY={scrollY} />
-                    
+
                     {/* Layer 2: Barrel Distortion (middle) */}
                     <BarrelDistortionTemplate waterRef={waterRef} />
-                    
+
                     {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
                     {deviceCapabilities?.shouldUseMobileWater ? (
                         <MobileWater ref={waterRef} scrollY={scrollY} />
                     ) : (
                         <SimpleWater ref={waterRef} scrollY={scrollY} />
                     )}
-                    
+
                     {/* WebGL Logo with water effect */}
                     <WebGLLogo waterRef={waterRef} />
                 </Canvas>}

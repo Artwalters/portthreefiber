@@ -30,6 +30,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       fogColor: { value: new THREE.Color(0xffffff) },
       fogNear: { value: isMobile ? 8 : 5 },
       fogFar: { value: isMobile ? 15 : 12 },
+      fogIntensity: { value: 1.0 }, // Dynamic fog intensity multiplier
+      dynamicFogNear: { value: isMobile ? 8 : 5 }, // Dynamic fog near plane
+      dynamicFogFar: { value: isMobile ? 15 : 12 }, // Dynamic fog far plane
       uIsTransitioning: { value: 0 },
       uSweepPosition: { value: -25 },
       uIsFlyingIn: { value: 0 },
@@ -81,6 +84,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uniform vec3 fogColor;
       uniform float fogNear;
       uniform float fogFar;
+      uniform float fogIntensity;
+      uniform float dynamicFogNear;
+      uniform float dynamicFogFar;
       uniform float uIsTransitioning;
       uniform float uSweepPosition;
       uniform float uIsFlyingIn;
@@ -92,12 +98,12 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       
       void main() {
         // Calculate chromatic aberration - always present with base amount
-        float baseAberration = 0.003; // Always subtle RGB split
-        float velocityAberration = abs(uVelo) * 0.001; // Minimal additional based on movement
+        float baseAberration = 0.0008; // Very subtle RGB split (reduced from 0.0021)
+        float velocityAberration = abs(uVelo) * 0.0003; // Minimal additional based on movement (reduced from 0.0007)
         
         // Combine base and velocity-based aberration
         float aberrationStrength = baseAberration + velocityAberration;
-        aberrationStrength = min(aberrationStrength, 0.006); // Very low maximum for extreme subtlety
+        aberrationStrength = min(aberrationStrength, 0.0015); // Very low maximum for extreme subtlety (reduced from 0.0042)
         
         vec2 globalUV = (vUv + vec2(1000. + time * 0.01, 0.));
         vec2 tilesUV = globalUV * vec2(${aspect * 1.2}, 1.);
@@ -208,10 +214,15 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           }
         }
         
-        // Apply fog with stronger curve - less fog in front, more in back
-        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+        // Apply fog with dynamic near/far planes for transition effects
+        float fogFactor = smoothstep(dynamicFogNear, dynamicFogFar, vFogDepth);
         // Make fog curve more aggressive in the back
         fogFactor = fogFactor * fogFactor; // Quadratic curve - less fog in front, stronger in back
+        
+        // Apply dynamic fog intensity during transitions
+        fogFactor = fogFactor * fogIntensity;
+        fogFactor = min(fogFactor, 0.98); // Cap at 98% for extreme fog
+        
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
         
         // Ensure proper gamma correction
@@ -271,6 +282,15 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     }
   }
   
+  material.updateFogIntensity = function(intensity) {
+    this.uniforms.fogIntensity.value = intensity
+  }
+  
+  material.updateDynamicFog = function(nearValue, farValue) {
+    this.uniforms.dynamicFogNear.value = nearValue
+    this.uniforms.dynamicFogFar.value = farValue
+  }
+  
   
   return material
 }
@@ -302,6 +322,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const animationEndTime = useRef(0) // When animation ended for gradual build-up
   const animationSpeedMultiplier = useRef(1) // Speed multiplier for GSAP timeline
   const dragVelocityTracker = useRef(0) // Track drag velocity during animation
+  const isAnimationCancelled = useRef(false) // Direct flag for immediate cancellation
   
   // Mouse tracking voor desktop parallax position effect
   const mousePosition = useRef({ x: 0, y: 0 })
@@ -515,7 +536,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
       startX = clientX
       startY = clientY
-      startOffset = currentOffset.current
+      startOffset = currentOffset.current // Use current position as baseline, not target
       dragging = true
       
       // Cancel any ongoing snap
@@ -524,6 +545,34 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       isUserInteracting.current = true
       lastInteractionTime.current = Date.now()
       swipeDirection.current = 0 // Reset swipe direction
+      
+      // Smooth transition from animation to user control - GSAP best practice
+      if (isFlyingIn && flyInTween.current) {
+        // Immediate cancellation to prevent useFrame from overriding position
+        isAnimationCancelled.current = true
+        
+        // Capture current animated position before killing tween
+        const currentAnimatedOffset = currentOffset.current
+        
+        // Kill animation smoothly
+        flyInTween.current.kill()
+        flyInTween.current = null
+        setIsFlyingIn(false) // Stop fly-in animation permanently
+        
+        // Use current animated position as starting point for user control
+        startOffset = currentAnimatedOffset // Update drag start to current position
+        targetOffset.current = currentAnimatedOffset // Immediately freeze target position
+        
+        userInfluenceFactor.current = 1 // Give user full control immediately
+        sliderSpeed.current = 0
+        animationEndTime.current = 0 // Reset animation timing
+        
+        // Reset momentum and snapping for clean transition
+        momentum.current = 0
+        swipeDirection.current = 0
+        isSnapping.current = false
+        clearSnapTimeout()
+      }
       
       // Water effect
       if (waterRef?.current?.updateMouse) {
@@ -545,19 +594,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Calculate momentum for natural continuation
       const prevOffset = targetOffset.current
       
-      // During fly-in animation, only track drag velocity for animation speed control
-      if (isFlyingIn) {
-        // Calculate drag velocity for animation speed influence
-        const dragVelocity = isMobile ? 
-          (clientY - startY) * 0.002 : // Mobile: vertical drag
-          -(clientX - startX) * 0.002   // Desktop: horizontal drag (inverted)
-        
-        dragVelocityTracker.current = dragVelocity
-        // Don't update sliderSpeed or targetOffset during fly-in
-        return
-      }
-      
-      // Normal drag handling when not in fly-in animation
+      // Normal drag handling - always allow user control
       let newTargetOffset
       let dragDelta = 0
       
@@ -579,9 +616,8 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       }
       
-      // Apply user influence factor for gradual control build-up
-      const offsetDelta = newTargetOffset - targetOffset.current
-      targetOffset.current += offsetDelta * userInfluenceFactor.current
+      // Always apply full user control during interaction
+      targetOffset.current = newTargetOffset
       
       // Calculate momentum (velocity) for continuation effect
       momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
@@ -596,10 +632,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       dragging = false
       isUserInteracting.current = false
       
-      // Reset drag velocity tracker when user stops interacting
-      if (isFlyingIn) {
-        dragVelocityTracker.current = 0
-      }
+      // No special fly-in handling needed - animation is cancelled on interaction
       
       // Use momentum to determine direction and add continuation
       if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
@@ -642,6 +675,33 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       isUserInteracting.current = true
       lastInteractionTime.current = Date.now()
       
+      // Smooth transition from animation to user control - GSAP best practice
+      if (isFlyingIn && flyInTween.current) {
+        // Immediate cancellation to prevent useFrame from overriding position
+        isAnimationCancelled.current = true
+        
+        // Capture current animated position before killing tween
+        const currentAnimatedOffset = currentOffset.current
+        
+        // Kill animation smoothly
+        flyInTween.current.kill()
+        flyInTween.current = null
+        setIsFlyingIn(false) // Stop fly-in animation permanently
+        
+        // Update targetOffset to current position for smooth continuation
+        targetOffset.current = currentAnimatedOffset
+        
+        userInfluenceFactor.current = 1 // Give user full control immediately
+        sliderSpeed.current = 0
+        animationEndTime.current = 0 // Reset animation timing
+        
+        // Reset momentum and snapping for clean transition
+        momentum.current = 0
+        swipeDirection.current = 0
+        isSnapping.current = false
+        clearSnapTimeout()
+      }
+      
       // Smooth wheel scrolling - accumulate wheel delta for smoother movement
       const wheelDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100) // Cap max delta
       
@@ -660,18 +720,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         sliderSpeed.current = wheelDelta * 0.8 // Stronger deformation
       }
       
-      // During fly-in animation, track scroll for animation speed control
-      if (isFlyingIn) {
-        // Track scroll velocity for animation speed influence
-        const scrollVelocity = isMobile ? 
-          wheelDelta * 0.01 : // Mobile: scroll up/down
-          -wheelDelta * 0.01  // Desktop: scroll (inverted)
-        
-        dragVelocityTracker.current = scrollVelocity
-        // Don't update sliderSpeed during fly-in to prevent barrel distortion
-        // sliderSpeed will only be controlled by the animation
-        return // Don't update targetOffset during fly-in
-      }
+      // No special fly-in handling - animation gets cancelled above
       
       let scrollAmount = 0
       if (isMobile) {
@@ -690,8 +739,8 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         }
       }
       
-      // Apply user influence factor for gradual control build-up
-      targetOffset.current += scrollAmount * userInfluenceFactor.current
+      // Always apply full user control during scroll
+      targetOffset.current += scrollAmount
       
       // Calculate momentum (velocity) for continuation effect like drag
       momentum.current = (targetOffset.current - prevOffset) * 0.8 + momentum.current * 0.2 // Smooth momentum
@@ -767,7 +816,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       mousePosition.current = { x: normalizedX, y: normalizedY }
       
       // Zichtbare parallax movement
-      const maxOffset = 0.105 // 30% minder sterk (0.15 * 0.7)
+      const maxOffset = 0.0735 // 30% minder sterk van 0.105
       targetPosition.current = {
         x: -normalizedX * maxOffset,  // Mouse rechts = mesh naar links
         y: normalizedY * maxOffset    // Mouse omhoog = mesh naar beneden
@@ -785,6 +834,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const fadeStartOffset = useRef(0)
   const hasCompletionFired = useRef(false)
   const isAnimationEnding = useRef(false) // For smooth velocity fade-out after animations
+  const [fogIntensity, setFogIntensity] = useState(1.0) // Dynamic fog intensity
   
   // Fly-in animation state with GSAP
   const [isFlyingIn, setIsFlyingIn] = useState(false)
@@ -810,6 +860,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Start fly-in animation on next frame (after mesh is hidden)
       requestAnimationFrame(() => {
         setIsFlyingIn(true)
+        isAnimationCancelled.current = false // Reset cancellation flag
         flyInStartOffset.current = currentOffset.current
         
         // Cancel any existing snapping during fly-in to prevent bounce-back
@@ -895,11 +946,18 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     
     // If clicking during fly-in, interrupt the animation first
     if (isFlyingIn) {
+      // Immediate cancellation to prevent useFrame from overriding position
+      isAnimationCancelled.current = true
+      
       // Stop GSAP animation immediately
       if (flyInTween.current) {
         flyInTween.current.kill()
         flyInTween.current = null
       }
+      
+      // Capture and freeze current position
+      const currentAnimatedOffset = currentOffset.current
+      targetOffset.current = currentAnimatedOffset
       
       // Clean up fly-in state
       setIsFlyingIn(false)
@@ -1007,6 +1065,51 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   useFrame((state, delta) => {
     if (!material) return
     
+    // Update fog intensity and position based on animation states
+    if (isFading) {
+      // Accelerate fog intensification - reach peak faster, at 80% of animation
+      const acceleratedProgress = Math.min(fadeProgress * 1.25, 1.0)
+      const targetFogIntensity = 1.0 + (acceleratedProgress * 2.0) // Goes up to 3x fog intensity
+      setFogIntensity(targetFogIntensity)
+      
+      // Move fog closer to camera - fog comes forward
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      const dynamicFogNear = baseFogNear - (acceleratedProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      const dynamicFogFar = baseFogFar - (acceleratedProgress * 6) // Far plane comes forward moderately
+      
+      if (material) {
+        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+    } else if (isFlyingIn) {
+      // Start with 3x fog, then decrease smoothly during fly-in - 20% slower retreat
+      // Use slower easeOut curve for delayed fog retreat
+      const slowerProgress = flyInProgress * 0.8 // 20% slower fog retreat
+      const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve with slower timing
+      const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
+      setFogIntensity(targetFogIntensity)
+      
+      // Fog starts close and moves back to normal - also 20% slower
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back slower
+      const dynamicFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back slower
+      
+      if (material) {
+        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+    } else {
+      // Gradually return to normal fog when not animating
+      setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
+      
+      // Return fog planes to normal
+      const baseFogNear = isMobile ? 8 : 5
+      const baseFogFar = isMobile ? 15 : 12
+      if (material) {
+        material.updateDynamicFog(baseFogNear, baseFogFar)
+      }
+    }
+    
     // Handle fade animation (both slider and fade together)
     if (isFading) {
       // Time-based animation duration (consistent across all framerates)
@@ -1063,50 +1166,26 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
-    } else if (isFlyingIn) {
-      // GSAP-driven fly-in animation with user speed control
+    } else if (isFlyingIn && flyInTween.current && !isAnimationCancelled.current) {
+      // GSAP-driven fly-in animation - runs until interrupted by user
       const slideDistance = 67
       
-      // Calculate animation speed based on user drag/scroll during animation
-      if (Math.abs(dragVelocityTracker.current) > 0.01) {
-        // User is dragging - determine direction relative to animation
-        const animationDirection = -1 // Animation goes in negative direction (left/up)
-        const userDirection = Math.sign(dragVelocityTracker.current)
-        
-        if (userDirection === animationDirection) {
-          // Same direction - speed up animation (max 3x speed)
-          const speedBoost = Math.min(Math.abs(dragVelocityTracker.current) * 20, 2) // Scale drag to speed boost
-          animationSpeedMultiplier.current = 1 + speedBoost
-        } else {
-          // Opposite direction - slow down animation (min 0.2x speed)
-          const slowDown = Math.min(Math.abs(dragVelocityTracker.current) * 20, 0.8)
-          animationSpeedMultiplier.current = Math.max(0.2, 1 - slowDown)
-        }
-      } else {
-        // No user input - gradually return to normal speed with smooth easing
-        animationSpeedMultiplier.current += (1 - animationSpeedMultiplier.current) * 0.05
-      }
-      
-      // Apply speed multiplier to GSAP timeline with smooth interpolation
-      if (flyInTween.current) {
-        flyInTween.current.timeScale(animationSpeedMultiplier.current)
-      }
-      
-      // Apply power2.out easing to the final position (zachte landing)
+      // Apply power2.out easing to the final position (zachte landing)  
       const power2Out = (t) => 1 - Math.pow(1 - t, 2)
       const easedProgress = power2Out(flyInProgress)
       
-      const animatedOffset = flyInStartOffset.current - (easedProgress * slideDistance) // Move LEFT to RIGHT (subtract to go right)
+      const animatedOffset = flyInStartOffset.current - (easedProgress * slideDistance)
       
-      // During fly-in animation, don't update sliderSpeed to prevent any barrel distortion
-      // The animation looks cleaner without the warping effect
-      // sliderSpeed.current remains at 0 during fly-in animation
-      
-      // Apply animation position
+      // Animation controls position until user interrupts
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
     } else {
+      // Reset cancellation flag when in normal operation
+      if (isAnimationCancelled.current) {
+        isAnimationCancelled.current = false
+      }
+      
       // Handle gradual user influence build-up after fly-in animation
       if (animationEndTime.current > 0) {
         const timeSinceAnimationEnd = (Date.now() - animationEndTime.current) / 1000 // Convert to seconds
@@ -1188,6 +1267,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     // Disable barrel distortion during animations completely
     const velocityToApply = (isFading || isFlyingIn) ? 0 : sliderSpeed.current
     material.updateVelocity(velocityToApply)
+    material.updateFogIntensity(fogIntensity)
     
     // Calculate sweep progress to match actual slider speed calculation  
     if (isFading) {
