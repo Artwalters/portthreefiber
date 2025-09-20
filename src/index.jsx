@@ -499,11 +499,6 @@ function App() {
                 {/* Rotating Snake */}
                 <RotatingSnake />
 
-                {/* Test cube */}
-                <mesh position={[0, 0, 0]}>
-                    <boxGeometry args={[2, 2, 2]} />
-                    <meshBasicMaterial color="red" />
-                </mesh>
 
                 {/* Layer 1: Fish (bottom) */}
                 {/* <FishParticleSystem /> */}
