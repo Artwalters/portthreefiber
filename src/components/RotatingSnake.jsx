@@ -15,36 +15,43 @@ export default function RotatingSnake() {
     // Load the dragon GLB model
     const { scene: dragonScene } = useGLTF('./models/dragon basev.glb')
 
-    // Create a complex, smooth curve with multiple loops + CACHED LOOKUP
+    // Create 3 distinct circles overlapping, each rotated, with seamless connection
     const { curve, curveCache } = useMemo(() => {
         const points = []
-        const numPoints = 48 // Even more points for smoother complex curve
-        const baseRadius = 4
+        const numPointsPerCircle = 120
+        const radius = 5
+        const numCircles = 3
 
-        // Create a complex 3D curve with multiple rotations and very smooth transitions
-        for (let i = 0; i < numPoints; i++) {
-            const t = (i / numPoints) * Math.PI * 6 // Three full rotations instead of one
+        // Create 3 circles with smooth interpolated rotation between them
+        for (let circleIdx = 0; circleIdx < numCircles; circleIdx++) {
+            for (let i = 0; i < numPointsPerCircle; i++) {
+                const angle = (i / numPointsPerCircle) * Math.PI * 2
 
-            // Very gentle radius variation for ultra-smooth curves
-            const radiusVariation = 1 + Math.sin(t * 0.2) * 0.15 // Even gentler variation
-            const radius = baseRadius * radiusVariation
+                // Smooth rotation that interpolates between circles
+                const circleProgress = (circleIdx + (i / numPointsPerCircle)) / numCircles
+                const rotation = circleProgress * Math.PI * 2 // Full rotation over 3 circles for seamless loop
 
-            // Main circular motion with variations
-            const x = Math.cos(t) * radius
-            const z = Math.sin(t) * radius
+                // Base circle (vertical)
+                let x = Math.cos(angle) * radius
+                let y = Math.sin(angle) * radius
+                let z = 0
 
-            // Ultra-smooth vertical motion - very gentle waves
-            const y = Math.sin(t * 0.5) * 1.2 + Math.cos(t * 0.15) * 0.4
+                // Apply rotation around Y axis
+                const cosRot = Math.cos(rotation)
+                const sinRot = Math.sin(rotation)
+                const xRotated = x * cosRot - z * sinRot
+                const zRotated = x * sinRot + z * cosRot
 
-            points.push(new THREE.Vector3(x, y, z))
+                points.push(new THREE.Vector3(xRotated, y, zRotated))
+            }
         }
 
-        const curve = new THREE.CatmullRomCurve3(points, true) // closed curve
-        curve.curveType = 'catmullrom' // Smoother curves
-        curve.tension = 0.1 // Much lower tension for very smooth curves
+        const curve = new THREE.CatmullRomCurve3(points, true) // Closed for seamless loop
+        curve.curveType = 'centripetal'
+        curve.tension = 0.0
 
         // OPTIMIZATION 1: Pre-compute curve lookup table + Frenet frames
-        const cacheSize = 1000 // High resolution cache
+        const cacheSize = 2000 // Higher resolution cache for smoother deformation
         const curveCache = {
             points: new Array(cacheSize),
             tangents: new Array(cacheSize),
@@ -65,10 +72,10 @@ export default function RotatingSnake() {
         return { curve, curveCache }
     }, [])
 
-    // Simple Flow-like system based on THREE.js example
-    const { flowObject, originalGeometry, boundingBox, length } = useMemo(() => {
+    // Simple Flow-like system based on THREE.js example - create TWO dragons
+    const { flowObject, flowObject2, originalGeometry, boundingBox, length } = useMemo(() => {
         if (!dragonScene) {
-            return { flowObject: null, originalGeometry: null, boundingBox: null, length: 0 }
+            return { flowObject: null, flowObject2: null, originalGeometry: null, boundingBox: null, length: 0 }
         }
 
         // Find the first dragon mesh only (prevent duplicates)
@@ -80,12 +87,35 @@ export default function RotatingSnake() {
         })
 
         if (!dragonMesh) {
-            return { flowObject: null, originalGeometry: null, boundingBox: null, length: 0 }
+            return { flowObject: null, flowObject2: null, originalGeometry: null, boundingBox: null, length: 0 }
         }
 
         // Clone and prepare geometry like in THREE.js example
         const geometry = dragonMesh.geometry.clone()
-        const material = dragonMesh.material.clone()
+
+        // Red material for first dragon
+        const materialRed = new THREE.MeshStandardMaterial({
+            color: 0xff0000, // Red color
+            roughness: 0.7,
+            metalness: 0.1,
+            side: THREE.DoubleSide,
+            transparent: false,
+            opacity: 1.0,
+            depthWrite: true,
+            depthTest: true
+        })
+
+        // Blue material for second dragon
+        const materialBlue = new THREE.MeshStandardMaterial({
+            color: 0x0066ff, // Blue color
+            roughness: 0.7,
+            metalness: 0.1,
+            side: THREE.DoubleSide,
+            transparent: false,
+            opacity: 1.0,
+            depthWrite: true,
+            depthTest: true
+        })
 
         // Scale and orient
         geometry.scale(0.56, 0.56, 0.56)
@@ -97,7 +127,10 @@ export default function RotatingSnake() {
         const center = box.getCenter(new THREE.Vector3())
         geometry.translate(-center.x, -center.y, -center.z)
         geometry.computeBoundingBox()
-        const flowObject = new THREE.Mesh(geometry, material)
+
+        const flowObject = new THREE.Mesh(geometry.clone(), materialRed)
+        const flowObject2 = new THREE.Mesh(geometry.clone(), materialBlue)
+
         const originalGeometry = geometry.clone()
         originalGeometry.computeBoundingBox()
         const originalBox = originalGeometry.boundingBox.clone()
@@ -105,6 +138,7 @@ export default function RotatingSnake() {
 
         return {
             flowObject,
+            flowObject2,
             originalGeometry,
             boundingBox: originalBox,
             length
@@ -134,11 +168,11 @@ export default function RotatingSnake() {
     }, [])
 
     useFrame(({ clock }) => {
-        curveProgress.current = (curveProgress.current + 0.0002) % 1
+        curveProgress.current = (curveProgress.current + 0.0005) % 1
 
         const time = clock.getElapsedTime()
 
-        if (!flowObject || !originalGeometry || !boundingBox || length <= 0) {
+        if (!flowObject || !flowObject2 || !originalGeometry || !boundingBox || length <= 0) {
             return
         }
 
@@ -148,8 +182,15 @@ export default function RotatingSnake() {
 
         lastUpdateTime.current = time
 
-        if (!pendingUpdate.current) {
-            if (false && workerRef.current && typeof Worker !== 'undefined') {
+        // Update both dragons - second dragon has offset on curve
+        const dragons = [
+            { mesh: flowObject, offset: 0 },
+            { mesh: flowObject2, offset: 0.5 } // Half curve offset - swimming through each other
+        ]
+
+        dragons.forEach(({ mesh, offset }) => {
+            if (!pendingUpdate.current) {
+                if (false && workerRef.current && typeof Worker !== 'undefined') {
                 console.log('Using WebWorker for deformation')
                 pendingUpdate.current = true
                 workerRef.current.postMessage({
@@ -169,7 +210,7 @@ export default function RotatingSnake() {
                     length
                 })
             } else {
-                const positionAttribute = flowObject.geometry.attributes.position
+                const positionAttribute = mesh.geometry.attributes.position
                 const originalPositions = originalGeometry.attributes.position
                 const originalArray = originalPositions.array
                 const count = positionAttribute.count
@@ -178,9 +219,9 @@ export default function RotatingSnake() {
                 const minZ = boundingBox.min.z
                 const lengthValue = length
 
-                const snakeWaveFrequency = 15
-                const snakeWaveAmplitude = 0.25
-                const snakeWaveSpeed = 6.0
+                const snakeWaveFrequency = 8
+                const snakeWaveAmplitude = 0.35
+                const snakeWaveSpeed = 4.5
 
                 const { binormal, normal, newPosition } = scratchVectors
 
@@ -191,7 +232,9 @@ export default function RotatingSnake() {
                     const oz = originalArray[baseIndex + 2]
 
                     const normalizedZ = THREE.MathUtils.clamp((oz - minZ) / lengthValue, 0, 1)
-                    let t = (curveProgress.current + normalizedZ * 0.25) % 1
+                    // Balance between spread and straightness for natural swimming
+                    // Add offset for second dragon - reduced for 3x longer curve
+                    let t = (curveProgress.current + offset + normalizedZ * 0.15) % 1
                     if (t < 0) t += 1
 
                     const rawIndex = t * (cacheSize - 1)
@@ -199,25 +242,50 @@ export default function RotatingSnake() {
                     const nextIndex = (index + 1) % cacheSize
                     const lerpFactor = rawIndex - index
 
-                    newPosition.copy(curveCache.points[index]).lerp(curveCache.points[nextIndex], lerpFactor)
+                    // Get position on curve
+                    const curvePoint = curveCache.points[index].clone().lerp(curveCache.points[nextIndex], lerpFactor)
+
+                    // Scale position towards center for red dragon (offset 0)
+                    const radiusScale = offset === 0 ? 0.85 : 1.0 // Red dragon swims 15% closer to center
+                    newPosition.copy(curvePoint).multiplyScalar(radiusScale)
                     binormal.copy(curveCache.binormals[index]).lerp(curveCache.binormals[nextIndex], lerpFactor).normalize()
                     normal.copy(curveCache.normals[index]).lerp(curveCache.normals[nextIndex], lerpFactor).normalize()
 
-                    const wavePhase = normalizedZ * snakeWaveFrequency + time * snakeWaveSpeed
-                    const sideOffset = Math.sin(wavePhase) * snakeWaveAmplitude
-                    const amplitudeVariation = 0.1 + 0.9 * Math.sin(normalizedZ * Math.PI)
+                    // Multiple waves with different frequencies for natural variation
+                    const wave1 = Math.sin(normalizedZ * snakeWaveFrequency + time * snakeWaveSpeed)
+                    const wave2 = Math.sin(normalizedZ * (snakeWaveFrequency * 1.7) - time * snakeWaveSpeed * 0.6)
+                    const wave3 = Math.sin(normalizedZ * (snakeWaveFrequency * 0.5) + time * snakeWaveSpeed * 1.3)
+
+                    // Combine waves with different weights for organic movement
+                    const combinedWave = (wave1 * 0.6 + wave2 * 0.25 + wave3 * 0.15) * snakeWaveAmplitude
+
+                    // Add depth movement - forward/backward oscillation
+                    const depthWave = Math.cos(normalizedZ * snakeWaveFrequency * 0.7 + time * snakeWaveSpeed * 0.8)
+                    const depthMovement = depthWave * snakeWaveAmplitude * 0.4 // Less intense than lateral
+
+                    // Add slight randomness that varies per vertex but stays consistent
+                    const vertexRandom = Math.sin(i * 0.01) * 0.05
+
+                    // More natural: head moves subtly (0.3), tail moves a lot (2.5)
+                    const amplitudeVariation = 0.3 + (1.0 - normalizedZ) * 2.2
+
+                    // Get tangent direction for depth movement
+                    const tangent = curveCache.tangents[index].clone().lerp(curveCache.tangents[nextIndex], lerpFactor).normalize()
 
                     // Rotate dragon 90 degrees by swapping normal/binormal and adjusting signs
-                    newPosition.addScaledVector(normal, (ox * 0.8) + (sideOffset * amplitudeVariation))
+                    newPosition.addScaledVector(normal, (ox * 0.8) + (combinedWave * amplitudeVariation) + vertexRandom)
                     newPosition.addScaledVector(binormal, -oy * 0.8)
+                    // Add forward/backward depth movement along tangent
+                    newPosition.addScaledVector(tangent, depthMovement * amplitudeVariation)
 
                     positionAttribute.setXYZ(i, newPosition.x, newPosition.y, newPosition.z)
                 }
 
                 positionAttribute.needsUpdate = true
-                flowObject.geometry.computeVertexNormals()
+                mesh.geometry.computeVertexNormals()
             }
         }
+        })  // End forEach
 
         if (false && updateQueue.current.length > 0 && flowObject) {
             console.log('Processing WebWorker update from queue')
@@ -236,13 +304,14 @@ export default function RotatingSnake() {
             {/* Curve visualization - like the green line in the example */}
             <primitive
                 object={new THREE.Line(
-                    new THREE.BufferGeometry().setFromPoints(curve.getPoints(200)), // Much higher resolution
+                    new THREE.BufferGeometry().setFromPoints(curve.getPoints(500)), // Ultra high resolution
                     new THREE.LineBasicMaterial({ color: 0x00ff00 }) // Green like example
                 )}
             />
 
-            {/* Flow Object - single dragon with curve deformation */}
+            {/* Flow Objects - two dragons with curve deformation */}
             {flowObject && <primitive object={flowObject} ref={flowRef} />}
+            {flowObject2 && <primitive object={flowObject2} />}
 
             {/* Lighting setup like in example */}
             <directionalLight position={[-10, 10, 10]} intensity={1} color={0xffaa33} />

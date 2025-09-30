@@ -504,7 +504,7 @@ function App() {
                 {/* <FishParticleSystem /> */}
 
                 {/* Layer 2: Conditional Slider Rendering */}
-                {/* {showFilmStrip && (
+                {showFilmStrip && (
                     <IndexSlider
                         projects={projects}
                         onHover={setHoveredProject}
@@ -515,9 +515,9 @@ function App() {
                         isReturningFromGallery={isReturningFromGallery}
                         onFlyInComplete={handleFlyInComplete}
                     />
-                )} */}
+                )}
 
-                {/* {showSingleImage && (
+                {showSingleImage && (
                     <GallerySlider
                         key={selectedImageIndex} // Force complete recreation
                         initialImageIndex={0} // Always start at first image of the selected project
@@ -527,14 +527,14 @@ function App() {
                         setCurrentImageIndex={setCurrentImageIndex}
                         shouldExit={shouldExitGallery}
                     />
-                )} */}
+                )}
 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                {/* {deviceCapabilities?.shouldUseMobileWater ? (
+                {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )} */}
+                )}
 
 
                 {/* Performance Monitor with visibility toggle */}
