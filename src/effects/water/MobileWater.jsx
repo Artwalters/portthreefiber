@@ -114,7 +114,8 @@ const MobileWater = forwardRef((props, ref) => {
                 uMouseDown: { value: 0 },
                 uDelta: { value: 1.0 },
                 uHasFloatSupport: { value: hasFloatSupport ? 1.0 : 0.0 },
-                uIsMobile: { value: isMobile ? 1.0 : 0.0 }
+                uIsMobile: { value: isMobile ? 1.0 : 0.0 },
+                uIsInactive: { value: 0.0 }
             },
             vertexShader: `
                 varying vec2 vUv;
@@ -131,6 +132,7 @@ const MobileWater = forwardRef((props, ref) => {
                 uniform float uDelta;
                 uniform float uHasFloatSupport;
                 uniform float uIsMobile;
+                uniform float uIsInactive;
                 varying vec2 vUv;
 
                 void main() {
@@ -177,8 +179,18 @@ const MobileWater = forwardRef((props, ref) => {
                     pressure += delta * velocity;
 
                     // Underwater damping - slower dissipation like SimpleWater
-                    velocity *= 0.998; // Match SimpleWater exactly
-                    pressure *= 0.999; // Match SimpleWater exactly
+                    // BUT: much stronger damping when inactive to prevent accumulation errors
+                    float velocityDamping = (uIsInactive > 0.5) ? 0.95 : 0.998;
+                    float pressureDamping = (uIsInactive > 0.5) ? 0.96 : 0.999;
+
+                    velocity *= velocityDamping;
+                    pressure *= pressureDamping;
+
+                    // Clamp values to prevent runaway accumulation on byte textures
+                    if (uHasFloatSupport < 0.5) {
+                        pressure = clamp(pressure, -0.8, 0.8);
+                        velocity = clamp(velocity, -0.8, 0.8);
+                    }
 
                     // Underwater hand-swipe interaction (simplified but more like SimpleWater)
                     if (uMouseDown > 0.5) {
@@ -199,24 +211,27 @@ const MobileWater = forwardRef((props, ref) => {
                     }
 
                     // Optimized idle waves - reduced complexity for mobile
-                    float idleWaveStrength = 0.06;
-                    float idleSpeed = 0.3;
-                    float idleDisturbance;
+                    // STOP idle waves when inactive to prevent accumulation
+                    if (uIsInactive < 0.5) {
+                        float idleWaveStrength = 0.06;
+                        float idleSpeed = 0.3;
+                        float idleDisturbance;
 
-                    if (uIsMobile > 0.5) {
-                        // Mobile: Only 2 simpler waves for better performance
-                        float wave1 = sin(vUv.x * 8.0 + uTime * idleSpeed) * 0.5;
-                        float wave2 = sin(vUv.y * 6.0 + uTime * idleSpeed * 0.8) * 0.5;
-                        idleDisturbance = (wave1 + wave2) * idleWaveStrength;
-                    } else {
-                        // Desktop: Keep 3 waves for quality
-                        float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
-                        float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
-                        float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
-                        idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                        if (uIsMobile > 0.5) {
+                            // Mobile: Only 2 simpler waves for better performance
+                            float wave1 = sin(vUv.x * 8.0 + uTime * idleSpeed) * 0.5;
+                            float wave2 = sin(vUv.y * 6.0 + uTime * idleSpeed * 0.8) * 0.5;
+                            idleDisturbance = (wave1 + wave2) * idleWaveStrength;
+                        } else {
+                            // Desktop: Keep 3 waves for quality
+                            float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
+                            float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
+                            float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                            idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                        }
+
+                        pressure += idleDisturbance;
                     }
-
-                    pressure += idleDisturbance;
 
                     // Calculate gradients for normals
                     float gradX = (right - left) * 0.5;
@@ -449,8 +464,8 @@ const MobileWater = forwardRef((props, ref) => {
         const now = Date.now()
         const timeSinceLastInteraction = now - lastInteractionTime.current
 
-        // After 90 seconds of inactivity, reduce simulation frequency on mobile
-        if (timeSinceLastInteraction > 90000) { // 90 seconds
+        // After 30 seconds of inactivity, apply stronger damping and stop idle waves
+        if (timeSinceLastInteraction > 30000) { // 30 seconds
             isInactive.current = true
             // Skip every other frame during inactivity to reduce mobile load
             if (Math.floor(state.clock.elapsedTime * 30) % 2 === 0) {
@@ -473,6 +488,7 @@ const MobileWater = forwardRef((props, ref) => {
                 simMaterial.uniforms.uMouse.value.copy(mouse.current)
                 simMaterial.uniforms.uMouseDown.value = mouseDown.current ? 1.0 : 0.0
                 simMaterial.uniforms.uDelta.value = clampedDelta
+                simMaterial.uniforms.uIsInactive.value = isInactive.current ? 1.0 : 0.0
 
                 // Render simulation to write buffer - this MUST always happen
                 gl.setRenderTarget(buffers.write)
