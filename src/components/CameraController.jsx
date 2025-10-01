@@ -42,6 +42,14 @@ export default function CameraController() {
                 case 'KeyD':
                     keys.current.d = true
                     break
+                case 'KeyF':
+                    // Toggle pointer lock with F key
+                    if (document.pointerLockElement) {
+                        document.exitPointerLock()
+                    } else {
+                        document.body.requestPointerLock()
+                    }
+                    break
                 case 'ArrowUp':
                     keys.current.arrowUp = true
                     break
@@ -97,11 +105,6 @@ export default function CameraController() {
             mouseRef.current.y = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mouseRef.current.y))
         }
 
-        const handleClick = () => {
-            // Request pointer lock for mouse look
-            document.body.requestPointerLock()
-        }
-
         const handlePointerLockChange = () => {
             isMouseLocked.current = document.pointerLockElement === document.body
         }
@@ -121,7 +124,6 @@ export default function CameraController() {
         document.addEventListener('keydown', handleKeyDown)
         document.addEventListener('keyup', handleKeyUp)
         document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('click', handleClick)
         document.addEventListener('pointerlockchange', handlePointerLockChange)
         document.addEventListener('wheel', handleWheel, { passive: false })
 
@@ -129,7 +131,6 @@ export default function CameraController() {
             document.removeEventListener('keydown', handleKeyDown)
             document.removeEventListener('keyup', handleKeyUp)
             document.removeEventListener('mousemove', handleMouseMove)
-            document.removeEventListener('click', handleClick)
             document.removeEventListener('pointerlockchange', handlePointerLockChange)
             document.removeEventListener('wheel', handleWheel)
         }
