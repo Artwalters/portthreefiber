@@ -13,7 +13,7 @@ import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import ViewBasedProjects from './ViewBasedProjects.jsx'
 import CameraController from './components/CameraController.jsx'
-import RotatingSnake from './components/RotatingSnake.jsx'
+import RotatingDragon from './components/RotatingDragon.jsx'
 
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
@@ -482,12 +482,12 @@ function App() {
                 frameloop="always"
                 flat={false}
                 onCreated={({ scene, gl }) => {
-                    // Add fog - subtle depth effect
+                    // Add fog - subtle depth effect, less intense for dragons
                     const isMobile = window.innerWidth <= 768
                     if (isMobile) {
-                        scene.fog = new THREE.Fog(0xffffff, 7, 14)
+                        scene.fog = new THREE.Fog(0xffffff, 10, 20)
                     } else {
-                        scene.fog = new THREE.Fog(0xffffff, 5, 12)
+                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
                     }
                     // Set initial clear color to white
                     gl.setClearColor('#ffffff')
@@ -497,7 +497,7 @@ function App() {
                 <CameraController />
 
                 {/* Rotating Snake */}
-                <RotatingSnake />
+                <RotatingDragon />
 
 
                 {/* Layer 1: Fish (bottom) */}

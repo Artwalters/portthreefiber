@@ -8,8 +8,27 @@ const UPDATE_INTERVAL = 1 / 60
 // Import Flow modifier (you might need to install this or include the files)
 // import { Flow } from 'three/addons/modifiers/CurveModifier.js'
 
-export default function RotatingSnake() {
+export default function RotatingDragon() {
     const flowRef = useRef()
+
+    // Configurable curve width based on screen size
+    const curveWidthScale = useMemo(() => {
+        const screenWidth = window.innerWidth
+        if (screenWidth > 1920) return 1.65// Extra large screens
+        if (screenWidth > 1440) return 1.2 // Large screens
+        return 1.0 // Default for normal screens
+    }, [])
+
+    // Configurable curve height scale - lower on larger screens
+    const curveHeightScale = useMemo(() => {
+        const screenWidth = window.innerWidth
+        if (screenWidth > 1920) return 0.5 // Extra large screens = much lower
+        if (screenWidth > 1440) return 0.7 // Large screens = somewhat lower
+        return 1.0 // Default for normal screens
+    }, [])
+
+    // Debug mode - set to true to show curve lines and debug spheres
+    const showDebugLines = false
 
     // Load the dragon GLB model
     const { scene: dragonScene } = useGLTF('./models/dragon basev.glb')
@@ -24,10 +43,10 @@ export default function RotatingSnake() {
     const curvesInitialized = useRef(false)
 
     // Get swimming loop point with interweaving spiral pattern
-    const getLoopPoint = (time, t, yBaseHeight = 5, spiralOffset = 0) => {
+    const getLoopPoint = (time, t, yBaseHeight = 5, spiralOffset = 0, widthScale = 1.0, heightScale = 1.0) => {
         const numCircles = 3
-        const baseRadius = 8 // BIGGER loops - more screen space
-        const zDepthOffset = -10 // Move entire loop backwards (much further back)
+        const baseRadius = 8 * widthScale // BIGGER loops - more screen space, scaled by widthScale
+        const zDepthOffset = -8 // Move entire loop backwards (much further back)
 
         // Map t (0-1) to position in the 3-circle structure
         const totalProgress = t * numCircles
@@ -47,7 +66,7 @@ export default function RotatingSnake() {
         // Base circle (vertical) with animated twist - very subtle
         const twist = Math.sin(time * 0.08 + t * Math.PI * 3) * 0.05
         let x = Math.cos(angle + twist) * radius
-        let y = Math.sin(angle + twist) * radius
+        let y = (Math.sin(angle + twist) * radius) * heightScale // Scale vertical size
         let z = 0
 
         // Apply rotation around Y axis with animation - very subtle
@@ -60,127 +79,36 @@ export default function RotatingSnake() {
         // Add interweaving vertical spiral - dragons weave around each other
         // Each dragon has opposite spiral direction for harmonious interweaving
         const spiralFrequency = 4 // 4 complete up-down cycles during 2 loops
-        const spiralAmplitude = 2.5 // BIGGER height variation - more vertical space
+        const spiralAmplitude = 2.5 * heightScale // Height variation scaled by heightScale
         const spiralPhase = t * Math.PI * 2 * spiralFrequency + spiralOffset
         const spiralY = Math.sin(spiralPhase) * spiralAmplitude
 
         // LARGER radius variation to keep them apart - prevent overlap
         const radiusVariation = Math.cos(spiralPhase) * 0.8
-        const adjustedX = xRotated * (1 + radiusVariation * 0.25) // Increased from 0.1 to 0.25
-        const adjustedZ = zRotated * (1 + radiusVariation * 0.25) + zDepthOffset
+        let adjustedX = xRotated * (1 + radiusVariation * 0.25) // Increased from 0.1 to 0.25
+        let adjustedY = y + yBaseHeight + spiralY
+        let adjustedZ = zRotated * (1 + radiusVariation * 0.25) + zDepthOffset
 
-        return new THREE.Vector3(adjustedX, y + yBaseHeight + spiralY, adjustedZ)
+        // Apply X-axis rotation to tilt loops backward (bring bottom forward, push top back)
+        const tiltAngle = -Math.PI * 0.15 // Tilt backward by ~27 degrees
+        const cosX = Math.cos(tiltAngle)
+        const sinX = Math.sin(tiltAngle)
+        const rotatedY = adjustedY * cosX - adjustedZ * sinX
+        const rotatedZ = adjustedY * sinX + adjustedZ * cosX
+
+        return new THREE.Vector3(adjustedX, rotatedY, rotatedZ)
     }
 
-    // Create complete dragon path: entrance -> loops in center -> exit
-    const createDragonCurve = (time, direction, loopStartOffset = 0, spiralOffset = 0, yHeight = -0.5) => {
+    // Create complete dragon path: just the loop, starting at the back
+    const createDragonCurve = (time, direction, loopStartOffset = 0, spiralOffset = 0, yHeight = -0.5, startY = 2.5, widthScale = 1.0, heightScale = 1.0) => {
         const points = []
 
-        // Section 1: Entrance - arc OVER and AROUND the slider curve from the side
-        const entrancePoints = 200
-        const startX = direction === 1 ? -35 : 35 // Start at far edge
+        // Just the loop - no separate entrance/exit, starts at back (hidden by fog)
+        const loopPoints = 720 // More points for smoother animation
 
-        // Get loop entry point
-        const loopPoint0 = getLoopPoint(time, loopStartOffset, yHeight, spiralOffset)
-
-        // Create arcing path that goes OVER slider, staying at edge longer
-        // Slider is at y=0, so we need HIGH y values (2-4) to go OVER it
-        // Path: Start at edge HIGH → stay at edge while arcing OVER → descend and curve inward
-        const cp0 = new THREE.Vector3(startX, 2.5, 0) // START: far edge, HIGH (2.5 above slider!), at slider depth
-
-        // Control 1: Stay at edge, arc OVER the slider at HIGHEST point
-        const cp1 = new THREE.Vector3(startX * 0.95, 3.5, 0) // Still at edge, HIGHEST point (3.5!), at slider depth
-
-        // Control 2: Still at edge but starting to descend after passing over slider
-        const cp2 = new THREE.Vector3(startX * 0.85, 2.0, -2) // Edge, descending but still above slider, moving back
-
-        // Control 3: Still descending, getting closer to slider level
-        const cp3 = new THREE.Vector3(startX * 0.75, 1.0, -4) // Still quite far out, above slider, further back
-
-        // Control 4: Now at slider level, start curving inward toward center
-        const cp4 = new THREE.Vector3(startX * 0.5, 0.0, -6) // Slider level, moving back
-
-        // Control 5: Descending to loop level, halfway to loop
-        const cp5 = new THREE.Vector3(startX * 0.3, yHeight * 0.5, -8) // Transition to loop height
-
-        // Control 6: Approach loop depth at loop height
-        const cp6 = new THREE.Vector3(loopPoint0.x * 0.7, yHeight, -10) // At loop height, near loop depth
-
-        // Control 7: Final approach to loop
-        const cp7 = loopPoint0.clone()
-
-        // Generate smooth curve through all control points using Catmull-Rom spline
-        const entranceCurve = new THREE.CatmullRomCurve3([cp0, cp1, cp2, cp3, cp4, cp5, cp6, cp7], false, 'catmullrom', 0.2)
-
-        for (let i = 0; i < entrancePoints; i++) {
-            const t = i / entrancePoints
-            const point = entranceCurve.getPoint(t)
-            points.push(point)
-        }
-
-        // Section 2: Loop in center (360 points = 1 complete loop)
-        const loopPoints = 360
-        const numLoops = 1
-
-        for (let loop = 0; loop < numLoops; loop++) {
-            for (let i = 0; i < loopPoints; i++) {
-                const t = (i / loopPoints + loopStartOffset) % 1
-                const point = getLoopPoint(time, t, yHeight, spiralOffset)
-                points.push(point)
-            }
-        }
-
-        // Section 3: Exit - ultra smooth using tangent matching
-        const exitPoints = 100
-        const endX = direction === 1 ? 25 : -25
-
-        // Get last few positions to calculate smooth tangent direction
-        const p0 = points[points.length - 3].clone()
-        const p1 = points[points.length - 2].clone()
-        const p2 = points[points.length - 1].clone()
-
-        // Calculate exit tangent direction from loop
-        const exitTangent = new THREE.Vector3()
-            .subVectors(p2, p1)
-            .normalize()
-
-        // End position
-        const endPos = new THREE.Vector3(endX, yHeight, -12)
-
-        // End tangent (pointing towards exit direction)
-        const endTangent = new THREE.Vector3(direction, 0, 0).normalize()
-
-        // Create smooth Bezier-like curve using 4 control points
-        const exitDistance = endPos.distanceTo(p2)
-
-        // Control point 0: last loop point
-        const exitCp0 = p2.clone()
-
-        // Control point 1: extend tangent from last loop point
-        const exitCp1 = p2.clone().addScaledVector(exitTangent, exitDistance * 0.4)
-
-        // Control point 2: approach end from its tangent
-        const exitCp2 = endPos.clone().addScaledVector(endTangent, -exitDistance * 0.4)
-
-        // Control point 3: end point
-        const exitCp3 = endPos.clone()
-
-        // Generate smooth cubic Bezier curve for exit
-        for (let i = 1; i <= exitPoints; i++) {
-            const t = i / exitPoints
-
-            // Cubic Bezier interpolation
-            const t1 = 1 - t
-            const t1_2 = t1 * t1
-            const t1_3 = t1_2 * t1
-            const t_2 = t * t
-            const t_3 = t_2 * t
-
-            const point = new THREE.Vector3()
-            point.x = t1_3 * exitCp0.x + 3 * t1_2 * t * exitCp1.x + 3 * t1 * t_2 * exitCp2.x + t_3 * exitCp3.x
-            point.y = t1_3 * exitCp0.y + 3 * t1_2 * t * exitCp1.y + 3 * t1 * t_2 * exitCp2.y + t_3 * exitCp3.y
-            point.z = t1_3 * exitCp0.z + 3 * t1_2 * t * exitCp1.z + 3 * t1 * t_2 * exitCp2.z + t_3 * exitCp3.z
-
+        for (let i = 0; i < loopPoints; i++) {
+            const t = (i / loopPoints + loopStartOffset) % 1
+            const point = getLoopPoint(time, t, yHeight, spiralOffset, widthScale, heightScale)
             points.push(point)
         }
 
@@ -201,19 +129,24 @@ export default function RotatingSnake() {
             const tangent = curve.getTangentAt(t).normalize()
             tangents.push(tangent.clone())
 
-            // Compute normal by crossing tangent with up vector
-            let normal = new THREE.Vector3().crossVectors(tangent, upVector).normalize()
+            // Project upVector onto plane perpendicular to tangent to get binormal
+            // binormal = upVector - (upVector · tangent) * tangent
+            const tangentDotUp = tangent.dot(upVector)
+            let binormal = new THREE.Vector3()
+                .copy(upVector)
+                .addScaledVector(tangent, -tangentDotUp)
+                .normalize()
 
             // If tangent is parallel to up, use a fallback
-            if (normal.length() < 0.0001) {
-                normal = new THREE.Vector3(1, 0, 0)
+            if (binormal.length() < 0.0001) {
+                binormal = new THREE.Vector3(1, 0, 0)
             }
 
-            normals.push(normal.clone())
-
-            // Compute binormal
-            const binormal = new THREE.Vector3().crossVectors(normal, tangent).normalize()
             binormals.push(binormal.clone())
+
+            // Compute normal perpendicular to both
+            const normal = new THREE.Vector3().crossVectors(binormal, tangent).normalize()
+            normals.push(normal.clone())
         }
 
         return { tangents, normals, binormals }
@@ -225,16 +158,16 @@ export default function RotatingSnake() {
 
         console.log('Initializing complete curves...')
 
-        // Dragon 1 (RED): Starts LEFT, travels RIGHT - LOWER everywhere (links laag, rechts laag)
-        // loopStartOffset = 0, spiralOffset = 0 (spirals upward first), yHeight = -3.0 (LOWER)
-        const points1 = createDragonCurve(time, 1, 0, 0, -3.0)
+        // Dragon 1 (RED): Starts at BOTTOM of shape
+        // loopStartOffset = 0.75 (bottom), spiralOffset = 0, yHeight = 0.0 * heightScale, startY = 2.5 * heightScale, widthScale from screen size, heightScale applied
+        const points1 = createDragonCurve(time, 1, 0.90, 0, 0.0 * curveHeightScale, 2.5 * curveHeightScale, curveWidthScale, curveHeightScale)
         const curve1 = new THREE.CatmullRomCurve3(points1, false)
         curve1.curveType = 'centripetal'
         curve1.tension = 0.0
 
-        // Dragon 2 (BLUE): Starts RIGHT, travels LEFT - HIGHER everywhere (rechts hoog, links hoog)
-        // loopStartOffset = 0.5 (opposite side of loop), spiralOffset = Math.PI (opposite spiral direction), yHeight = -1.0 (HIGHER)
-        const points2 = createDragonCurve(time, -1, 0.5, Math.PI, -1.0)
+        // Dragon 2 (BLUE): Starts at TOP of shape
+        // loopStartOffset = 0.25 (top), spiralOffset = Math.PI (opposite spiral direction), yHeight = 2.0 * heightScale, startY = 0.5 * heightScale, widthScale from screen size, heightScale applied
+        const points2 = createDragonCurve(time, -1, 0.25, Math.PI, 2.0 * curveHeightScale, 0.5 * curveHeightScale, curveWidthScale, curveHeightScale)
         const curve2 = new THREE.CatmullRomCurve3(points2, false)
         curve2.curveType = 'centripetal'
         curve2.tension = 0.0
@@ -289,6 +222,21 @@ export default function RotatingSnake() {
         const geometry = new THREE.BufferGeometry()
         const material = new THREE.LineBasicMaterial({ color: 0x0066ff }) // Blue for dragon 2
         return new THREE.Line(geometry, material)
+    }, [])
+
+    // Create debug spheres for start (green) and end (red) points
+    const debugSpheres = useMemo(() => {
+        const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16)
+
+        // Curve 1 start (green) and end (red)
+        const curve1Start = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+        const curve1End = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+
+        // Curve 2 start (green) and end (red)
+        const curve2Start = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+        const curve2End = new THREE.Mesh(sphereGeometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+
+        return { curve1Start, curve1End, curve2Start, curve2End }
     }, [])
 
     // Simple Flow-like system based on THREE.js example - create TWO dragons
@@ -406,11 +354,23 @@ export default function RotatingSnake() {
             const points = dragonCurve1.current.curve.getPoints(500)
             curveLineObject1.geometry.setFromPoints(points)
             curveLineObject1.geometry.attributes.position.needsUpdate = true
+
+            // Update debug spheres for curve 1
+            if (points.length > 0) {
+                debugSpheres.curve1Start.position.copy(points[0]) // Start = green
+                debugSpheres.curve1End.position.copy(points[points.length - 1]) // End = red
+            }
         }
         if (dragonCurve2.current && curveLineObject2.geometry) {
             const points = dragonCurve2.current.curve.getPoints(500)
             curveLineObject2.geometry.setFromPoints(points)
             curveLineObject2.geometry.attributes.position.needsUpdate = true
+
+            // Update debug spheres for curve 2
+            if (points.length > 0) {
+                debugSpheres.curve2Start.position.copy(points[0]) // Start = green
+                debugSpheres.curve2End.position.copy(points[points.length - 1]) // End = red
+            }
         }
 
         // Update progress for both dragons (0 to 1 over entire curve including exit)
@@ -473,9 +433,9 @@ export default function RotatingSnake() {
                 const minZ = boundingBox.min.z
                 const lengthValue = length
 
-                const snakeWaveFrequency = 8
-                const snakeWaveAmplitude = 0.35
-                const snakeWaveSpeed = 2.0
+                const snakeWaveFrequency = 5
+                const snakeWaveAmplitude = 0.2
+                const snakeWaveSpeed = 3
 
                 const { binormal, normal, newPosition } = scratchVectors
 
@@ -508,9 +468,9 @@ export default function RotatingSnake() {
                     binormal.copy(activeCurve.binormals[index]).lerp(activeCurve.binormals[nextIndex], lerpFactor).normalize()
                     normal.copy(activeCurve.normals[index]).lerp(activeCurve.normals[nextIndex], lerpFactor).normalize()
 
-                    // Add roll variation (limited to -90 to +90 degrees to prevent flipping upside down)
+                    // Add roll variation (limited to -45 to +45 degrees for subtle rolling)
                     const rollFrequency = 0.5 // How fast the dragon rolls
-                    const maxRoll = Math.PI / 2 // 90 degrees max
+                    const maxRoll = Math.PI / 4 // 45 degrees max
                     const rollPhase = time * rollFrequency + t * Math.PI * 2 // Varies with time and position
                     const rollAngle = Math.sin(rollPhase) * maxRoll
 
@@ -573,9 +533,19 @@ export default function RotatingSnake() {
 
     return (
         <>
-            {/* Curve visualizations - RED for dragon 1, BLUE for dragon 2 */}
-            <primitive object={curveLineObject1} />
-            <primitive object={curveLineObject2} />
+            {/* Curve visualizations - RED for dragon 1, BLUE for dragon 2 (only shown in debug mode) */}
+            {showDebugLines && (
+                <>
+                    <primitive object={curveLineObject1} />
+                    <primitive object={curveLineObject2} />
+
+                    {/* Debug spheres - GREEN = start, RED = end */}
+                    <primitive object={debugSpheres.curve1Start} />
+                    <primitive object={debugSpheres.curve1End} />
+                    <primitive object={debugSpheres.curve2Start} />
+                    <primitive object={debugSpheres.curve2End} />
+                </>
+            )}
 
             {/* Flow Objects - two dragons with curve deformation */}
             {flowObject && <primitive object={flowObject} ref={flowRef} />}
