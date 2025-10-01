@@ -295,7 +295,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, onFogUpdate }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -1090,6 +1090,11 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
       }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(dynamicFogNear, dynamicFogFar)
+      }
     } else if (flyInTween.current) {
       // Start with 3x fog, then decrease smoothly during fly-in - 20% slower retreat
       // Use slower easeOut curve for delayed fog retreat
@@ -1098,25 +1103,35 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve with slower timing
       const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
       setFogIntensity(targetFogIntensity)
-      
+
       // Fog starts close and moves back to normal - also 20% slower
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back slower
       const dynamicFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back slower
-      
+
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(dynamicFogNear, dynamicFogFar)
       }
     } else {
       // Gradually return to normal fog when not animating
       setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
-      
+
       // Return fog planes to normal
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       if (material) {
         material.updateDynamicFog(baseFogNear, baseFogFar)
+      }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(baseFogNear, baseFogFar)
       }
     }
     

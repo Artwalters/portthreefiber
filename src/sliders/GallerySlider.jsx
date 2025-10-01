@@ -169,7 +169,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex, shouldExit = false }) => {
+const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex, shouldExit = false, onFogUpdate }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
   const [projectImages, setProjectImages] = useState([])
@@ -512,30 +512,45 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
       }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(dynamicFogNear, dynamicFogFar)
+      }
     } else if (isExiting) {
       // Accelerate fog increase during exit - reach peak quickly to match IndexSlider timing
       const acceleratedProgress = Math.min(exitProgress.current * 1.5, 1.0) // Faster acceleration for better timing
       const targetFogIntensity = 1.0 + (acceleratedProgress * 2.0) // From 1x up to 3x
       setFogIntensity(targetFogIntensity)
-      
+
       // Move fog closer to camera during exit - matches IndexSlider fade timing
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       const dynamicFogNear = baseFogNear - (acceleratedProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
       const dynamicFogFar = baseFogFar - (acceleratedProgress * 6) // Far plane comes forward
-      
+
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
+      }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(dynamicFogNear, dynamicFogFar)
       }
     } else {
       // Gradually return to normal fog when not animating
       setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
-      
+
       // Return fog planes to normal
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       if (material) {
         material.updateDynamicFog(baseFogNear, baseFogFar)
+      }
+
+      // Update scene fog via callback
+      if (onFogUpdate) {
+        onFogUpdate(baseFogNear, baseFogFar)
       }
     }
     

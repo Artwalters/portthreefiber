@@ -48,12 +48,13 @@ function App() {
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     const [shouldExitGallery, setShouldExitGallery] = useState(false)
     const [isSliderAnimationComplete, setIsSliderAnimationComplete] = useState(true) // Start as true for initial state
-    
+
     // Slider switching states
     const [showFilmStrip, setShowFilmStrip] = useState(true)
-    const [showSingleImage, setShowSingleImage] = useState(false)  
+    const [showSingleImage, setShowSingleImage] = useState(false)
     const [selectedImageIndex, setSelectedImageIndex] = useState(0)
     const waterRef = useRef()
+    const sceneRef = useRef() // Reference to Three.js scene for fog updates
     
     // Device capabilities detection
     const [deviceCapabilities, setDeviceCapabilities] = useState(null)
@@ -63,6 +64,14 @@ function App() {
         const capabilities = getDeviceCapabilities()
         setDeviceCapabilities(capabilities)
     }, [])
+
+    // Handle fog updates from sliders to keep scene fog in sync
+    const handleFogUpdate = (fogNear, fogFar) => {
+        if (sceneRef.current && sceneRef.current.fog) {
+            sceneRef.current.fog.near = fogNear
+            sceneRef.current.fog.far = fogFar
+        }
+    }
 
     // Load projects data from JSON
     useEffect(() => {
@@ -482,12 +491,16 @@ function App() {
                 frameloop="always"
                 flat={false}
                 onCreated={({ scene, gl }) => {
+                    // Store scene reference for fog updates
+                    sceneRef.current = scene
+
                     // Add fog - subtle depth effect, less intense for dragons
+                    // Match slider base fog values
                     const isMobile = window.innerWidth <= 768
                     if (isMobile) {
-                        scene.fog = new THREE.Fog(0xffffff, 7, 15)
+                        scene.fog = new THREE.Fog(0xffffff, 8, 15)
                     } else {
-                        scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                        scene.fog = new THREE.Fog(0xffffff, 5, 12)
                     }
                     // Set initial clear color to white
                     gl.setClearColor('#ffffff')
@@ -514,6 +527,7 @@ function App() {
                         onImageSelect={handleImageSelect}
                         isReturningFromGallery={isReturningFromGallery}
                         onFlyInComplete={handleFlyInComplete}
+                        onFogUpdate={handleFogUpdate}
                     />
                 )}
 
@@ -526,6 +540,7 @@ function App() {
                         currentImageIndex={currentImageIndex}
                         setCurrentImageIndex={setCurrentImageIndex}
                         shouldExit={shouldExitGallery}
+                        onFogUpdate={handleFogUpdate}
                     />
                 )}
 
