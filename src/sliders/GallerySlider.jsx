@@ -497,13 +497,14 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     
     // Update fog intensity and position based on animation states
     if (isAnimating) {
-      // Start with 3x fog, decrease smoothly during fly-in
-      // Use easeOut curve for natural fog retreat (same as IndexSlider fly-in)
-      const easedProgress = 1 - Math.pow(1 - animationProgress.current, 2) // EaseOut curve
+      // Start with 3x fog, decrease smoothly during fly-in - much slower retreat
+      // Use slower progress and easeOut curve for natural fog retreat
+      const slowerProgress = animationProgress.current * 0.65 // Much slower fog retreat - only 65% speed
+      const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve
       const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
       setFogIntensity(targetFogIntensity)
-      
-      // Fog starts close and moves back to normal position
+
+      // Fog starts close and moves back to normal position - much slower
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back
@@ -518,16 +519,16 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
         onFogUpdate(dynamicFogNear, dynamicFogFar)
       }
     } else if (isExiting) {
-      // Accelerate fog increase during exit - reach peak quickly to match IndexSlider timing
-      const acceleratedProgress = Math.min(exitProgress.current * 1.5, 1.0) // Faster acceleration for better timing
-      const targetFogIntensity = 1.0 + (acceleratedProgress * 2.0) // From 1x up to 3x
+      // Slower fog increase during exit for smoother transition
+      const slowProgress = Math.min(exitProgress.current * 0.85, 1.0) // Much slower - only 85% speed
+      const targetFogIntensity = 1.0 + (slowProgress * 2.0) // From 1x up to 3x
       setFogIntensity(targetFogIntensity)
 
-      // Move fog closer to camera during exit - matches IndexSlider fade timing
+      // Move fog closer to camera during exit - slower and smoother
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = baseFogNear - (acceleratedProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
-      const dynamicFogFar = baseFogFar - (acceleratedProgress * 6) // Far plane comes forward
+      const dynamicFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      const dynamicFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward
 
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)

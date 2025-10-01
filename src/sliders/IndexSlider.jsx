@@ -1076,16 +1076,16 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     
     // Update fog intensity and position based on animation states
     if (isFading) {
-      // Accelerate fog intensification - reach peak faster, at 80% of animation
-      const acceleratedProgress = Math.min(fadeProgress * 1.25, 1.0)
-      const targetFogIntensity = 1.0 + (acceleratedProgress * 2.0) // Goes up to 3x fog intensity
+      // Slower fog increase for smoother, longer transition
+      const slowProgress = Math.min(fadeProgress * 0.85, 1.0) // Much slower - only 85% speed
+      const targetFogIntensity = 1.0 + (slowProgress * 2.0) // Goes up to 3x fog intensity
       setFogIntensity(targetFogIntensity)
-      
-      // Move fog closer to camera - fog comes forward
+
+      // Move fog closer to camera - slower and smoother
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = baseFogNear - (acceleratedProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
-      const dynamicFogFar = baseFogFar - (acceleratedProgress * 6) // Far plane comes forward moderately
+      const dynamicFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      const dynamicFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward moderately
       
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
@@ -1096,15 +1096,15 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         onFogUpdate(dynamicFogNear, dynamicFogFar)
       }
     } else if (flyInTween.current) {
-      // Start with 3x fog, then decrease smoothly during fly-in - 20% slower retreat
+      // Start with 3x fog, then decrease smoothly during fly-in - much slower retreat
       // Use slower easeOut curve for delayed fog retreat
       // Check flyInTween instead of isFlyingIn (more reliable)
-      const slowerProgress = flyInProgress * 0.8 // 20% slower fog retreat
+      const slowerProgress = flyInProgress * 0.65 // Much slower fog retreat - only 65% speed
       const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve with slower timing
       const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
       setFogIntensity(targetFogIntensity)
 
-      // Fog starts close and moves back to normal - also 20% slower
+      // Fog starts close and moves back to normal - much slower
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
       const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back slower
