@@ -321,12 +321,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const userInfluenceFactor = useRef(1) // Gradual build-up of user control (0 = no control, 1 = full control)
   const animationEndTime = useRef(0) // When animation ended for gradual build-up
   const isAnimationCancelled = useRef(false) // Direct flag for immediate cancellation
-  
-  // Mouse tracking voor desktop parallax position effect
-  const mousePosition = useRef({ x: 0, y: 0 })
-  const targetPosition = useRef({ x: 0, y: 0 })
-  const currentPosition = useRef({ x: 0, y: 0 })
-  
+
   // Center snapping state
   const isSnapping = useRef(false)
   const snapTimeout = useRef(null)
@@ -830,33 +825,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       }
     }
   }, [gl, waterRef, isMobile])
-  
-  // Mouse tracking voor desktop rotation effect
-  useEffect(() => {
-    if (isMobile) return // Alleen voor desktop
-    
-    const handleMouseMove = (e) => {
-      const centerX = window.innerWidth / 2
-      const centerY = window.innerHeight / 2
-      
-      // Normalize mouse position (-1 to 1)
-      const normalizedX = (e.clientX - centerX) / (window.innerWidth / 2)
-      const normalizedY = (e.clientY - centerY) / (window.innerHeight / 2)
-      
-      mousePosition.current = { x: normalizedX, y: normalizedY }
-      
-      // Zichtbare parallax movement
-      const maxOffset = 0.0735 // 30% minder sterk van 0.105
-      targetPosition.current = {
-        x: -normalizedX * maxOffset,  // Mouse rechts = mesh naar links
-        y: normalizedY * maxOffset    // Mouse omhoog = mesh naar beneden
-      }
-    }
-    
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [isMobile])
-  
+
   // Animation state
   const [isFading, setIsFading] = useState(false)
   const [fadeProgress, setFadeProgress] = useState(0)
@@ -1321,20 +1290,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     } else {
       material.updateFlyIn(false, flyInProgress)
     }
-    
-    // Apply subtle mouse tracking position offset (desktop with mouse only)
-    if (!isMobile && meshRef.current && !('ontouchstart' in window) && window.matchMedia('(hover: hover)').matches) {
-      // Langzamere interpolation voor smoother parallax effect
-      const lerpSpeed = 0.02 // Veel langzamer voor smoother effect
-      currentPosition.current.x += (targetPosition.current.x - currentPosition.current.x) * lerpSpeed
-      currentPosition.current.y += (targetPosition.current.y - currentPosition.current.y) * lerpSpeed
-      
-      // Apply position offset to mesh
-      meshRef.current.position.x = currentPosition.current.x
-      meshRef.current.position.y = currentPosition.current.y
-    }
-    
-    // No fog color update needed
+
   })
   
   // Create material with textures and context loss recovery
