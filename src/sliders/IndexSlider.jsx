@@ -548,6 +548,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         isUserInteracting.current = true
         userInfluenceFactor.current = 1
 
+        // Ensure mesh is visible when taking control
+        setIsInitiallyVisible(true)
+
         // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
 
@@ -692,6 +695,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         // Force user control immediately to prevent useFrame race condition
         isUserInteracting.current = true
         userInfluenceFactor.current = 1
+
+        // Ensure mesh is visible when taking control
+        setIsInitiallyVisible(true)
 
         // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
@@ -853,17 +859,17 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   // Handle fly-in animation when returning from gallery
   useEffect(() => {
     if (isReturningFromGallery && !isFlyingIn) {
-      // Start fly-in animation immediately - mesh stays visible throughout
-      setIsFlyingIn(true)
-      isAnimationCancelled.current = false // Reset cancellation flag
+      // Hide mesh first to prevent flicker
+      setIsInitiallyVisible(false)
 
-      // Force slider to start position before animation begins
+      // Force slider to start position BEFORE making visible
       const slideDistance = 67
       flyInStartOffset.current = slideDistance // Start from right side
       currentOffset.current = slideDistance // Force immediate position update
       targetOffset.current = slideDistance // Ensure target matches
 
-      // Cancel any existing snapping during fly-in to prevent bounce-back
+      // Reset animation state
+      isAnimationCancelled.current = false // Reset cancellation flag
       clearSnapTimeout()
       isSnapping.current = false
 
@@ -872,9 +878,14 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         flyInTween.current.kill()
       }
 
-      // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
-      const animObj = { progress: 0, velocity: 0 }
-      flyInTween.current = gsap.timeline()
+      // Wait one frame for position to be applied, then start animation
+      requestAnimationFrame(() => {
+        setIsFlyingIn(true)
+        setIsInitiallyVisible(true) // Make visible after position is set
+
+        // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
+        const animObj = { progress: 0, velocity: 0 }
+        flyInTween.current = gsap.timeline()
           .to(animObj, {
             progress: 1,
             duration: 2, // Perfect balance - not too fast, not too slow
@@ -913,6 +924,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
               }
             }
           }, 0) // Start at same time as progress animation
+      })
     }
   }, [isReturningFromGallery, isFlyingIn])
   
@@ -940,6 +952,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     if (isFlyingIn) {
       // Immediate cancellation to prevent useFrame from overriding position
       isAnimationCancelled.current = true
+
+      // Ensure mesh is visible when taking control
+      setIsInitiallyVisible(true)
 
       // Stop GSAP animation immediately
       if (flyInTween.current) {
