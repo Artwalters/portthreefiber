@@ -199,6 +199,10 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   const exitProgress = useRef(0)
   const exitStartPosition = useRef(0) // Track position when exit animation starts
   const [fogIntensity, setFogIntensity] = useState(3.0) // Start with 3x fog intensity for fly-in
+
+  // Fog smoothing refs
+  const currentFogNear = useRef(1.0) // Start at 1.0 for fly-in
+  const currentFogFar = useRef(isMobile ? 9 : 6) // Start close for fly-in
   
   // GSAP animation refs
   const flyInTween = useRef(null)
@@ -495,64 +499,51 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
   useFrame((state, delta) => {
     if (!material) return
     
-    // Update fog intensity and position based on animation states
+    // Calculate target fog values based on animation states
+    let targetFogIntensity = 1.0
+    let targetFogNear = isMobile ? 8 : 5
+    let targetFogFar = isMobile ? 15 : 12
+
     if (isAnimating) {
       // Start with 3x fog, decrease smoothly during fly-in - much slower retreat
       // Use slower progress and easeOut curve for natural fog retreat
       const slowerProgress = animationProgress.current * 0.65 // Much slower fog retreat - only 65% speed
       const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve
-      const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
-      setFogIntensity(targetFogIntensity)
+      targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
 
       // Fog starts close and moves back to normal position - much slower
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back
-      const dynamicFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back
-      
-      if (material) {
-        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
-      }
-
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(dynamicFogNear, dynamicFogFar)
-      }
+      targetFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back
+      targetFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back
     } else if (isExiting) {
       // Slower fog increase during exit for smoother transition
       const slowProgress = Math.min(exitProgress.current * 0.85, 1.0) // Much slower - only 85% speed
-      const targetFogIntensity = 1.0 + (slowProgress * 2.0) // From 1x up to 3x
-      setFogIntensity(targetFogIntensity)
+      targetFogIntensity = 1.0 + (slowProgress * 2.0) // From 1x up to 3x
 
       // Move fog closer to camera during exit - slower and smoother
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
-      const dynamicFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward
+      targetFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      targetFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward
+    }
 
-      if (material) {
-        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
-      }
+    // Smooth interpolation to target fog values (very smooth lerp)
+    const fogLerpSpeed = 0.08 // Smooth interpolation
+    currentFogNear.current += (targetFogNear - currentFogNear.current) * fogLerpSpeed
+    currentFogFar.current += (targetFogFar - currentFogFar.current) * fogLerpSpeed
 
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(dynamicFogNear, dynamicFogFar)
-      }
-    } else {
-      // Gradually return to normal fog when not animating
-      setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
+    // Update fog intensity with smooth transition
+    setFogIntensity(prev => prev + (targetFogIntensity - prev) * fogLerpSpeed)
 
-      // Return fog planes to normal
-      const baseFogNear = isMobile ? 8 : 5
-      const baseFogFar = isMobile ? 15 : 12
-      if (material) {
-        material.updateDynamicFog(baseFogNear, baseFogFar)
-      }
+    // Apply smoothed fog values
+    if (material) {
+      material.updateDynamicFog(currentFogNear.current, currentFogFar.current)
+    }
 
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(baseFogNear, baseFogFar)
-      }
+    // Update scene fog via callback with smoothed values
+    if (onFogUpdate) {
+      onFogUpdate(currentFogNear.current, currentFogFar.current)
     }
     
     // Handle GSAP-driven exit animation - plane completes curve to right

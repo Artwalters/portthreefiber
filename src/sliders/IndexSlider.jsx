@@ -336,8 +336,11 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const dragStartX = useRef(0)
   const dragStartY = useRef(0)
   const dragStartOffset = useRef(0)
-  
-  
+
+  // Fog smoothing refs
+  const currentFogNear = useRef(isMobile ? 8 : 5)
+  const currentFogFar = useRef(isMobile ? 15 : 12)
+
   // Center snapping functions
   const calculateNearestSnapPosition = (currentPos, direction = 0) => {
     const itemWidth = isMobile ? 2.3 : 3.5 // Same spacing as used elsewhere
@@ -1074,65 +1077,49 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   useFrame((state, delta) => {
     if (!material) return
     
-    // Update fog intensity and position based on animation states
+    // Calculate target fog values based on animation states
+    let targetFogIntensity = 1.0
+    let targetFogNear = isMobile ? 8 : 5
+    let targetFogFar = isMobile ? 15 : 12
+
     if (isFading) {
       // Slower fog increase for smoother, longer transition
       const slowProgress = Math.min(fadeProgress * 0.85, 1.0) // Much slower - only 85% speed
-      const targetFogIntensity = 1.0 + (slowProgress * 2.0) // Goes up to 3x fog intensity
-      setFogIntensity(targetFogIntensity)
+      targetFogIntensity = 1.0 + (slowProgress * 2.0) // Goes up to 3x fog intensity
 
       // Move fog closer to camera - slower and smoother
       const baseFogNear = isMobile ? 8 : 5
       const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
-      const dynamicFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward moderately
-      
-      if (material) {
-        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
-      }
-
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(dynamicFogNear, dynamicFogFar)
-      }
+      targetFogNear = baseFogNear - (slowProgress * (baseFogNear - 1.0)) // Fog moves to 1.0
+      targetFogFar = baseFogFar - (slowProgress * 6) // Far plane comes forward moderately
     } else if (flyInTween.current) {
       // Start with 3x fog, then decrease smoothly during fly-in - much slower retreat
       // Use slower easeOut curve for delayed fog retreat
-      // Check flyInTween instead of isFlyingIn (more reliable)
       const slowerProgress = flyInProgress * 0.65 // Much slower fog retreat - only 65% speed
       const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve with slower timing
-      const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
-      setFogIntensity(targetFogIntensity)
+      targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
 
       // Fog starts close and moves back to normal - much slower
-      const baseFogNear = isMobile ? 8 : 5
-      const baseFogFar = isMobile ? 15 : 12
-      const dynamicFogNear = 1.0 + (easedProgress * (baseFogNear - 1.0)) // Start at 1.0, move back slower
-      const dynamicFogFar = (baseFogFar - 6) + (easedProgress * 6) // Far plane moves back slower
+      targetFogNear = 1.0 + (easedProgress * ((isMobile ? 8 : 5) - 1.0)) // Start at 1.0, move back slower
+      targetFogFar = ((isMobile ? 15 : 12) - 6) + (easedProgress * 6) // Far plane moves back slower
+    }
 
-      if (material) {
-        material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
-      }
+    // Smooth interpolation to target fog values (very smooth lerp)
+    const fogLerpSpeed = 0.08 // Smooth interpolation
+    currentFogNear.current += (targetFogNear - currentFogNear.current) * fogLerpSpeed
+    currentFogFar.current += (targetFogFar - currentFogFar.current) * fogLerpSpeed
 
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(dynamicFogNear, dynamicFogFar)
-      }
-    } else {
-      // Gradually return to normal fog when not animating
-      setFogIntensity(prev => prev + (1.0 - prev) * 0.08) // Slightly faster return to normal
+    // Update fog intensity with smooth transition
+    setFogIntensity(prev => prev + (targetFogIntensity - prev) * fogLerpSpeed)
 
-      // Return fog planes to normal
-      const baseFogNear = isMobile ? 8 : 5
-      const baseFogFar = isMobile ? 15 : 12
-      if (material) {
-        material.updateDynamicFog(baseFogNear, baseFogFar)
-      }
+    // Apply smoothed fog values
+    if (material) {
+      material.updateDynamicFog(currentFogNear.current, currentFogFar.current)
+    }
 
-      // Update scene fog via callback
-      if (onFogUpdate) {
-        onFogUpdate(baseFogNear, baseFogFar)
-      }
+    // Update scene fog via callback with smoothed values
+    if (onFogUpdate) {
+      onFogUpdate(currentFogNear.current, currentFogFar.current)
     }
     
     // Handle fade animation (both slider and fade together)
