@@ -224,12 +224,12 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       flyInTween.current.kill()
     }
     
-    // Start GSAP fly-in animation
+    // Start GSAP fly-in animation with very dramatic curve
     const animObj = { progress: 0 }
     flyInTween.current = gsap.to(animObj, {
       progress: 1,
-      duration: 1.6, // Faster timing
-      ease: "power4.out", // Ultra extreme fast start → soft landing
+      duration: 1.8, // Slightly longer for more drama
+      ease: "expo.out", // VERY dramatic: explosive fast start → extremely soft landing
       onUpdate: () => {
         animationProgress.current = animObj.progress
       },
@@ -270,12 +270,12 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
         flyInTween.current.kill()
       }
       
-      // Start GSAP exit animation - match IndexSlider fly-in timing
+      // Start GSAP exit animation with very dramatic curve
       const animObj = { progress: 0 }
       exitTween.current = gsap.to(animObj, {
         progress: 1,
-        duration: 2.0, // Match the 2-second phase timing from index.jsx
-        ease: "power4.in", // Ultra slow start → extremely fast end
+        duration: 1.0, // Shorter for explosive acceleration
+        ease: "expo.in", // VERY dramatic: very slow start → explosive acceleration
         onUpdate: () => {
           exitProgress.current = animObj.progress
         }
