@@ -320,8 +320,6 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const sliderSpeed = useRef(0)
   const userInfluenceFactor = useRef(1) // Gradual build-up of user control (0 = no control, 1 = full control)
   const animationEndTime = useRef(0) // When animation ended for gradual build-up
-  const animationSpeedMultiplier = useRef(1) // Speed multiplier for GSAP timeline
-  const dragVelocityTracker = useRef(0) // Track drag velocity during animation
   const isAnimationCancelled = useRef(false) // Direct flag for immediate cancellation
   
   // Mouse tracking voor desktop parallax position effect
@@ -498,7 +496,6 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
           (tex) => {
             // Ensure correct color space for accurate colors
             tex.colorSpace = THREE.SRGBColorSpace
-            // tex.encoding = THREE.sRGBEncoding // Deprecated in Three.js r152+
             // Maximum quality texture settings
             tex.generateMipmaps = true // Enable mipmaps for better performance
             tex.wrapS = THREE.RepeatWrapping // Allow texture to repeat and cover full plane
@@ -941,11 +938,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
               animationEndTime.current = Date.now()
               userInfluenceFactor.current = 0 // Start with no user control
               
-              // Reset any accumulated momentum/movement and animation speed
+              // Reset any accumulated momentum/movement
               momentum.current = 0
               swipeDirection.current = 0
-              animationSpeedMultiplier.current = 1
-              dragVelocityTracker.current = 0
               
               // Notify parent that fly-in is complete
               if (onFlyInComplete) {
@@ -994,8 +989,6 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       
       // Clean up fly-in state
       setIsFlyingIn(false)
-      animationSpeedMultiplier.current = 1
-      dragVelocityTracker.current = 0
       animationEndTime.current = 0
       userInfluenceFactor.current = 1 // Full control immediately
       sliderSpeed.current = 0
