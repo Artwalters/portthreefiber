@@ -295,7 +295,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, onFogUpdate }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -1112,14 +1112,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     // Update fog intensity with smooth transition
     setFogIntensity(prev => prev + (targetFogIntensity - prev) * fogLerpSpeed)
 
-    // Apply smoothed fog values
+    // Apply smoothed fog values to slider material only
     if (material) {
       material.updateDynamicFog(currentFogNear.current, currentFogFar.current)
-    }
-
-    // Update scene fog via callback with smoothed values
-    if (onFogUpdate) {
-      onFogUpdate(currentFogNear.current, currentFogFar.current)
     }
     
     // Handle fade animation (both slider and fade together)

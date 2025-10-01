@@ -169,7 +169,7 @@ const createSingleImageMaterial = (texture, isMobile = false) => {
   return material
 }
 
-const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex, shouldExit = false, onFogUpdate }) => {
+const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, currentImageIndex, setCurrentImageIndex, shouldExit = false }) => {
   const meshRef = useRef()
   const [texture, setTexture] = useState(null)
   const [projectImages, setProjectImages] = useState([])
@@ -536,14 +536,9 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     // Update fog intensity with smooth transition
     setFogIntensity(prev => prev + (targetFogIntensity - prev) * fogLerpSpeed)
 
-    // Apply smoothed fog values
+    // Apply smoothed fog values to slider material only
     if (material) {
       material.updateDynamicFog(currentFogNear.current, currentFogFar.current)
-    }
-
-    // Update scene fog via callback with smoothed values
-    if (onFogUpdate) {
-      onFogUpdate(currentFogNear.current, currentFogFar.current)
     }
     
     // Handle GSAP-driven exit animation - plane completes curve to right
