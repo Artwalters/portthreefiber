@@ -856,7 +856,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       // Start fly-in animation immediately - mesh stays visible throughout
       setIsFlyingIn(true)
       isAnimationCancelled.current = false // Reset cancellation flag
-      flyInStartOffset.current = currentOffset.current
+
+      // Force slider to start position before animation begins
+      const slideDistance = 67
+      flyInStartOffset.current = slideDistance // Start from right side
+      currentOffset.current = slideDistance // Force immediate position update
+      targetOffset.current = slideDistance // Ensure target matches
 
       // Cancel any existing snapping during fly-in to prevent bounce-back
       clearSnapTimeout()
