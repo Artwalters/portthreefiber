@@ -9,6 +9,8 @@ const MobileWater = forwardRef((props, ref) => {
     const mouseDown = useRef(false)
     const lastInteractionTime = useRef(Date.now()) // Track last interaction
     const isInactive = useRef(false) // Track if we should pause simulation
+    const lastResetTime = useRef(Date.now()) // Track last buffer reset
+    const needsReset = useRef(false) // Flag to trigger buffer reset
 
     // Mouse tracking voor subtiele parallax position effect
     const mousePosition = useRef({ x: 0, y: 0 })
@@ -179,17 +181,26 @@ const MobileWater = forwardRef((props, ref) => {
                     pressure += delta * velocity;
 
                     // Underwater damping - slower dissipation like SimpleWater
-                    // BUT: much stronger damping when inactive to prevent accumulation errors
-                    float velocityDamping = (uIsInactive > 0.5) ? 0.95 : 0.998;
-                    float pressureDamping = (uIsInactive > 0.5) ? 0.96 : 0.999;
+                    // BUT: stronger damping for mobile byte textures to prevent accumulation
+                    float velocityDamping, pressureDamping;
+
+                    if (uHasFloatSupport < 0.5) {
+                        // Byte textures - much stronger damping to prevent precision errors
+                        velocityDamping = (uIsInactive > 0.5) ? 0.90 : 0.985;
+                        pressureDamping = (uIsInactive > 0.5) ? 0.92 : 0.990;
+                    } else {
+                        // Float textures - normal damping
+                        velocityDamping = (uIsInactive > 0.5) ? 0.95 : 0.998;
+                        pressureDamping = (uIsInactive > 0.5) ? 0.96 : 0.999;
+                    }
 
                     velocity *= velocityDamping;
                     pressure *= pressureDamping;
 
-                    // Clamp values to prevent runaway accumulation on byte textures
+                    // Stronger clamping for byte textures to prevent runaway accumulation
                     if (uHasFloatSupport < 0.5) {
-                        pressure = clamp(pressure, -0.8, 0.8);
-                        velocity = clamp(velocity, -0.8, 0.8);
+                        pressure = clamp(pressure, -0.5, 0.5);
+                        velocity = clamp(velocity, -0.5, 0.5);
                     }
 
                     // Underwater hand-swipe interaction (simplified but more like SimpleWater)
@@ -463,6 +474,7 @@ const MobileWater = forwardRef((props, ref) => {
         // Check for inactivity to prevent mobile memory/precision issues
         const now = Date.now()
         const timeSinceLastInteraction = now - lastInteractionTime.current
+        const timeSinceLastReset = now - lastResetTime.current
 
         // After 30 seconds of inactivity, apply stronger damping and stop idle waves
         if (timeSinceLastInteraction > 30000) { // 30 seconds
@@ -473,6 +485,13 @@ const MobileWater = forwardRef((props, ref) => {
             }
         }
 
+        // Periodically reset buffers on mobile with byte textures to prevent accumulation
+        // Reset every 45 seconds to prevent noise buildup
+        if (!buffers.hasFloatSupport && timeSinceLastReset > 45000) {
+            needsReset.current = true
+            lastResetTime.current = now
+        }
+
         // Clamp delta to prevent simulation instability
         const clampedDelta = Math.min(delta * 60, 1.4)
 
@@ -481,6 +500,16 @@ const MobileWater = forwardRef((props, ref) => {
         // 1. Water simulation with mobile safety checks
         try {
             if (simMaterial.uniforms && buffers.read && buffers.write) {
+                // Reset buffers if needed (mobile byte texture precision fix)
+                if (needsReset.current) {
+                    gl.setRenderTarget(buffers.read)
+                    gl.clear()
+                    gl.setRenderTarget(buffers.write)
+                    gl.clear()
+                    needsReset.current = false
+                    console.log('Water buffers reset to prevent accumulation')
+                }
+
                 simMaterial.uniforms.uPrevious.value = buffers.read.texture
                 // Use modulo to prevent floating point precision issues on mobile
                 const safeTime = (state.clock.elapsedTime * 0.3) % 1000 // Cycle every 1000 seconds
