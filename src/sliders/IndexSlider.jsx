@@ -878,14 +878,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         flyInTween.current.kill()
       }
 
-      // Wait one frame for position to be applied, then start animation
-      requestAnimationFrame(() => {
-        setIsFlyingIn(true)
-        setIsInitiallyVisible(true) // Make visible after position is set
+      // Start animation state immediately
+      setIsFlyingIn(true)
 
-        // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
-        const animObj = { progress: 0, velocity: 0 }
-        flyInTween.current = gsap.timeline()
+      // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
+      const animObj = { progress: 0, velocity: 0 }
+      flyInTween.current = gsap.timeline()
           .to(animObj, {
             progress: 1,
             duration: 2, // Perfect balance - not too fast, not too slow
@@ -924,6 +922,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
               }
             }
           }, 0) // Start at same time as progress animation
+
+      // Wait 2 frames for position to stabilize, then make visible
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsInitiallyVisible(true)
+        })
       })
     }
   }, [isReturningFromGallery, isFlyingIn])
