@@ -224,12 +224,12 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
       flyInTween.current.kill()
     }
     
-    // Start GSAP fly-in animation with very dramatic curve
+    // Start GSAP fly-in animation - exact reverse of exit animation
     const animObj = { progress: 0 }
     flyInTween.current = gsap.to(animObj, {
       progress: 1,
-      duration: 1.8, // Slightly longer for more drama
-      ease: "expo.in", // VERY dramatic: slow start → explosive fast arrival
+      duration: 1.0, // Match exit duration exactly
+      ease: "expo.out", // Reverse of exit (expo.in): fast start → slow landing
       onUpdate: () => {
         animationProgress.current = animObj.progress
       },
