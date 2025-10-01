@@ -337,6 +337,12 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   const swipeDirection = useRef(0) // -1 = left, 1 = right, 0 = no direction
   const isUserInteracting = useRef(false) // Track if user is actively dragging/scrolling
   const momentum = useRef(0) // Track momentum for natural continuation
+
+  // Drag state - must be ref to persist across re-renders
+  const isDragging = useRef(false)
+  const dragStartX = useRef(0)
+  const dragStartY = useRef(0)
+  const dragStartOffset = useRef(0)
   
   
   // Center snapping functions
@@ -526,52 +532,63 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   
   // Drag interactions - responsive to mobile/desktop
   useEffect(() => {
-    let startX = 0
-    let startY = 0
-    let startOffset = 0
-    let dragging = false
-    
     const handleStart = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
-      startX = clientX
-      startY = clientY
-      startOffset = currentOffset.current // Use current position as baseline, not target
-      dragging = true
-      
+      dragStartX.current = clientX
+      dragStartY.current = clientY
+      dragStartOffset.current = currentOffset.current // Use current position as baseline, not target
+      isDragging.current = true
+
       // Cancel any ongoing snap
       clearSnapTimeout()
       isSnapping.current = false
       isUserInteracting.current = true
       lastInteractionTime.current = Date.now()
       swipeDirection.current = 0 // Reset swipe direction
-      
-      // Smooth transition from animation to user control - GSAP best practice
-      if (isFlyingIn && flyInTween.current) {
-        // Immediate cancellation to prevent useFrame from overriding position
+
+      // KILL ANIMATION COMPLETELY - take full control
+      if (flyInTween.current) {
+        // CRITICAL: Set cancellation flag FIRST before anything else
         isAnimationCancelled.current = true
-        
-        // Capture current animated position before killing tween
+
+        // Force user control immediately to prevent useFrame race condition
+        isUserInteracting.current = true
+        userInfluenceFactor.current = 1
+
+        // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
-        
-        // Kill animation smoothly
-        flyInTween.current.kill()
-        flyInTween.current = null
-        setIsFlyingIn(false) // Stop fly-in animation permanently
-        
-        // Use current animated position as starting point for user control
-        startOffset = currentAnimatedOffset // Update drag start to current position
-        targetOffset.current = currentAnimatedOffset // Immediately freeze target position
-        
-        userInfluenceFactor.current = 1 // Give user full control immediately
+
+        // KILL GSAP completely - stop all animations
+        try {
+          flyInTween.current.kill()
+          flyInTween.current = null
+          setIsFlyingIn(false)
+        } catch (e) {
+          console.warn('GSAP kill error:', e)
+          flyInTween.current = null
+          setIsFlyingIn(false)
+        }
+
+        // Freeze position at current location
+        currentOffset.current = currentAnimatedOffset // Lock current position
+        targetOffset.current = currentAnimatedOffset // Lock target position
+        dragStartOffset.current = currentAnimatedOffset // Update drag start to current position
+
         sliderSpeed.current = 0
         animationEndTime.current = 0 // Reset animation timing
-        
+
         // Reset momentum and snapping for clean transition
         momentum.current = 0
         swipeDirection.current = 0
         isSnapping.current = false
         clearSnapTimeout()
+      }
+
+      // Also stop build-up if it's still running (extra safety)
+      if (animationEndTime.current > 0) {
+        animationEndTime.current = 0
+        userInfluenceFactor.current = 1
       }
       
       // Water effect
@@ -583,34 +600,34 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     const handleMove = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX
       const clientY = e.touches ? e.touches[0].clientY : e.clientY
-      
+
       // Mouse position updates are handled in handleMouseMove
-      
-      if (!dragging) return
-      
+
+      if (!isDragging.current) return
+
       // Update interaction time
       lastInteractionTime.current = Date.now()
-      
+
       // Calculate momentum for natural continuation
       const prevOffset = targetOffset.current
-      
+
       // Normal drag handling - always allow user control
       let newTargetOffset
       let dragDelta = 0
-      
+
       if (isMobile) {
         // Mobile: vertical drag = scroll with increased responsiveness (inverted)
-        const deltaY = clientY - startY
+        const deltaY = clientY - dragStartY.current
         dragDelta = deltaY * 0.05
-        newTargetOffset = startOffset + dragDelta // More responsive
+        newTargetOffset = dragStartOffset.current + dragDelta // More responsive
         // Gradual speed buildup for smoother RGB effect - 50% less intense
         const targetSpeed = -deltaY * 0.3
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
       } else {
-        // Desktop: horizontal drag = scroll  
-        const deltaX = clientX - startX
+        // Desktop: horizontal drag = scroll
+        const deltaX = clientX - dragStartX.current
         dragDelta = -deltaX * 0.03
-        newTargetOffset = startOffset + dragDelta
+        newTargetOffset = dragStartOffset.current + dragDelta
         // Gradual speed buildup for smoother RGB effect - 50% less intense
         const targetSpeed = -deltaX * 0.25
         sliderSpeed.current += (targetSpeed - sliderSpeed.current) * 0.1 // Smooth acceleration
@@ -629,7 +646,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     }
     
     const handleEnd = () => {
-      dragging = false
+      isDragging.current = false
       isUserInteracting.current = false
       
       // No special fly-in handling needed - animation is cancelled on interaction
@@ -662,44 +679,60 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     
     const handleWheel = (e) => {
       e.preventDefault()
-      
+
       // Clear previous wheel end timeout
       if (wheelEndTimeout) {
         clearTimeout(wheelEndTimeout)
         wheelEndTimeout = null
       }
-      
+
       // Cancel any ongoing snap and mark as interacting
       clearSnapTimeout()
       isSnapping.current = false
       isUserInteracting.current = true
       lastInteractionTime.current = Date.now()
-      
-      // Smooth transition from animation to user control - GSAP best practice
-      if (isFlyingIn && flyInTween.current) {
-        // Immediate cancellation to prevent useFrame from overriding position
+
+      // KILL ANIMATION COMPLETELY - take full control
+      if (flyInTween.current) {
+        // CRITICAL: Set cancellation flag FIRST before anything else
         isAnimationCancelled.current = true
-        
-        // Capture current animated position before killing tween
+
+        // Force user control immediately to prevent useFrame race condition
+        isUserInteracting.current = true
+        userInfluenceFactor.current = 1
+
+        // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
-        
-        // Kill animation smoothly
-        flyInTween.current.kill()
-        flyInTween.current = null
-        setIsFlyingIn(false) // Stop fly-in animation permanently
-        
-        // Update targetOffset to current position for smooth continuation
-        targetOffset.current = currentAnimatedOffset
-        
-        userInfluenceFactor.current = 1 // Give user full control immediately
+
+        // KILL GSAP completely - stop all animations
+        try {
+          flyInTween.current.kill()
+          flyInTween.current = null
+          setIsFlyingIn(false)
+        } catch (e) {
+          console.warn('GSAP kill error:', e)
+          flyInTween.current = null
+          setIsFlyingIn(false)
+        }
+
+        // Freeze position at current location
+        currentOffset.current = currentAnimatedOffset // Lock current position
+        targetOffset.current = currentAnimatedOffset // Lock target position
+
         sliderSpeed.current = 0
         animationEndTime.current = 0 // Reset animation timing
-        
+
         // Reset momentum and snapping for clean transition
         momentum.current = 0
         swipeDirection.current = 0
         isSnapping.current = false
         clearSnapTimeout()
+      }
+
+      // Also stop build-up if it's still running (extra safety)
+      if (animationEndTime.current > 0) {
+        animationEndTime.current = 0
+        userInfluenceFactor.current = 1
       }
       
       // Smooth wheel scrolling - accumulate wheel delta for smoother movement
@@ -862,24 +895,24 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         setIsFlyingIn(true)
         isAnimationCancelled.current = false // Reset cancellation flag
         flyInStartOffset.current = currentOffset.current
-        
+
         // Cancel any existing snapping during fly-in to prevent bounce-back
         clearSnapTimeout()
         isSnapping.current = false
-        
-        // Make visible again once animation starts
-        requestAnimationFrame(() => {
-          setIsInitiallyVisible(true)
-        })
-        
+
         // Kill any existing tween
         if (flyInTween.current) {
           flyInTween.current.kill()
         }
-        
+
         // Create GSAP animation for perfect smooth fly-in - 2 seconds for good balance
         const animObj = { progress: 0, velocity: 0 }
-        flyInTween.current = gsap.timeline()
+        flyInTween.current = gsap.timeline({
+          onStart: () => {
+            // Make visible only AFTER GSAP is fully set up
+            setIsInitiallyVisible(true)
+          }
+        })
           .to(animObj, {
             progress: 1,
             duration: 2, // Perfect balance - not too fast, not too slow
@@ -1081,9 +1114,10 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       if (material) {
         material.updateDynamicFog(dynamicFogNear, dynamicFogFar)
       }
-    } else if (isFlyingIn) {
+    } else if (flyInTween.current) {
       // Start with 3x fog, then decrease smoothly during fly-in - 20% slower retreat
       // Use slower easeOut curve for delayed fog retreat
+      // Check flyInTween instead of isFlyingIn (more reliable)
       const slowerProgress = flyInProgress * 0.8 // 20% slower fog retreat
       const easedProgress = 1 - Math.pow(1 - slowerProgress, 2) // EaseOut curve with slower timing
       const targetFogIntensity = 3.0 - (easedProgress * 2.0) // From 3x down to 1x (normal)
@@ -1166,18 +1200,21 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       currentOffset.current = animatedOffset
       targetOffset.current = animatedOffset
       
-    } else if (isFlyingIn && flyInTween.current && !isAnimationCancelled.current) {
+    } else if (flyInTween.current && !isAnimationCancelled.current && !isUserInteracting.current) {
       // GSAP-driven fly-in animation - runs until interrupted by user
+      // TRIPLE CHECK: flyInTween exists, not cancelled, AND no user interaction
       const slideDistance = 67
-      
-      // Apply power2.out easing to the final position (zachte landing)  
+
+      // Apply power2.out easing to the final position (zachte landing)
       const power2Out = (t) => 1 - Math.pow(1 - t, 2)
       const easedProgress = power2Out(flyInProgress)
-      
+
       const animatedOffset = flyInStartOffset.current - (easedProgress * slideDistance)
-      
+
       // Animation controls position until user interrupts
-      currentOffset.current = animatedOffset
+      // Use smooth lerping even during animation to prevent glitches
+      const animLerpSpeed = 0.3 // Faster lerp during animation
+      currentOffset.current += (animatedOffset - currentOffset.current) * animLerpSpeed
       targetOffset.current = animatedOffset
       
     } else {
@@ -1204,7 +1241,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       }
       
       // Always use smooth interpolation between current and target
-      const lerpSpeed = isUserInteracting.current ? 0.15 : 0.08 // Faster during interaction, slower when settling
+      // Extra responsive during fly-in if user starts interacting
+      // Use flyInTween check instead of isFlyingIn state
+      const lerpSpeed = (isUserInteracting.current || (flyInTween.current && animationEndTime.current === 0)) ? 0.15 : 0.08
       currentOffset.current += (targetOffset.current - currentOffset.current) * lerpSpeed
       
       // Handle very subtle snapping only when not interacting
@@ -1281,12 +1320,13 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     }
     
     // Use eased progress for sweep timing to match position animation
-    if (isFlyingIn) {
+    // Check flyInTween instead of isFlyingIn for more reliable detection
+    if (flyInTween.current) {
       const power2Out = (t) => 1 - Math.pow(1 - t, 2)
       const easedSweepProgress = power2Out(flyInProgress) // Same power2.out als slider movement
-      material.updateFlyIn(isFlyingIn, easedSweepProgress)
+      material.updateFlyIn(true, easedSweepProgress)
     } else {
-      material.updateFlyIn(isFlyingIn, flyInProgress)
+      material.updateFlyIn(false, flyInProgress)
     }
     
     // Apply subtle mouse tracking position offset (desktop with mouse only)
