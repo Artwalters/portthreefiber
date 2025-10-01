@@ -131,7 +131,7 @@ export default function ViewBasedProjects() {
                         // Add fog - adjust for mobile
                         const isMobile = window.innerWidth <= 768
                         if (isMobile) {
-                            scene.fog = new THREE.Fog(0xffffff, 8, 18)
+                            scene.fog = new THREE.Fog(0xffffff, 6, 14)
                         } else {
                             scene.fog = new THREE.Fog(0xffffff, 5, 15)
                         }

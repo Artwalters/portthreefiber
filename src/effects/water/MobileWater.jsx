@@ -176,18 +176,25 @@ const MobileWater = forwardRef((props, ref) => {
 
                     pressure += delta * velocity;
 
-                    // Match SimpleWater's damping for longer lasting waves
-                    velocity *= 0.995; // Same as SimpleWater
-                    pressure *= 0.998; // Same as SimpleWater
+                    // Underwater damping - slower dissipation like SimpleWater
+                    velocity *= 0.998; // Match SimpleWater exactly
+                    pressure *= 0.999; // Match SimpleWater exactly
 
-                    // Mouse interaction - matching SimpleWater
+                    // Underwater hand-swipe interaction (simplified but more like SimpleWater)
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float rippleStrength = 0.5; // Match SimpleWater
-                        float rippleRadius = 0.075; // Match SimpleWater
+                        float swipeRadius = 0.12; // Larger interaction area like SimpleWater
+                        float swipeStrength = 0.3;
 
-                        if (dist < rippleRadius) {
-                            pressure += (1.0 - dist / rippleRadius) * rippleStrength;
+                        if (dist < swipeRadius) {
+                            float falloff = smoothstep(swipeRadius, 0.0, dist);
+
+                            // Add subtle turbulence for more natural underwater effect
+                            float turbulence = sin(vUv.x * 30.0 + uTime) * cos(vUv.y * 30.0 - uTime) * 0.2;
+
+                            // Combined underwater effect
+                            float effect = falloff * swipeStrength;
+                            pressure += effect * (1.0 + turbulence);
                         }
                     }
 
@@ -272,14 +279,14 @@ const MobileWater = forwardRef((props, ref) => {
                         gradY = water.w * 2.0 - 1.0;
                     }
 
-                    // Match SimpleWater's distortion strength
-                    float distortionStrength = 0.04;
+                    // More visible distortion for underwater effect (like SimpleWater)
+                    float distortionStrength = 0.055;
 
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
 
-                    // Chromatic aberration - sample RGB channels with slight offset
-                    float aberrationStrength = 0.002; // Very subtle
+                    // Chromatic aberration - more subtle like SimpleWater
+                    float aberrationStrength = 0.001; // Even more subtle
                     vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
 
                     // Sample each color channel with different offsets
@@ -287,7 +294,7 @@ const MobileWater = forwardRef((props, ref) => {
                     vec2 uvG = distortedUv;
                     vec2 uvB = distortedUv - aberrationOffset;
 
-                    // Clamp UVs to prevent edge artifacts
+                    // Softer UV clamping to reduce edge artifacts (like SimpleWater)
                     uvR = clamp(uvR, 0.0001, 0.9999);
                     uvG = clamp(uvG, 0.0001, 0.9999);
                     uvB = clamp(uvB, 0.0001, 0.9999);
@@ -300,27 +307,46 @@ const MobileWater = forwardRef((props, ref) => {
 
                     vec4 sceneColor = vec4(r, g, b, a);
 
-                    // Use white fallback for empty pixels
+                    // Softer fallback transition for smoother edges (like SimpleWater)
                     if (sceneColor.a < 0.01) {
                         sceneColor = vec4(1.0, 1.0, 1.0, 1.0);
                     }
 
-                    // Match SimpleWater's subtle water color
+                    // Much more subtle water color - almost white (like SimpleWater)
                     vec3 waterColor = vec3(0.98, 0.99, 1.0);
 
                     // Calculate normal from gradients for lighting
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
                     vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
 
-                    // Specular highlight
-                    float spec = pow(max(dot(normal, lightDir), 0.0), 60.0);
+                    // Depth calculation using pressure values as proxy (like SimpleWater)
+                    float depth = abs(pressure) * 2.0 + 0.1; // Base depth + variation
+                    float depthAttenuation = exp(-depth * 0.5); // Exponential falloff
+
+                    // Cleaner, single-layer specular with depth (like SimpleWater)
+                    float spec = pow(max(dot(normal, lightDir), 0.0), 50.0) * depthAttenuation;
+
+                    // Subtle volumetric scattering (like SimpleWater)
+                    float volumetricScatter = 1.0 - exp(-depth * 0.5);
+                    vec3 scatterColor = vec3(0.95, 0.97, 1.0); // Very subtle blue tint
+
+                    // Cleaner, slower caustics (like SimpleWater)
+                    float causticScale = 6.0;
+                    float caustic = sin(vUv.x * causticScale + uTime * 0.3) * sin(vUv.y * causticScale + uTime * 0.2);
+                    caustic *= exp(-depth * 1.0) * 0.15; // More subtle caustics
 
                     // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
 
-                    // Match SimpleWater's reduced visual effect strength
-                    float effectStrength = 0.3; // Same as SimpleWater
-                    float pressureStrength = 0.03; // Same as SimpleWater
+                    // Add subtle volumetric scattering (like SimpleWater)
+                    finalColor = mix(finalColor, scatterColor, volumetricScatter * 0.05);
+
+                    // Add clean caustics (like SimpleWater)
+                    finalColor += vec3(caustic) * 0.1;
+
+                    // Reduced visual effect strength - keep deformation but less visible water effects (like SimpleWater)
+                    float effectStrength = 0.11; // Slightly more visible glare
+                    float pressureStrength = 0.03; // Reduced for less pressure visibility
 
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;

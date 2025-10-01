@@ -485,7 +485,7 @@ function App() {
                     // Add fog - subtle depth effect, less intense for dragons
                     const isMobile = window.innerWidth <= 768
                     if (isMobile) {
-                        scene.fog = new THREE.Fog(0xffffff, 10, 20)
+                        scene.fog = new THREE.Fog(0xffffff, 7, 15)
                     } else {
                         scene.fog = new THREE.Fog(0xffffff, 8, 18)
                     }
