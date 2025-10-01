@@ -14,21 +14,30 @@ export default function RotatingDragon() {
     // Configurable curve width based on screen size
     const curveWidthScale = useMemo(() => {
         const screenWidth = window.innerWidth
-        if (screenWidth > 1920) return 1.65// Extra large screens
+        if (screenWidth > 1920) return 1.65 // Extra large screens
         if (screenWidth > 1440) return 1.2 // Large screens
+        if (screenWidth <= 768) return 0.7 // Mobile = smaller/narrower
         return 1.0 // Default for normal screens
     }, [])
 
-    // Configurable curve height scale - lower on larger screens
+    // Configurable curve height scale - taller on mobile, lower on large screens
     const curveHeightScale = useMemo(() => {
         const screenWidth = window.innerWidth
         if (screenWidth > 1920) return 0.5 // Extra large screens = much lower
         if (screenWidth > 1440) return 0.7 // Large screens = somewhat lower
+        if (screenWidth <= 768) return 1.6 // Mobile = much taller/more stretched vertically
         return 1.0 // Default for normal screens
     }, [])
 
+    // Vertical offset - move curves down on mobile so start/end points are off-screen
+    const curveYOffset = useMemo(() => {
+        const screenWidth = window.innerWidth
+        if (screenWidth <= 768) return -3.0 // Mobile = move down
+        return 0.0 // Default = no offset
+    }, [])
+
     // Debug mode - set to true to show curve lines and debug spheres
-    const showDebugLines = false
+    const showDebugLines = true
 
     // Load the dragon GLB model
     const { scene: dragonScene } = useGLTF('./models/dragon basev.glb')
@@ -159,15 +168,15 @@ export default function RotatingDragon() {
         console.log('Initializing complete curves...')
 
         // Dragon 1 (RED): Starts at BOTTOM of shape
-        // loopStartOffset = 0.75 (bottom), spiralOffset = 0, yHeight = 0.0 * heightScale, startY = 2.5 * heightScale, widthScale from screen size, heightScale applied
-        const points1 = createDragonCurve(time, 1, 0.90, 0, 0.0 * curveHeightScale, 2.5 * curveHeightScale, curveWidthScale, curveHeightScale)
+        // loopStartOffset = 0.75 (bottom), spiralOffset = 0, yHeight with offset, startY with offset, widthScale from screen size, heightScale applied
+        const points1 = createDragonCurve(time, 1, 0.90, 0, (0.0 * curveHeightScale) + curveYOffset, (2.5 * curveHeightScale) + curveYOffset, curveWidthScale, curveHeightScale)
         const curve1 = new THREE.CatmullRomCurve3(points1, false)
         curve1.curveType = 'centripetal'
         curve1.tension = 0.0
 
         // Dragon 2 (BLUE): Starts at TOP of shape
-        // loopStartOffset = 0.25 (top), spiralOffset = Math.PI (opposite spiral direction), yHeight = 2.0 * heightScale, startY = 0.5 * heightScale, widthScale from screen size, heightScale applied
-        const points2 = createDragonCurve(time, -1, 0.25, Math.PI, 2.0 * curveHeightScale, 0.5 * curveHeightScale, curveWidthScale, curveHeightScale)
+        // loopStartOffset = 0.25 (top), spiralOffset = Math.PI (opposite spiral direction), yHeight with offset, startY with offset, widthScale from screen size, heightScale applied
+        const points2 = createDragonCurve(time, -1, 0.25, Math.PI, (2.0 * curveHeightScale) + curveYOffset, (0.5 * curveHeightScale) + curveYOffset, curveWidthScale, curveHeightScale)
         const curve2 = new THREE.CatmullRomCurve3(points2, false)
         curve2.curveType = 'centripetal'
         curve2.tension = 0.0
@@ -335,7 +344,7 @@ export default function RotatingDragon() {
         }
     }, [])
 
-    useFrame(({ clock }) => {
+    useFrame(({ clock }, delta) => {
         const time = clock.getElapsedTime()
 
         if (!flowObject || !flowObject2 || !originalGeometry || !boundingBox || length <= 0) {
@@ -374,10 +383,10 @@ export default function RotatingDragon() {
         }
 
         // Update progress for both dragons (0 to 1 over entire curve including exit)
-        // Speed: 20% slower than original
-        const speed = 0.00016
-        curveProgress1.current += speed
-        curveProgress2.current += speed
+        // Speed: frame-rate independent (units per second)
+        const speed = 0.0125 // 0.0125 = completes curve in ~80 seconds
+        curveProgress1.current += speed * delta
+        curveProgress2.current += speed * delta
 
         // Reset to start when dragons reach the end for infinite loop
         if (curveProgress1.current > 1.0) {

@@ -175,51 +175,42 @@ const MobileWater = forwardRef((props, ref) => {
                     
                     pressure += delta * velocity;
 
-                    // Underwater damping - same as SimpleWater
-                    velocity *= 0.998;
-                    pressure *= 0.999;
+                    // More aggressive damping for mobile stability
+                    velocity *= 0.99;
+                    pressure *= 0.995;
 
-                    // Underwater hand-swipe interaction - same as SimpleWater
+                    // Simplified interaction for mobile stability
                     if (uMouseDown > 0.5) {
                         float dist = distance(vUv, uMouse);
-                        float swipeRadius = 0.12; // Larger interaction area
-                        float swipeStrength = 0.3;
-
-                        // Calculate flow direction from velocity
-                        vec2 flowDir = normalize(uMouseVelocity + vec2(0.001)); // Avoid zero
-                        float velocityMagnitude = length(uMouseVelocity) * 10.0;
+                        float swipeRadius = 0.1; // Slightly smaller
+                        float swipeStrength = 0.2; // Reduced strength for stability
 
                         if (dist < swipeRadius) {
-                            // Elongated pressure zone in movement direction
-                            vec2 toMouse = vUv - uMouse;
-                            float alongFlow = dot(toMouse, flowDir);
-
-                            // Create trailing effect
-                            float trailFactor = smoothstep(-swipeRadius * 0.5, swipeRadius * 1.5, -alongFlow);
                             float falloff = smoothstep(swipeRadius, 0.0, dist);
 
-                            // Add turbulent flow
-                            float turbulence = sin(vUv.x * 30.0 + uTime) * cos(vUv.y * 30.0 - uTime) * 0.2;
+                            // Simpler interaction without turbulence for stability
+                            pressure += falloff * swipeStrength;
 
-                            // Combined underwater effect
-                            float effect = falloff * trailFactor * swipeStrength * (1.0 + velocityMagnitude);
-                            pressure += effect * (1.0 + turbulence);
-
-                            // Add directional velocity
-                            velocity += effect * dot(toMouse, flowDir) * 0.3;
+                            // Add subtle directional velocity
+                            vec2 toMouse = normalize(vUv - uMouse + vec2(0.001));
+                            float velocityMagnitude = length(uMouseVelocity);
+                            velocity += falloff * velocityMagnitude * 0.1;
                         }
                     }
+
+                    // Clamp values to prevent instability
+                    pressure = clamp(pressure, -2.0, 2.0);
+                    velocity = clamp(velocity, -2.0, 2.0);
                     
-                    // Stronger idle deformation - same as SimpleWater
-                    float idleWaveStrength = 0.06;
+                    // Reduced idle deformation for mobile stability
+                    float idleWaveStrength = 0.04; // Reduced from 0.06
                     float idleSpeed = 0.3;
 
-                    // Multiple sine waves at different frequencies for natural movement
-                    float wave1 = sin(vUv.x * 12.0 + uTime * idleSpeed) * 0.4;
-                    float wave2 = sin(vUv.y * 8.0 + uTime * idleSpeed * 0.7) * 0.3;
-                    float wave3 = sin((vUv.x + vUv.y) * 6.0 + uTime * idleSpeed * 1.3) * 0.3;
+                    // Simpler waves for mobile
+                    float wave1 = sin(vUv.x * 8.0 + uTime * idleSpeed) * 0.5;
+                    float wave2 = sin(vUv.y * 6.0 + uTime * idleSpeed * 0.8) * 0.5;
 
-                    float idleDisturbance = (wave1 + wave2 + wave3) * idleWaveStrength;
+                    float idleDisturbance = (wave1 + wave2) * idleWaveStrength;
                     pressure += idleDisturbance;
                     
                     // Calculate gradients for normals
@@ -283,15 +274,19 @@ const MobileWater = forwardRef((props, ref) => {
                         gradY = water.w * 2.0 - 1.0;
                     }
 
-                    // More visible distortion for underwater effect - same as SimpleWater
-                    float distortionStrength = 0.055;
+                    // Clamp gradients to prevent extreme distortion
+                    gradX = clamp(gradX, -1.0, 1.0);
+                    gradY = clamp(gradY, -1.0, 1.0);
+
+                    // Reduced distortion for mobile stability
+                    float distortionStrength = 0.04; // Reduced from 0.055
 
                     vec2 distortion = vec2(gradX, gradY) * distortionStrength;
                     vec2 distortedUv = vUv + distortion;
 
-                    // Chromatic aberration - same as SimpleWater
-                    float aberrationStrength = 0.001;
-                    vec2 aberrationOffset = distortion * aberrationStrength / distortionStrength;
+                    // Reduced chromatic aberration for stability
+                    float aberrationStrength = 0.0005; // Reduced from 0.001
+                    vec2 aberrationOffset = distortion * aberrationStrength / max(distortionStrength, 0.001);
 
                     // Sample each color channel with different offsets
                     vec2 uvR = distortedUv + aberrationOffset;
@@ -323,37 +318,43 @@ const MobileWater = forwardRef((props, ref) => {
                     vec3 normal = normalize(vec3(-gradX, 0.1, -gradY));
                     vec3 lightDir = normalize(vec3(-0.3, 1.0, 0.3));
 
-                    // Depth calculation using pressure values as proxy - same as SimpleWater
-                    float depth = abs(pressure) * 2.0 + 0.1;
+                    // Simplified depth calculation for stability
+                    pressure = clamp(pressure, -1.0, 1.0); // Extra clamping
+                    float depth = abs(pressure) * 1.5 + 0.1;
+                    depth = clamp(depth, 0.0, 3.0); // Prevent extreme values
                     float depthAttenuation = exp(-depth * 0.5);
 
-                    // Cleaner, single-layer specular with depth - same as SimpleWater
-                    float spec = pow(max(dot(normal, lightDir), 0.0), 50.0) * depthAttenuation;
+                    // Simplified specular
+                    float spec = pow(max(dot(normal, lightDir), 0.0), 40.0) * depthAttenuation;
+                    spec = clamp(spec, 0.0, 1.0);
 
-                    // Subtle volumetric scattering - same as SimpleWater
-                    float volumetricScatter = 1.0 - exp(-depth * 0.5);
+                    // Reduced volumetric scattering for stability
+                    float volumetricScatter = clamp(1.0 - exp(-depth * 0.5), 0.0, 0.3);
                     vec3 scatterColor = vec3(0.95, 0.97, 1.0);
 
-                    // Cleaner, slower caustics - same as SimpleWater
-                    float causticScale = 6.0;
-                    float caustic = sin(vUv.x * causticScale + uTime * 0.3) * sin(vUv.y * causticScale + uTime * 0.2);
-                    caustic *= exp(-depth * 1.0) * 0.15;
+                    // Simplified caustics for mobile
+                    float caustic = sin(vUv.x * 4.0 + uTime * 0.2) * sin(vUv.y * 4.0 + uTime * 0.15);
+                    caustic *= exp(-depth * 0.8) * 0.08; // Reduced strength
+                    caustic = clamp(caustic, -0.2, 0.2);
 
                     // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
 
                     // Add subtle volumetric scattering
-                    finalColor = mix(finalColor, scatterColor, volumetricScatter * 0.05);
+                    finalColor = mix(finalColor, scatterColor, volumetricScatter * 0.03);
 
                     // Add clean caustics
-                    finalColor += vec3(caustic) * 0.1;
+                    finalColor += vec3(caustic) * 0.05;
 
-                    // Reduced visual effect strength - same as SimpleWater
-                    float effectStrength = 0.11;
-                    float pressureStrength = 0.03;
+                    // Reduced visual effect strength for stability
+                    float effectStrength = 0.08;
+                    float pressureStrength = 0.02;
 
                     finalColor += vec3(spec) * effectStrength;
                     finalColor += pressure * pressureStrength;
+
+                    // Final clamp to prevent any out-of-range colors
+                    finalColor = clamp(finalColor, 0.0, 1.5);
 
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
