@@ -229,7 +229,7 @@ const GallerySlider = ({ initialImageIndex = 0, waterRef, selectedProject, curre
     flyInTween.current = gsap.to(animObj, {
       progress: 1,
       duration: 1.8, // Slightly longer for more drama
-      ease: "expo.out", // VERY dramatic: explosive fast start → extremely soft landing
+      ease: "expo.in", // VERY dramatic: slow start → explosive fast arrival
       onUpdate: () => {
         animationProgress.current = animObj.progress
       },
