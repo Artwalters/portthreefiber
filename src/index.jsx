@@ -412,41 +412,41 @@ function App() {
         const calculatedOffset = selectedIndex * itemWidth
         setInitialOffset(calculatedOffset)
         
-        // PHASE 1 (0ms): Start plane exit animation - curve completion (2 seconds)
+        // PHASE 1 (0ms): Start plane exit animation (1s expo.in)
         setShouldExitGallery(true)
-        
-        // PHASE 2 (1000ms): Start UI fade out while plane is halfway through curve
+
+        // PHASE 2 (600ms): Start UI fade out while plane is moving
         setTimeout(() => {
             setIsReturningToSlider(true) // This triggers UI fade-out
-        }, 1000)
-        
-        // PHASE 3 (2000ms): Switch sliders after plane has completed curve
+        }, 600)
+
+        // PHASE 3 (1100ms): Switch sliders shortly after gallery exit completes (1000ms)
         setTimeout(() => {
             setShowSingleImage(false)
             setShowFilmStrip(true)
             setIsPostTransition(false) // Exit post-transition mode
-            
+
             // Reset hover states
             setHoveredProject(null)
             setDisplayedProject(null)
             setIsVisible(false)
             setHighlightedProject(null)
             setIsHighlightVisible(false)
-            
+
             // Recreate slider to ensure proper positioning
             setSliderKey(prev => prev + 1) // Force complete slider recreation
             setIsReturningFromGallery(true) // Mark that we're returning from gallery
             setIsSliderAnimationComplete(false) // Mark that slider animation is starting
-        }, 2000)
-        
-        // PHASE 4 (2400ms): Fade UI back in and clean up
+        }, 1100)
+
+        // PHASE 4 (1500ms): Fade UI back in and clean up
         setTimeout(() => {
             setIsReturningToSlider(false) // This triggers UI fade-in
             setSelectedProject(null) // Now safe to clear selected project
             setCurrentImageIndex(0) // Reset image index
             setIsReturningFromGallery(false) // Reset the return flag
             setShouldExitGallery(false) // Reset exit state
-        }, 2400)
+        }, 1500)
     }
 
     // Don't render until projects are loaded
