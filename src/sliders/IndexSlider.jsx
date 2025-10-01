@@ -548,6 +548,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         isUserInteracting.current = true
         userInfluenceFactor.current = 1
 
+        // Ensure mesh is visible when taking control (prevents glitch if cancelled early)
+        setIsInitiallyVisible(true)
+
         // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
 
@@ -692,6 +695,9 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         // Force user control immediately to prevent useFrame race condition
         isUserInteracting.current = true
         userInfluenceFactor.current = 1
+
+        // Ensure mesh is visible when taking control (prevents glitch if cancelled early)
+        setIsInitiallyVisible(true)
 
         // Capture current animated position BEFORE killing
         const currentAnimatedOffset = currentOffset.current
@@ -945,27 +951,30 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     if (isFlyingIn) {
       // Immediate cancellation to prevent useFrame from overriding position
       isAnimationCancelled.current = true
-      
+
+      // Ensure mesh is visible when taking control (prevents glitch if cancelled early)
+      setIsInitiallyVisible(true)
+
       // Stop GSAP animation immediately
       if (flyInTween.current) {
         flyInTween.current.kill()
         flyInTween.current = null
       }
-      
+
       // Capture and freeze current position
       const currentAnimatedOffset = currentOffset.current
       targetOffset.current = currentAnimatedOffset
-      
+
       // Clean up fly-in state
       setIsFlyingIn(false)
       animationEndTime.current = 0
       userInfluenceFactor.current = 1 // Full control immediately
       sliderSpeed.current = 0
-      
+
       // Reset any momentum
       momentum.current = 0
       swipeDirection.current = 0
-      
+
       // Continue with click processing after interruption
     }
     
