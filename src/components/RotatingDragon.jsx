@@ -36,6 +36,13 @@ export default function RotatingDragon() {
         return 0.0 // Default = no offset
     }, [])
 
+    // Animation speed - 10% faster on mobile
+    const animationSpeed = useMemo(() => {
+        const screenWidth = window.innerWidth
+        if (screenWidth <= 768) return 0.015125 // Mobile = 10% faster (~66 seconds)
+        return 0.01375 // Desktop = ~73 seconds
+    }, [])
+
     // Debug mode - set to true to show curve lines and debug spheres
     const showDebugLines = true
 
@@ -384,9 +391,8 @@ export default function RotatingDragon() {
 
         // Update progress for both dragons (0 to 1 over entire curve including exit)
         // Speed: frame-rate independent (units per second)
-        const speed = 0.0125 // 0.0125 = completes curve in ~80 seconds
-        curveProgress1.current += speed * delta
-        curveProgress2.current += speed * delta
+        curveProgress1.current += animationSpeed * delta
+        curveProgress2.current += animationSpeed * delta
 
         // Reset to start when dragons reach the end for infinite loop
         if (curveProgress1.current > 1.0) {
