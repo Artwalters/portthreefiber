@@ -1,7 +1,8 @@
-import React, { useRef, useMemo } from 'react'
+import React, { useRef, useMemo, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { Html } from '@react-three/drei'
 
 const UPDATE_INTERVAL = 1 / 60
 
@@ -10,6 +11,17 @@ const UPDATE_INTERVAL = 1 / 60
 
 export default function RotatingDragon() {
     const flowRef = useRef()
+    const [debugInfo, setDebugInfo] = useState([])
+    const [shaderError, setShaderError] = useState(null)
+
+    // Mobile debug logger - shows on screen
+    const addDebugLog = (message) => {
+        const isMobile = window.innerWidth <= 768
+        if (isMobile) {
+            setDebugInfo(prev => [...prev.slice(-8), `${new Date().toLocaleTimeString()}: ${message}`])
+        }
+        console.log(message)
+    }
 
     // Configurable curve width based on screen size
     const curveWidthScale = useMemo(() => {
@@ -180,7 +192,9 @@ export default function RotatingDragon() {
         let useFloats = false
 
         if (gl) {
-            console.log('[Dragon Texture] WebGL version:', gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL1')
+            const webglVersion = gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL1'
+            addDebugLog(`[Texture] ${webglVersion}`)
+            console.log('[Dragon Texture] WebGL version:', webglVersion)
 
             // WebGL 2.0 check
             if (gl instanceof WebGL2RenderingContext) {
@@ -188,9 +202,11 @@ export default function RotatingDragon() {
                 if (floatExt) {
                     textureType = THREE.FloatType
                     useFloats = true
+                    addDebugLog('[Texture] FloatType')
                     console.log('[Dragon Texture] Using FloatType (WebGL2 + EXT_color_buffer_float)')
                 } else {
                     textureType = THREE.HalfFloatType
+                    addDebugLog('[Texture] HalfFloatType')
                     console.log('[Dragon Texture] Using HalfFloatType (WebGL2 without float support)')
                 }
             } else {
@@ -364,6 +380,7 @@ export default function RotatingDragon() {
             flowObject.material.uniforms.uCurveTexture.value = texture1
             flowObject2.material.uniforms.uCurveTexture.value = texture2
 
+            addDebugLog('[Init] Textures baked to GPU')
             console.log('Curve textures baked to GPU', {
                 texture1Type: texture1.type,
                 texture2Type: texture2.type,
@@ -373,6 +390,7 @@ export default function RotatingDragon() {
         }
 
         curvesInitialized.current = true
+        addDebugLog('[Init] Curves ready!')
         console.log('Curves initialized')
     }
 
@@ -443,7 +461,9 @@ export default function RotatingDragon() {
 
         // Custom GPU shader material with curve deformation
         const createDragonMaterial = (color) => {
-            return new THREE.ShaderMaterial({
+            let material
+            try {
+                material = new THREE.ShaderMaterial({
                 uniforms: THREE.UniformsUtils.merge([
                     THREE.UniformsLib.fog, // Add built-in fog uniforms
                     {
@@ -617,12 +637,31 @@ export default function RotatingDragon() {
                 depthWrite: true,
                 depthTest: true
             })
+
+            // Check for shader compilation errors
+            material.onBeforeCompile = (shader, renderer) => {
+                addDebugLog('[Shader] Compiling...')
+            }
+
+            return material
+
+            } catch (error) {
+                addDebugLog(`[Shader ERROR] ${error.message}`)
+                setShaderError(error.message)
+
+                // Fallback to basic material
+                return new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.7,
+                    metalness: 0.1
+                })
+            }
         }
 
         const materialRed = createDragonMaterial(0xff0000)
         const materialBlue = createDragonMaterial(0x0066ff)
 
-        console.log('[Dragon Init] Materials created')
+        addDebugLog('[Dragon Init] Materials created')
 
         // Create geometries - shared geometry, different materials
         const flowGeometry1 = geometry.clone()
@@ -631,6 +670,7 @@ export default function RotatingDragon() {
         const flowObject = new THREE.Mesh(flowGeometry1, materialRed)
         const flowObject2 = new THREE.Mesh(flowGeometry2, materialBlue)
 
+        addDebugLog(`[Dragon Init] Meshes: ${flowGeometry1.attributes.position.count} vertices`)
         console.log('[Dragon Init] Meshes created:', {
             vertices: flowGeometry1.attributes.position.count,
             flowObject: flowObject,
@@ -676,6 +716,7 @@ export default function RotatingDragon() {
 
         // Debug log first few frames
         if (frameCount.current <= 3) {
+            addDebugLog(`[Frame ${frameCount.current}] Running`)
             console.log('[Dragon Frame]', frameCount.current, {
                 time,
                 progress1: curveProgress1.current,
@@ -733,8 +774,31 @@ export default function RotatingDragon() {
         }
     })
 
+    const isMobile = window.innerWidth <= 768
+
     return (
         <>
+            {/* Mobile Debug Overlay - ONLY on mobile */}
+            {isMobile && debugInfo.length > 0 && (
+                <Html position={[0, 5, 0]} center style={{
+                    background: 'rgba(0,0,0,0.8)',
+                    color: shaderError ? '#ff0000' : '#00ff00',
+                    padding: '10px',
+                    borderRadius: '5px',
+                    fontSize: '10px',
+                    maxWidth: '300px',
+                    pointerEvents: 'none',
+                    fontFamily: 'monospace'
+                }}>
+                    <div>
+                        {shaderError && <div style={{color: '#ff0000', fontWeight: 'bold'}}>SHADER ERROR: {shaderError}</div>}
+                        {debugInfo.map((log, i) => (
+                            <div key={i}>{log}</div>
+                        ))}
+                    </div>
+                </Html>
+            )}
+
             {/* Curve visualizations - RED for dragon 1, BLUE for dragon 2 (only shown in debug mode) */}
             {showDebugLines && (
                 <>
