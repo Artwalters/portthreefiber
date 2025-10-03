@@ -15,13 +15,22 @@ export default function RotatingDragon() {
     const [shaderError, setShaderError] = useState(null)
 
     // Mobile debug logger - shows on screen
+    const debugLogRef = useRef([])
     const addDebugLog = (message) => {
         const isMobile = window.innerWidth <= 768
-        if (isMobile) {
-            setDebugInfo(prev => [...prev.slice(-8), `${new Date().toLocaleTimeString()}: ${message}`])
-        }
+        const timeMsg = `${new Date().toLocaleTimeString()}: ${message}`
         console.log(message)
+
+        if (isMobile) {
+            debugLogRef.current = [...debugLogRef.current.slice(-8), timeMsg]
+            setDebugInfo([...debugLogRef.current])
+        }
     }
+
+    // Log on mount
+    useEffect(() => {
+        addDebugLog('[Mount] Dragon component mounted')
+    }, [])
 
     // Configurable curve width based on screen size
     const curveWidthScale = useMemo(() => {
@@ -193,7 +202,7 @@ export default function RotatingDragon() {
 
         if (gl) {
             const webglVersion = gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL1'
-            addDebugLog(`[Texture] ${webglVersion}`)
+            console.error(`[MOBILE DEBUG] WebGL version: ${webglVersion}`)
             console.log('[Dragon Texture] WebGL version:', webglVersion)
 
             // WebGL 2.0 check
@@ -202,11 +211,11 @@ export default function RotatingDragon() {
                 if (floatExt) {
                     textureType = THREE.FloatType
                     useFloats = true
-                    addDebugLog('[Texture] FloatType')
+                    console.error('[MOBILE DEBUG] Using FloatType')
                     console.log('[Dragon Texture] Using FloatType (WebGL2 + EXT_color_buffer_float)')
                 } else {
                     textureType = THREE.HalfFloatType
-                    addDebugLog('[Texture] HalfFloatType')
+                    console.error('[MOBILE DEBUG] Using HalfFloatType')
                     console.log('[Dragon Texture] Using HalfFloatType (WebGL2 without float support)')
                 }
             } else {
@@ -217,14 +226,19 @@ export default function RotatingDragon() {
                 if (floatExt) {
                     textureType = THREE.FloatType
                     useFloats = true
+                    console.error('[MOBILE DEBUG] Using FloatType (WebGL1)')
                     console.log('[Dragon Texture] Using FloatType (WebGL1 + OES_texture_float)')
                 } else if (halfFloatExt) {
                     textureType = THREE.HalfFloatType
+                    console.error('[MOBILE DEBUG] Using HalfFloatType (WebGL1)')
                     console.log('[Dragon Texture] Using HalfFloatType (WebGL1 + OES_texture_half_float)')
                 } else {
+                    console.error('[MOBILE DEBUG] WARNING: Using UnsignedByteType (low precision!)')
                     console.warn('[Dragon Texture] No float support! Using UnsignedByteType - precision may be reduced')
                 }
             }
+        } else {
+            console.error('[MOBILE DEBUG] ERROR: No WebGL context!')
         }
 
         // Create data array based on type
@@ -374,23 +388,26 @@ export default function RotatingDragon() {
 
         // Bake curves to GPU textures
         if (flowObject && flowObject2) {
+            console.error('[MOBILE DEBUG] Starting texture baking...')
             const texture1 = bakeCurveToTexture(dragonCurve1.current)
             const texture2 = bakeCurveToTexture(dragonCurve2.current)
 
             flowObject.material.uniforms.uCurveTexture.value = texture1
             flowObject2.material.uniforms.uCurveTexture.value = texture2
 
-            addDebugLog('[Init] Textures baked to GPU')
-            console.log('Curve textures baked to GPU', {
+            console.error('[MOBILE DEBUG] Textures baked:', {
                 texture1Type: texture1.type,
                 texture2Type: texture2.type,
-                flowObjectVisible: flowObject.visible,
-                flowObject2Visible: flowObject2.visible
+                texture1Size: `${texture1.image.width}x${texture1.image.height}`,
+                hasTexture1: !!flowObject.material.uniforms.uCurveTexture.value,
+                hasTexture2: !!flowObject2.material.uniforms.uCurveTexture.value
             })
+        } else {
+            console.error('[MOBILE DEBUG] ERROR: No flowObjects to bake textures to!')
         }
 
         curvesInitialized.current = true
-        addDebugLog('[Init] Curves ready!')
+        console.error('[MOBILE DEBUG] Curves initialized successfully')
         console.log('Curves initialized')
     }
 
@@ -433,7 +450,10 @@ export default function RotatingDragon() {
         dragonScene.traverse((child) => {
             if (child.isMesh && !dragonMesh) {
                 dragonMesh = child
-                console.log(`Dragon model: ${dragonMesh.geometry.attributes.position.count} vertices, ~${Math.floor(dragonMesh.geometry.index ? dragonMesh.geometry.index.count / 3 : dragonMesh.geometry.attributes.position.count / 3)} triangles`)
+                const vertexCount = dragonMesh.geometry.attributes.position.count
+        const triangleCount = Math.floor(dragonMesh.geometry.index ? dragonMesh.geometry.index.count / 3 : dragonMesh.geometry.attributes.position.count / 3)
+        console.error(`[MOBILE DEBUG] Dragon model loaded: ${vertexCount} vertices, ${triangleCount} triangles`)
+        console.log(`Dragon model: ${vertexCount} vertices, ~${triangleCount} triangles`)
             }
         })
 
@@ -661,7 +681,10 @@ export default function RotatingDragon() {
         const materialRed = createDragonMaterial(0xff0000)
         const materialBlue = createDragonMaterial(0x0066ff)
 
-        addDebugLog('[Dragon Init] Materials created')
+        console.error('[MOBILE DEBUG] Materials created:', {
+            materialRed: materialRed.type,
+            materialBlue: materialBlue.type
+        })
 
         // Create geometries - shared geometry, different materials
         const flowGeometry1 = geometry.clone()
@@ -670,7 +693,18 @@ export default function RotatingDragon() {
         const flowObject = new THREE.Mesh(flowGeometry1, materialRed)
         const flowObject2 = new THREE.Mesh(flowGeometry2, materialBlue)
 
-        addDebugLog(`[Dragon Init] Meshes: ${flowGeometry1.attributes.position.count} vertices`)
+        // CRITICAL: Force visibility and frustum culling off
+        flowObject.frustumCulled = false
+        flowObject2.frustumCulled = false
+        flowObject.visible = true
+        flowObject2.visible = true
+
+        console.error('[MOBILE DEBUG] Meshes created:', {
+            vertices: flowGeometry1.attributes.position.count,
+            visible1: flowObject.visible,
+            visible2: flowObject2.visible,
+            frustumCulled: flowObject.frustumCulled
+        })
         console.log('[Dragon Init] Meshes created:', {
             vertices: flowGeometry1.attributes.position.count,
             flowObject: flowObject,
