@@ -535,8 +535,9 @@ function App() {
                 )}
 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                {/* TEMPORARY: Water disabled on mobile for dragon testing */}
-                {!deviceCapabilities?.shouldUseMobileWater && (
+                {deviceCapabilities?.shouldUseMobileWater ? (
+                    <MobileWater ref={waterRef} />
+                ) : (
                     <SimpleWater ref={waterRef} />
                 )}
 

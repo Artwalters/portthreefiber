@@ -168,55 +168,122 @@ export default function RotatingDragon() {
         return { tangents, normals, binormals }
     }
 
-    // Bake curve data to DataTexture for GPU
+    // Bake curve data to DataTexture for GPU - with better mobile support
     const bakeCurveToTexture = (curveData) => {
         const cacheSize = 2000
 
-        // Try FloatType first, fallback to HalfFloatType for mobile compatibility
-        let textureType = THREE.FloatType
-        let data = new Float32Array(cacheSize * 4 * 4)
-
-        // Check if device supports FloatType textures
+        // Detect WebGL capabilities
         const canvas = document.createElement('canvas')
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+
+        let textureType = THREE.UnsignedByteType // Safest fallback
+        let useFloats = false
+
         if (gl) {
-            const floatExt = gl.getExtension('OES_texture_float')
-            if (!floatExt) {
-                console.log('FloatType not supported, using HalfFloatType')
-                textureType = THREE.HalfFloatType
+            console.log('[Dragon Texture] WebGL version:', gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL1')
+
+            // WebGL 2.0 check
+            if (gl instanceof WebGL2RenderingContext) {
+                const floatExt = gl.getExtension('EXT_color_buffer_float')
+                if (floatExt) {
+                    textureType = THREE.FloatType
+                    useFloats = true
+                    console.log('[Dragon Texture] Using FloatType (WebGL2 + EXT_color_buffer_float)')
+                } else {
+                    textureType = THREE.HalfFloatType
+                    console.log('[Dragon Texture] Using HalfFloatType (WebGL2 without float support)')
+                }
+            } else {
+                // WebGL 1.0 check
+                const floatExt = gl.getExtension('OES_texture_float')
+                const halfFloatExt = gl.getExtension('OES_texture_half_float')
+
+                if (floatExt) {
+                    textureType = THREE.FloatType
+                    useFloats = true
+                    console.log('[Dragon Texture] Using FloatType (WebGL1 + OES_texture_float)')
+                } else if (halfFloatExt) {
+                    textureType = THREE.HalfFloatType
+                    console.log('[Dragon Texture] Using HalfFloatType (WebGL1 + OES_texture_half_float)')
+                } else {
+                    console.warn('[Dragon Texture] No float support! Using UnsignedByteType - precision may be reduced')
+                }
             }
         }
 
-        // 4 rows: points (row 0), tangents (row 1), normals (row 2), binormals (row 3)
-        for (let i = 0; i < cacheSize; i++) {
-            const baseIndex = i * 4
+        // Create data array based on type
+        let data
+        if (textureType === THREE.UnsignedByteType) {
+            // Pack floats into bytes (0-255 range) - loses precision but works everywhere
+            data = new Uint8Array(cacheSize * 4 * 4)
 
-            // Row 0: Points
-            data[baseIndex + 0] = curveData.points[i].x
-            data[baseIndex + 1] = curveData.points[i].y
-            data[baseIndex + 2] = curveData.points[i].z
-            data[baseIndex + 3] = 1.0
+            for (let i = 0; i < cacheSize; i++) {
+                const baseIndex = i * 4
 
-            // Row 1: Tangents
-            const tangentIndex = cacheSize * 4 + baseIndex
-            data[tangentIndex + 0] = curveData.tangents[i].x
-            data[tangentIndex + 1] = curveData.tangents[i].y
-            data[tangentIndex + 2] = curveData.tangents[i].z
-            data[tangentIndex + 3] = 1.0
+                // Helper to pack float to byte (normalize to 0-255)
+                const packFloat = (val) => Math.floor((val + 20) / 40 * 255) // Assume range -20 to +20
 
-            // Row 2: Normals
-            const normalIndex = cacheSize * 8 + baseIndex
-            data[normalIndex + 0] = curveData.normals[i].x
-            data[normalIndex + 1] = curveData.normals[i].y
-            data[normalIndex + 2] = curveData.normals[i].z
-            data[normalIndex + 3] = 1.0
+                // Row 0: Points
+                data[baseIndex + 0] = packFloat(curveData.points[i].x)
+                data[baseIndex + 1] = packFloat(curveData.points[i].y)
+                data[baseIndex + 2] = packFloat(curveData.points[i].z)
+                data[baseIndex + 3] = 255
 
-            // Row 3: Binormals
-            const binormalIndex = cacheSize * 12 + baseIndex
-            data[binormalIndex + 0] = curveData.binormals[i].x
-            data[binormalIndex + 1] = curveData.binormals[i].y
-            data[binormalIndex + 2] = curveData.binormals[i].z
-            data[binormalIndex + 3] = 1.0
+                // Row 1: Tangents
+                const tangentIndex = cacheSize * 4 + baseIndex
+                data[tangentIndex + 0] = packFloat(curveData.tangents[i].x)
+                data[tangentIndex + 1] = packFloat(curveData.tangents[i].y)
+                data[tangentIndex + 2] = packFloat(curveData.tangents[i].z)
+                data[tangentIndex + 3] = 255
+
+                // Row 2: Normals (already -1 to 1, pack differently)
+                const normalIndex = cacheSize * 8 + baseIndex
+                data[normalIndex + 0] = Math.floor((curveData.normals[i].x + 1) / 2 * 255)
+                data[normalIndex + 1] = Math.floor((curveData.normals[i].y + 1) / 2 * 255)
+                data[normalIndex + 2] = Math.floor((curveData.normals[i].z + 1) / 2 * 255)
+                data[normalIndex + 3] = 255
+
+                // Row 3: Binormals
+                const binormalIndex = cacheSize * 12 + baseIndex
+                data[binormalIndex + 0] = Math.floor((curveData.binormals[i].x + 1) / 2 * 255)
+                data[binormalIndex + 1] = Math.floor((curveData.binormals[i].y + 1) / 2 * 255)
+                data[binormalIndex + 2] = Math.floor((curveData.binormals[i].z + 1) / 2 * 255)
+                data[binormalIndex + 3] = 255
+            }
+        } else {
+            // Float or HalfFloat - use Float32Array
+            data = new Float32Array(cacheSize * 4 * 4)
+
+            for (let i = 0; i < cacheSize; i++) {
+                const baseIndex = i * 4
+
+                // Row 0: Points
+                data[baseIndex + 0] = curveData.points[i].x
+                data[baseIndex + 1] = curveData.points[i].y
+                data[baseIndex + 2] = curveData.points[i].z
+                data[baseIndex + 3] = 1.0
+
+                // Row 1: Tangents
+                const tangentIndex = cacheSize * 4 + baseIndex
+                data[tangentIndex + 0] = curveData.tangents[i].x
+                data[tangentIndex + 1] = curveData.tangents[i].y
+                data[tangentIndex + 2] = curveData.tangents[i].z
+                data[tangentIndex + 3] = 1.0
+
+                // Row 2: Normals
+                const normalIndex = cacheSize * 8 + baseIndex
+                data[normalIndex + 0] = curveData.normals[i].x
+                data[normalIndex + 1] = curveData.normals[i].y
+                data[normalIndex + 2] = curveData.normals[i].z
+                data[normalIndex + 3] = 1.0
+
+                // Row 3: Binormals
+                const binormalIndex = cacheSize * 12 + baseIndex
+                data[binormalIndex + 0] = curveData.binormals[i].x
+                data[binormalIndex + 1] = curveData.binormals[i].y
+                data[binormalIndex + 2] = curveData.binormals[i].z
+                data[binormalIndex + 3] = 1.0
+            }
         }
 
         const texture = new THREE.DataTexture(data, cacheSize, 4, THREE.RGBAFormat, textureType)
@@ -225,6 +292,13 @@ export default function RotatingDragon() {
         texture.magFilter = THREE.LinearFilter
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
+
+        console.log('[Dragon Texture] Created texture:', {
+            type: textureType,
+            width: cacheSize,
+            height: 4,
+            dataLength: data.length
+        })
 
         return texture
     }
@@ -402,12 +476,45 @@ export default function RotatingDragon() {
                     const float snakeWaveAmplitude = 0.2;
                     const float snakeWaveSpeed = 3.0;
 
-                    // Sample curve data from texture
+                    // Sample curve data from texture - handles both float and byte textures
                     vec4 sampleCurve(float t, int offset) {
                         float index = t * (CACHE_SIZE - 1.0);
                         float u = (index + 0.5) / CACHE_SIZE;
                         float v = (float(offset) + 0.5) / 4.0; // 4 rows: points, tangents, normals, binormals
-                        return texture2D(uCurveTexture, vec2(u, v));
+                        vec4 data = texture2D(uCurveTexture, vec2(u, v));
+
+                        // Check if data looks normalized (0-1 range) - indicates UnsignedByteType
+                        // For positions, absolute values should be > 1 if using floats
+                        if (offset == 0 && abs(data.x) < 1.5 && abs(data.y) < 1.5) {
+                            // Unpack from byte range (0-255) back to float (-20 to +20 for positions)
+                            if (offset == 0) {
+                                // Positions
+                                return vec4(
+                                    data.x * 40.0 - 20.0,
+                                    data.y * 40.0 - 20.0,
+                                    data.z * 40.0 - 20.0,
+                                    1.0
+                                );
+                            } else if (offset == 1) {
+                                // Tangents
+                                return vec4(
+                                    data.x * 40.0 - 20.0,
+                                    data.y * 40.0 - 20.0,
+                                    data.z * 40.0 - 20.0,
+                                    1.0
+                                );
+                            } else {
+                                // Normals and binormals (-1 to 1)
+                                return vec4(
+                                    data.x * 2.0 - 1.0,
+                                    data.y * 2.0 - 1.0,
+                                    data.z * 2.0 - 1.0,
+                                    1.0
+                                );
+                            }
+                        }
+
+                        return data;
                     }
 
                     void main() {
@@ -515,12 +622,21 @@ export default function RotatingDragon() {
         const materialRed = createDragonMaterial(0xff0000)
         const materialBlue = createDragonMaterial(0x0066ff)
 
+        console.log('[Dragon Init] Materials created')
+
         // Create geometries - shared geometry, different materials
         const flowGeometry1 = geometry.clone()
         const flowGeometry2 = geometry.clone()
 
         const flowObject = new THREE.Mesh(flowGeometry1, materialRed)
         const flowObject2 = new THREE.Mesh(flowGeometry2, materialBlue)
+
+        console.log('[Dragon Init] Meshes created:', {
+            vertices: flowGeometry1.attributes.position.count,
+            flowObject: flowObject,
+            flowObject2: flowObject2,
+            visible: flowObject.visible && flowObject2.visible
+        })
 
         return {
             flowObject,
@@ -535,10 +651,16 @@ export default function RotatingDragon() {
 
     // GPU deformation - no worker needed anymore
 
+    const frameCount = useRef(0)
+
     useFrame(({ clock }, delta) => {
         const time = clock.getElapsedTime()
+        frameCount.current++
 
         if (!flowObject || !flowObject2) {
+            if (frameCount.current === 1) {
+                console.log('[Dragon Frame] No flowObjects yet')
+            }
             return
         }
 
@@ -546,7 +668,23 @@ export default function RotatingDragon() {
         initializeCurves(time)
 
         if (!dragonCurve1.current || !dragonCurve2.current) {
+            if (frameCount.current < 5) {
+                console.log('[Dragon Frame] Waiting for curves to initialize...', frameCount.current)
+            }
             return
+        }
+
+        // Debug log first few frames
+        if (frameCount.current <= 3) {
+            console.log('[Dragon Frame]', frameCount.current, {
+                time,
+                progress1: curveProgress1.current,
+                progress2: curveProgress2.current,
+                hasTexture1: !!flowObject.material.uniforms.uCurveTexture.value,
+                hasTexture2: !!flowObject2.material.uniforms.uCurveTexture.value,
+                visible1: flowObject.visible,
+                visible2: flowObject2.visible
+            })
         }
 
         // Update curve visualizations (debug only)

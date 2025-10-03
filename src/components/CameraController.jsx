@@ -18,6 +18,10 @@ export default function CameraController() {
     const velocity = useRef(new THREE.Vector3())
     const direction = useRef(new THREE.Vector3())
 
+    // Store original camera position and rotation
+    const originalPosition = useRef(camera.position.clone())
+    const originalRotation = useRef(camera.rotation.clone())
+
     // Movement settings
     const baseMoveSpeed = 12
     const moveSpeed = useRef(12)
@@ -106,7 +110,17 @@ export default function CameraController() {
         }
 
         const handlePointerLockChange = () => {
+            const wasLocked = isMouseLocked.current
             isMouseLocked.current = document.pointerLockElement === document.body
+
+            // If pointer lock was just released, return camera to original position
+            if (wasLocked && !isMouseLocked.current) {
+                camera.position.copy(originalPosition.current)
+                camera.rotation.copy(originalRotation.current)
+                mouseRef.current.x = 0
+                mouseRef.current.y = 0
+                velocity.current.set(0, 0, 0)
+            }
         }
 
         const handleWheel = (event) => {
@@ -137,6 +151,9 @@ export default function CameraController() {
     }, [])
 
     useFrame((state, delta) => {
+        // Only allow movement when pointer is locked (F key pressed)
+        if (!isMouseLocked.current) return
+
         // Calculate movement direction
         direction.current.set(0, 0, 0)
 
@@ -170,11 +187,9 @@ export default function CameraController() {
         camera.position.addScaledVector(velocity.current, delta)
 
         // Apply mouse look rotation
-        if (isMouseLocked.current) {
-            camera.rotation.order = 'YXZ'
-            camera.rotation.y = mouseRef.current.x
-            camera.rotation.x = mouseRef.current.y
-        }
+        camera.rotation.order = 'YXZ'
+        camera.rotation.y = mouseRef.current.x
+        camera.rotation.x = mouseRef.current.y
     })
 
     return null // This component doesn't render anything
