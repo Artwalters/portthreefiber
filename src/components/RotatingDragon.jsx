@@ -1,8 +1,7 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react'
+import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { Html } from '@react-three/drei'
 
 const UPDATE_INTERVAL = 1 / 60
 
@@ -11,26 +10,6 @@ const UPDATE_INTERVAL = 1 / 60
 
 export default function RotatingDragon() {
     const flowRef = useRef()
-    const [debugInfo, setDebugInfo] = useState([])
-    const [shaderError, setShaderError] = useState(null)
-
-    // Mobile debug logger - shows on screen
-    const debugLogRef = useRef([])
-    const addDebugLog = (message) => {
-        const isMobile = window.innerWidth <= 768
-        const timeMsg = `${new Date().toLocaleTimeString()}: ${message}`
-        console.log(message)
-
-        if (isMobile) {
-            debugLogRef.current = [...debugLogRef.current.slice(-8), timeMsg]
-            setDebugInfo([...debugLogRef.current])
-        }
-    }
-
-    // Log on mount
-    useEffect(() => {
-        addDebugLog('[Mount] Dragon component mounted')
-    }, [])
 
     // Configurable curve width based on screen size
     const curveWidthScale = useMemo(() => {
@@ -202,8 +181,6 @@ export default function RotatingDragon() {
 
         if (gl) {
             const webglVersion = gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL1'
-            console.error(`[MOBILE DEBUG] WebGL version: ${webglVersion}`)
-            console.log('[Dragon Texture] WebGL version:', webglVersion)
 
             // WebGL 2.0 check
             if (gl instanceof WebGL2RenderingContext) {
@@ -211,12 +188,8 @@ export default function RotatingDragon() {
                 if (floatExt) {
                     textureType = THREE.FloatType
                     useFloats = true
-                    console.error('[MOBILE DEBUG] Using FloatType')
-                    console.log('[Dragon Texture] Using FloatType (WebGL2 + EXT_color_buffer_float)')
                 } else {
                     textureType = THREE.HalfFloatType
-                    console.error('[MOBILE DEBUG] Using HalfFloatType')
-                    console.log('[Dragon Texture] Using HalfFloatType (WebGL2 without float support)')
                 }
             } else {
                 // WebGL 1.0 check
@@ -226,19 +199,10 @@ export default function RotatingDragon() {
                 if (floatExt) {
                     textureType = THREE.FloatType
                     useFloats = true
-                    console.error('[MOBILE DEBUG] Using FloatType (WebGL1)')
-                    console.log('[Dragon Texture] Using FloatType (WebGL1 + OES_texture_float)')
                 } else if (halfFloatExt) {
                     textureType = THREE.HalfFloatType
-                    console.error('[MOBILE DEBUG] Using HalfFloatType (WebGL1)')
-                    console.log('[Dragon Texture] Using HalfFloatType (WebGL1 + OES_texture_half_float)')
-                } else {
-                    console.error('[MOBILE DEBUG] WARNING: Using UnsignedByteType (low precision!)')
-                    console.warn('[Dragon Texture] No float support! Using UnsignedByteType - precision may be reduced')
                 }
             }
-        } else {
-            console.error('[MOBILE DEBUG] ERROR: No WebGL context!')
         }
 
         // Create data array based on type
@@ -326,11 +290,9 @@ export default function RotatingDragon() {
             if (floatLinearExt) {
                 texture.minFilter = THREE.LinearFilter
                 texture.magFilter = THREE.LinearFilter
-                console.error('[MOBILE DEBUG] Using LinearFilter (extension available)')
             } else {
                 texture.minFilter = THREE.NearestFilter
                 texture.magFilter = THREE.NearestFilter
-                console.error('[MOBILE DEBUG] Using NearestFilter (no linear filtering extension)')
             }
         } else {
             // UnsignedByteType always supports linear filtering
@@ -341,23 +303,12 @@ export default function RotatingDragon() {
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
 
-        console.log('[Dragon Texture] Created texture:', {
-            type: textureType,
-            width: cacheSize,
-            height: 4,
-            dataLength: data.length,
-            minFilter: texture.minFilter,
-            magFilter: texture.magFilter
-        })
-
         return texture
     }
 
     // Initialize complete curves once
     const initializeCurves = (time) => {
         if (curvesInitialized.current) return
-
-        console.log('Initializing complete curves...')
 
         // Dragon 1 (RED): Starts at BOTTOM of shape
         const points1 = createDragonCurve(time, 1, 0.90, 0, (0.0 * curveHeightScale) + curveYOffset, (2.5 * curveHeightScale) + curveYOffset, curveWidthScale, curveHeightScale)
@@ -408,27 +359,14 @@ export default function RotatingDragon() {
 
         // Bake curves to GPU textures
         if (flowObject && flowObject2) {
-            console.error('[MOBILE DEBUG] Starting texture baking...')
             const texture1 = bakeCurveToTexture(dragonCurve1.current)
             const texture2 = bakeCurveToTexture(dragonCurve2.current)
 
             flowObject.material.uniforms.uCurveTexture.value = texture1
             flowObject2.material.uniforms.uCurveTexture.value = texture2
-
-            console.error('[MOBILE DEBUG] Textures baked:', {
-                texture1Type: texture1.type,
-                texture2Type: texture2.type,
-                texture1Size: `${texture1.image.width}x${texture1.image.height}`,
-                hasTexture1: !!flowObject.material.uniforms.uCurveTexture.value,
-                hasTexture2: !!flowObject2.material.uniforms.uCurveTexture.value
-            })
-        } else {
-            console.error('[MOBILE DEBUG] ERROR: No flowObjects to bake textures to!')
         }
 
         curvesInitialized.current = true
-        console.error('[MOBILE DEBUG] Curves initialized successfully')
-        console.log('Curves initialized')
     }
 
     // Create separate line visualizations for both curves
@@ -470,10 +408,6 @@ export default function RotatingDragon() {
         dragonScene.traverse((child) => {
             if (child.isMesh && !dragonMesh) {
                 dragonMesh = child
-                const vertexCount = dragonMesh.geometry.attributes.position.count
-        const triangleCount = Math.floor(dragonMesh.geometry.index ? dragonMesh.geometry.index.count / 3 : dragonMesh.geometry.attributes.position.count / 3)
-        console.error(`[MOBILE DEBUG] Dragon model loaded: ${vertexCount} vertices, ${triangleCount} triangles`)
-        console.log(`Dragon model: ${vertexCount} vertices, ~${triangleCount} triangles`)
             }
         })
 
@@ -501,9 +435,7 @@ export default function RotatingDragon() {
 
         // Custom GPU shader material with curve deformation
         const createDragonMaterial = (color) => {
-            let material
-            try {
-                material = new THREE.ShaderMaterial({
+            return new THREE.ShaderMaterial({
                 uniforms: THREE.UniformsUtils.merge([
                     THREE.UniformsLib.fog, // Add built-in fog uniforms
                     {
@@ -677,34 +609,10 @@ export default function RotatingDragon() {
                 depthWrite: true,
                 depthTest: true
             })
-
-            // Check for shader compilation errors
-            material.onBeforeCompile = (shader, renderer) => {
-                addDebugLog('[Shader] Compiling...')
-            }
-
-            return material
-
-            } catch (error) {
-                addDebugLog(`[Shader ERROR] ${error.message}`)
-                setShaderError(error.message)
-
-                // Fallback to basic material
-                return new THREE.MeshStandardMaterial({
-                    color: color,
-                    roughness: 0.7,
-                    metalness: 0.1
-                })
-            }
         }
 
         const materialRed = createDragonMaterial(0xff0000)
         const materialBlue = createDragonMaterial(0x0066ff)
-
-        console.error('[MOBILE DEBUG] Materials created:', {
-            materialRed: materialRed.type,
-            materialBlue: materialBlue.type
-        })
 
         // Create geometries - shared geometry, different materials
         const flowGeometry1 = geometry.clone()
@@ -719,19 +627,6 @@ export default function RotatingDragon() {
         flowObject.visible = true
         flowObject2.visible = true
 
-        console.error('[MOBILE DEBUG] Meshes created:', {
-            vertices: flowGeometry1.attributes.position.count,
-            visible1: flowObject.visible,
-            visible2: flowObject2.visible,
-            frustumCulled: flowObject.frustumCulled
-        })
-        console.log('[Dragon Init] Meshes created:', {
-            vertices: flowGeometry1.attributes.position.count,
-            flowObject: flowObject,
-            flowObject2: flowObject2,
-            visible: flowObject.visible && flowObject2.visible
-        })
-
         return {
             flowObject,
             flowObject2,
@@ -745,16 +640,10 @@ export default function RotatingDragon() {
 
     // GPU deformation - no worker needed anymore
 
-    const frameCount = useRef(0)
-
     useFrame(({ clock }, delta) => {
         const time = clock.getElapsedTime()
-        frameCount.current++
 
         if (!flowObject || !flowObject2) {
-            if (frameCount.current === 1) {
-                console.log('[Dragon Frame] No flowObjects yet')
-            }
             return
         }
 
@@ -762,24 +651,7 @@ export default function RotatingDragon() {
         initializeCurves(time)
 
         if (!dragonCurve1.current || !dragonCurve2.current) {
-            if (frameCount.current < 5) {
-                console.log('[Dragon Frame] Waiting for curves to initialize...', frameCount.current)
-            }
             return
-        }
-
-        // Debug log first few frames
-        if (frameCount.current <= 3) {
-            addDebugLog(`[Frame ${frameCount.current}] Running`)
-            console.log('[Dragon Frame]', frameCount.current, {
-                time,
-                progress1: curveProgress1.current,
-                progress2: curveProgress2.current,
-                hasTexture1: !!flowObject.material.uniforms.uCurveTexture.value,
-                hasTexture2: !!flowObject2.material.uniforms.uCurveTexture.value,
-                visible1: flowObject.visible,
-                visible2: flowObject2.visible
-            })
         }
 
         // Update curve visualizations (debug only)
@@ -828,31 +700,8 @@ export default function RotatingDragon() {
         }
     })
 
-    const isMobile = window.innerWidth <= 768
-
     return (
         <>
-            {/* Mobile Debug Overlay - ONLY on mobile */}
-            {isMobile && debugInfo.length > 0 && (
-                <Html position={[0, 5, 0]} center style={{
-                    background: 'rgba(0,0,0,0.8)',
-                    color: shaderError ? '#ff0000' : '#00ff00',
-                    padding: '10px',
-                    borderRadius: '5px',
-                    fontSize: '10px',
-                    maxWidth: '300px',
-                    pointerEvents: 'none',
-                    fontFamily: 'monospace'
-                }}>
-                    <div>
-                        {shaderError && <div style={{color: '#ff0000', fontWeight: 'bold'}}>SHADER ERROR: {shaderError}</div>}
-                        {debugInfo.map((log, i) => (
-                            <div key={i}>{log}</div>
-                        ))}
-                    </div>
-                </Html>
-            )}
-
             {/* Curve visualizations - RED for dragon 1, BLUE for dragon 2 (only shown in debug mode) */}
             {showDebugLines && (
                 <>
