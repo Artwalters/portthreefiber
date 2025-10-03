@@ -20,6 +20,22 @@
             }
         }(window.location))
     </script>
+    <!-- Eruda Mobile Console - ONLY on mobile devices -->
+    <script>
+        (function() {
+            // Only load on mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            if (isMobile) {
+                var script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/npm/eruda";
+                script.onload = function() {
+                    eruda.init();
+                    console.log('%c[ERUDA] Mobile console loaded! Tap icon in bottom right.', 'background: #222; color: #00ff00; font-size: 14px; padding: 5px;');
+                };
+                document.body.appendChild(script);
+            }
+        })();
+    </script>
 </head>
 <body>
     <div id="root"></div>
