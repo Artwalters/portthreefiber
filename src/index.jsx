@@ -14,8 +14,6 @@ import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import ViewBasedProjects from './ViewBasedProjects.jsx'
 import CameraController from './components/CameraController.jsx'
 import RotatingDragon from './components/RotatingDragon.jsx'
-import IntroScene from './components/IntroScene.jsx'
-import DragonIntro from './components/DragonIntro.jsx'
 
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
