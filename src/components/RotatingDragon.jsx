@@ -318,8 +318,26 @@ export default function RotatingDragon() {
 
         const texture = new THREE.DataTexture(data, cacheSize, 4, THREE.RGBAFormat, textureType)
         texture.needsUpdate = true
-        texture.minFilter = THREE.LinearFilter
-        texture.magFilter = THREE.LinearFilter
+
+        // CRITICAL FIX: Float textures need NearestFilter if linear filtering not supported
+        // Check for OES_texture_float_linear support
+        if (textureType === THREE.FloatType || textureType === THREE.HalfFloatType) {
+            const floatLinearExt = gl.getExtension('OES_texture_float_linear') || gl.getExtension('OES_texture_half_float_linear')
+            if (floatLinearExt) {
+                texture.minFilter = THREE.LinearFilter
+                texture.magFilter = THREE.LinearFilter
+                console.error('[MOBILE DEBUG] Using LinearFilter (extension available)')
+            } else {
+                texture.minFilter = THREE.NearestFilter
+                texture.magFilter = THREE.NearestFilter
+                console.error('[MOBILE DEBUG] Using NearestFilter (no linear filtering extension)')
+            }
+        } else {
+            // UnsignedByteType always supports linear filtering
+            texture.minFilter = THREE.LinearFilter
+            texture.magFilter = THREE.LinearFilter
+        }
+
         texture.wrapS = THREE.ClampToEdgeWrapping
         texture.wrapT = THREE.ClampToEdgeWrapping
 
@@ -327,7 +345,9 @@ export default function RotatingDragon() {
             type: textureType,
             width: cacheSize,
             height: 4,
-            dataLength: data.length
+            dataLength: data.length,
+            minFilter: texture.minFilter,
+            magFilter: texture.magFilter
         })
 
         return texture
