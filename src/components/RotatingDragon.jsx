@@ -171,9 +171,23 @@ export default function RotatingDragon() {
     // Bake curve data to DataTexture for GPU
     const bakeCurveToTexture = (curveData) => {
         const cacheSize = 2000
-        // 4 rows: points (row 0), tangents (row 1), normals (row 2), binormals (row 3)
-        const data = new Float32Array(cacheSize * 4 * 4) // width * height * 4 (RGBA)
 
+        // Try FloatType first, fallback to HalfFloatType for mobile compatibility
+        let textureType = THREE.FloatType
+        let data = new Float32Array(cacheSize * 4 * 4)
+
+        // Check if device supports FloatType textures
+        const canvas = document.createElement('canvas')
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+        if (gl) {
+            const floatExt = gl.getExtension('OES_texture_float')
+            if (!floatExt) {
+                console.log('FloatType not supported, using HalfFloatType')
+                textureType = THREE.HalfFloatType
+            }
+        }
+
+        // 4 rows: points (row 0), tangents (row 1), normals (row 2), binormals (row 3)
         for (let i = 0; i < cacheSize; i++) {
             const baseIndex = i * 4
 
@@ -205,7 +219,7 @@ export default function RotatingDragon() {
             data[binormalIndex + 3] = 1.0
         }
 
-        const texture = new THREE.DataTexture(data, cacheSize, 4, THREE.RGBAFormat, THREE.FloatType)
+        const texture = new THREE.DataTexture(data, cacheSize, 4, THREE.RGBAFormat, textureType)
         texture.needsUpdate = true
         texture.minFilter = THREE.LinearFilter
         texture.magFilter = THREE.LinearFilter
@@ -276,7 +290,12 @@ export default function RotatingDragon() {
             flowObject.material.uniforms.uCurveTexture.value = texture1
             flowObject2.material.uniforms.uCurveTexture.value = texture2
 
-            console.log('Curve textures baked to GPU')
+            console.log('Curve textures baked to GPU', {
+                texture1Type: texture1.type,
+                texture2Type: texture2.type,
+                flowObjectVisible: flowObject.visible,
+                flowObject2Visible: flowObject2.visible
+            })
         }
 
         curvesInitialized.current = true
@@ -431,8 +450,8 @@ export default function RotatingDragon() {
                         // Amplitude variation (head subtle, tail moves more)
                         float amplitudeVariation = 0.3 + (1.0 - normalizedZ) * 2.2;
 
-                        // Vertex random
-                        float vertexRandom = sin(float(gl_VertexID) * 0.01) * 0.05;
+                        // Vertex random - use position hash instead of gl_VertexID for WebGL 1.0 compatibility
+                        float vertexRandom = sin((pos.x + pos.y + pos.z) * 100.0) * 0.05;
 
                         // Build final position
                         vec3 newPosition = curvePoint;
