@@ -20,21 +20,25 @@
             }
         }(window.location))
     </script>
-    <!-- Eruda Mobile Console - ONLY on mobile devices -->
+    <!-- Eruda Mobile Console - For debugging -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>
-        (function() {
-            // Only load on mobile
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-            if (isMobile) {
-                var script = document.createElement('script');
-                script.src = "https://cdn.jsdelivr.net/npm/eruda";
-                script.onload = function() {
-                    eruda.init();
-                    console.log('%c[ERUDA] Mobile console loaded! Tap icon in bottom right.', 'background: #222; color: #00ff00; font-size: 14px; padding: 5px;');
-                };
-                document.body.appendChild(script);
+        // Initialize Eruda immediately
+        eruda.init();
+        console.log('%c🔍 ERUDA CONSOLE LOADED! Look for green button bottom-right!', 'background: #00ff00; color: #000; font-size: 20px; font-weight: bold; padding: 10px;');
+
+        // Make button bigger and more visible
+        setTimeout(function() {
+            var erudaBtn = document.querySelector('.eruda-entry-btn');
+            if (erudaBtn) {
+                erudaBtn.style.width = '60px';
+                erudaBtn.style.height = '60px';
+                erudaBtn.style.fontSize = '30px';
+                erudaBtn.style.backgroundColor = '#00ff00';
+                erudaBtn.style.zIndex = '999999';
+                console.log('%c✅ Eruda button enlarged!', 'background: #00ff00; color: #000; font-size: 16px; padding: 5px;');
             }
-        })();
+        }, 1000);
     </script>
   <script type="module" crossorigin src="/portthreefiber/assets/index-leQ5__VX.js"></script>
   <link rel="stylesheet" crossorigin href="/portthreefiber/assets/index-BMIDb-J4.css">
