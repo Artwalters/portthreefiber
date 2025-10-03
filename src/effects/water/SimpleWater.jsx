@@ -29,15 +29,20 @@ const SimpleWater = forwardRef((props, ref) => {
             type: THREE.FloatType
         }
         const resolution = 2048 // Verhoogd voor hogere resolutie water
+
+        // Higher resolution scene capture for smoother rendering
+        const sceneResolution = Math.max(size.width, size.height) * window.devicePixelRatio
+
         return {
             read: new THREE.WebGLRenderTarget(resolution, resolution, options),
             write: new THREE.WebGLRenderTarget(resolution, resolution, options),
-            scene: new THREE.WebGLRenderTarget(size.width, size.height, {
-                minFilter: THREE.LinearFilter,
+            scene: new THREE.WebGLRenderTarget(sceneResolution, sceneResolution, {
+                minFilter: THREE.LinearMipmapLinearFilter,
                 magFilter: THREE.LinearFilter,
                 format: THREE.RGBAFormat,
-                samples: 4, // Enable multisampling for smoother edges
-                generateMipmaps: false
+                samples: 8, // Higher multisampling for smoother edges
+                generateMipmaps: true,
+                anisotropy: gl.capabilities.getMaxAnisotropy() // Enable anisotropic filtering
             })
         }
     }, []) // Remove size dependency to prevent buffer recreation
@@ -229,10 +234,13 @@ const SimpleWater = forwardRef((props, ref) => {
                     float volumetricScatter = 1.0 - exp(-depth * 0.5);
                     vec3 scatterColor = vec3(0.95, 0.97, 1.0); // Very subtle blue tint
                     
-                    // Cleaner, slower caustics
+                    // Smoother, slower caustics with anti-aliasing
                     float causticScale = 6.0;
-                    float caustic = sin(vUv.x * causticScale + uTime * 0.3) * sin(vUv.y * causticScale + uTime * 0.2);
-                    caustic *= exp(-depth * 1.0) * 0.15; // More subtle caustics
+                    float caustic1 = sin(vUv.x * causticScale + uTime * 0.3) * sin(vUv.y * causticScale + uTime * 0.2);
+                    float caustic2 = sin(vUv.x * causticScale * 1.3 - uTime * 0.25) * sin(vUv.y * causticScale * 0.8 + uTime * 0.18);
+                    float caustic = (caustic1 + caustic2) * 0.5; // Average multiple frequencies for smoother result
+                    caustic = smoothstep(-0.5, 0.5, caustic); // Smooth transitions instead of hard sine waves
+                    caustic *= exp(-depth * 1.0) * 0.12; // More subtle caustics
                     
                     // Combine scene with water effects
                     vec3 finalColor = sceneColor.rgb * waterColor;
