@@ -39,15 +39,15 @@ export default function RotatingDragon() {
     // Animation speed - 10% faster on mobile
     const animationSpeed = useMemo(() => {
         const screenWidth = window.innerWidth
-        if (screenWidth <= 768) return 0.015125 // Mobile = 10% faster (~66 seconds)
-        return 0.01375 // Desktop = ~73 seconds
+        if (screenWidth <= 768) return 0.0166375 // Mobile = 10% faster (~60 seconds)
+        return 0.015125 // Desktop = ~66 seconds
     }, [])
 
     // Debug mode - set to true to show curve lines and debug spheres
     const showDebugLines = false
 
     // Load the dragon GLB model
-    const { scene: dragonScene } = useGLTF('./models/dragonwaltersstudio_low.glb')
+    const { scene: dragonScene } = useGLTF('./models/waltersstudiov2base.glb')
 
     // Complete curves for each dragon (2 loops + exit)
     const dragonCurve1 = useRef(null) // Red dragon - starts left, exits right
