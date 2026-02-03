@@ -92,7 +92,7 @@ body,
 
 /* Logo styling */
 .walters-logo {
-    height: 96px;
+    height: 32px;
     width: auto;
     opacity: 1;
     filter: brightness(0);
@@ -138,7 +138,7 @@ body,
     }
     
     .walters-logo {
-        height: 28px;
+        height: 18px;
     }
 }
 

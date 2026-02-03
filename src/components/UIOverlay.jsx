@@ -166,13 +166,15 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             </div>
           )}
 
-          {/* Bottom Left: lioni */}
+          {/* Bottom Left: Logo */}
           <div className="ui-corner ui-bottom-left">
-            <span
-              className="ui-text"
+            <img
+              src="./img/logo/walters_logo.svg"
+              alt="Walters Studio"
+              className="walters-logo"
               onClick={isPostTransition ? onBackToSlider : undefined}
               style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
-            >lioni</span>
+            />
           </div>
 
           {/* Bottom Right: Year (only on hover) or info in gallery */}
@@ -226,13 +228,15 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             <span className="ui-text ui-clickable">contact</span>
           </div>
 
-          {/* Bottom Left: lioni */}
+          {/* Bottom Left: Logo */}
           <div className="ui-corner ui-bottom-left">
-            <span
-              className="ui-text"
+            <img
+              src="./img/logo/walters_logo.svg"
+              alt="Walters Studio"
+              className="walters-logo"
               onClick={isPostTransition ? onBackToSlider : undefined}
               style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
-            >lioni</span>
+            />
           </div>
 
           {/* Bottom Center: Year (only on hover in index mode) */}
