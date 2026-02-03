@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 
-function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick }) {
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick, isTransitioningToContact }) {
   const overlayRef = useRef(null)
 
   // State for smooth transitions between hovered projects
@@ -83,7 +83,7 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
   useEffect(() => {
     if (!overlayRef.current) return
 
-    if (isTransitioning) {
+    if (isTransitioning || isTransitioningToContact) {
       gsap.to(overlayRef.current, {
         opacity: 0,
         duration: 0.6,
@@ -110,7 +110,7 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
     } else {
       gsap.set(overlayRef.current, { opacity: 0 })
     }
-  }, [isTransitioning, isPostTransition, isReturningToSlider, isSliderAnimationComplete])
+  }, [isTransitioning, isPostTransition, isReturningToSlider, isSliderAnimationComplete, isTransitioningToContact])
 
   return (
     <div

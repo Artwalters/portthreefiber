@@ -1,8 +1,8 @@
 import React from 'react'
 
-export default function Contact({ onBack }) {
+export default function Contact({ onBack, isVisible }) {
     return (
-        <div className="contact-page">
+        <div className={`contact-page ${isVisible ? 'visible' : ''}`}>
             {/* Header */}
             <header className="contact-header">
                 <div className="contact-back" onClick={onBack}>
@@ -55,12 +55,13 @@ export default function Contact({ onBack }) {
                     <span>Quentin Walters</span>
                 </div>
 
-                <a href="mailto:hello@walters.studio" className="contact-cta">
+                <a href="mailto:arthur@walters.studio" className="contact-cta">
                     [Begin Your Inquiry]
                 </a>
 
                 <div className="contact-links">
-                    <p>Mail: hello@walters.studio</p>
+                    <p>Mail: arthur@walters.studio</p>
+                    <p>Mail: quentin@walters.studio</p>
                     <p>Instagram: @walters.inc</p>
                 </div>
             </section>

@@ -295,7 +295,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -858,6 +858,24 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       animationEndTime.current = 0
     }
   }, [isReturningFromGallery, isFlyingIn])
+
+  // Track if exit was triggered externally (for contact page)
+  const isExternalExit = useRef(false)
+
+  // Handle external exit trigger (e.g., clicking contact)
+  useEffect(() => {
+    if (shouldExit && !isFading) {
+      isExternalExit.current = true
+      fadeStartOffset.current = currentOffset.current
+      hasCompletionFired.current = false
+      setIsFading(true)
+      setFadeProgress(0)
+      setSliderProgress(0)
+      if (onTransitionStart) {
+        onTransitionStart(true)
+      }
+    }
+  }, [shouldExit, isFading, onTransitionStart])
   
   // Handle fly-in animation when returning from gallery
   useEffect(() => {
@@ -1184,9 +1202,16 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         const newProgress = prev + fadeDeltaProgress
         if (newProgress >= 1.0) {
           // Fade complete - trigger completion callback once
-          if (!hasCompletionFired.current && onTransitionComplete) {
+          if (!hasCompletionFired.current) {
             hasCompletionFired.current = true
-            onTransitionComplete()
+            if (isExternalExit.current && onExitComplete) {
+              // Exit was triggered externally (contact page)
+              isExternalExit.current = false
+              onExitComplete()
+            } else if (onTransitionComplete) {
+              // Exit was triggered by project selection
+              onTransitionComplete()
+            }
           }
           // Start smooth velocity fade-out
           isAnimationEnding.current = true

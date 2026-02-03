@@ -21,6 +21,11 @@ const root = ReactDOM.createRoot(document.querySelector('#root'))
 function App() {
     // Page state
     const [showContact, setShowContact] = useState(false)
+    const [isTransitioningToContact, setIsTransitioningToContact] = useState(false)
+    const [isContactVisible, setIsContactVisible] = useState(false)
+    const [shouldExitSlider, setShouldExitSlider] = useState(false)
+    const [contactReturnTo, setContactReturnTo] = useState('slider') // 'slider' or 'gallery'
+    const [savedProject, setSavedProject] = useState(null) // Save project when going to contact from gallery
 
     // Performance monitor visibility state
     const [showPerf, setShowPerf] = useState(false)
@@ -454,9 +459,121 @@ function App() {
         }}>Loading...</div>
     }
 
+    // Handle slider exit complete (for contact page transition)
+    const handleSliderExitComplete = () => {
+        // Slider animation complete, switch to contact page
+        setShowContact(true)
+        setShouldExitSlider(false)
+        setIsTransitioning(false) // Reset transitioning state
+
+        // Fade in contact page after a short delay
+        setTimeout(() => {
+            setIsContactVisible(true)
+            setIsTransitioningToContact(false)
+        }, 100)
+    }
+
+    // Handle contact page navigation with fade transitions
+    const handleContactClick = () => {
+        if (isPostTransition) {
+            // FROM GALLERY MODE: Save state and exit gallery
+            setContactReturnTo('gallery')
+            setSavedProject(selectedProject)
+
+            // PHASE 1 (0ms): Start gallery exit animation
+            setShouldExitGallery(true)
+
+            // PHASE 2 (400ms): Start UI fade out while gallery is animating
+            setTimeout(() => {
+                setIsTransitioningToContact(true)
+            }, 400)
+
+            // PHASE 3 (1000ms): Gallery animation complete, switch to contact
+            setTimeout(() => {
+                setShowSingleImage(false)
+                setShowFilmStrip(true)
+                setIsPostTransition(false)
+                setShouldExitGallery(false)
+                // Don't clear selectedProject - we need it for return
+                setShowContact(true)
+                setIsTransitioning(false)
+            }, 1000)
+
+            // PHASE 4 (1100ms): Fade in contact page
+            setTimeout(() => {
+                setIsContactVisible(true)
+                setIsTransitioningToContact(false)
+            }, 1100)
+        } else {
+            // FROM SLIDER MODE: Exit slider first, then show contact
+            setContactReturnTo('slider')
+            setSavedProject(null)
+
+            // PHASE 1 (0ms): Start slider exit animation (fog fade out)
+            setShouldExitSlider(true)
+
+            // PHASE 2 (400ms): Start UI fade out while slider is animating
+            setTimeout(() => {
+                setIsTransitioningToContact(true)
+            }, 400)
+
+            // PHASE 3: Switch happens via onExitComplete callback when slider animation finishes
+        }
+    }
+
+    // Handle returning from contact page - return to slider or gallery
+    const handleContactBack = () => {
+        // PHASE 1 (0ms): Fade out contact page
+        setIsContactVisible(false)
+
+        if (contactReturnTo === 'gallery' && savedProject) {
+            // RETURN TO GALLERY
+            // PHASE 2 (600ms): Switch back to gallery
+            setTimeout(() => {
+                setShowContact(false)
+                setIsTransitioningToContact(false)
+                setIsTransitioning(false)
+                // Restore gallery state
+                setSelectedProject(savedProject)
+                setShowFilmStrip(false)
+                setShowSingleImage(true)
+                setIsPostTransition(true)
+                setCurrentImageIndex(0)
+            }, 600)
+
+            // PHASE 3 (700ms): Show UI
+            setTimeout(() => {
+                setSavedProject(null)
+                setContactReturnTo('slider')
+            }, 700)
+        } else {
+            // RETURN TO SLIDER
+            // PHASE 2 (600ms): Switch back to slider with fly-in animation
+            setTimeout(() => {
+                setShowContact(false)
+                setIsTransitioningToContact(false)
+                // Reset all transitioning states to clean slate
+                setIsTransitioning(false)
+                setIsReturningToSlider(false)
+                setIsPostTransition(false)
+                setSelectedProject(null)
+                // Slider needs to recreate since Canvas was unmounted
+                setSliderKey(prev => prev + 1)
+                setIsReturningFromGallery(true) // Trigger fly-in animation
+                setIsSliderAnimationComplete(false) // UI hidden initially
+            }, 600)
+
+            // PHASE 3 (800ms): Show UI while slider is flying in
+            setTimeout(() => {
+                setIsSliderAnimationComplete(true)
+                setIsReturningFromGallery(false)
+            }, 800)
+        }
+    }
+
     // Show contact page
     if (showContact) {
-        return <Contact onBack={() => setShowContact(false)} />
+        return <Contact onBack={handleContactBack} isVisible={isContactVisible} />
     }
 
     return (
@@ -518,6 +635,8 @@ function App() {
                         onImageSelect={handleImageSelect}
                         isReturningFromGallery={isReturningFromGallery}
                         onFlyInComplete={handleFlyInComplete}
+                        shouldExit={shouldExitSlider}
+                        onExitComplete={handleSliderExitComplete}
                     />
                 )}
 
@@ -588,7 +707,8 @@ function App() {
                 hoveredProject={hoveredProject}
                 hoveredProjectIndex={hoveredProject ? projects.findIndex(p => p.id === hoveredProject.id) : -1}
                 totalProjects={projects.length}
-                onContactClick={() => setShowContact(true)}
+                onContactClick={handleContactClick}
+                isTransitioningToContact={isTransitioningToContact}
             />
         </>
     )
