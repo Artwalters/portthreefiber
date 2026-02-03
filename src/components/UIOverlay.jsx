@@ -4,7 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 gsap.registerPlugin(ScrollTrigger)
 
-function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick, isTransitioningToContact, centeredProjectIndex }) {
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick, isTransitioningToContact, centeredProjectIndex, sliderVelocity }) {
   const overlayRef = useRef(null)
 
   // State for smooth transitions between hovered projects
@@ -82,9 +82,13 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
     }
   }, [])
 
-  // Initialize dragon marquee animation
+  // Ref for marquee animation
+  const marqueeAnimationRef = useRef(null)
+  const marqueeInitializedRef = useRef(false)
+
+  // Initialize dragon marquee (duplicate content once)
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile || marqueeInitializedRef.current) return
 
     const marquee = document.querySelector('[data-marquee-scroll-direction-target]')
     if (!marquee) return
@@ -93,10 +97,7 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
     const marqueeScroll = marquee.querySelector('[data-marquee-scroll-target]')
     if (!marqueeContent || !marqueeScroll) return
 
-    const { marqueeSpeed: speed, marqueeDirection: direction, marqueeDuplicate: duplicate } = marquee.dataset
-
-    const marqueeSpeedAttr = parseFloat(speed) || 20
-    const marqueeDirectionAttr = direction === 'right' ? 1 : -1
+    const { marqueeDuplicate: duplicate } = marquee.dataset
     const duplicateAmount = parseInt(duplicate || 0)
 
     // Duplicate marquee content
@@ -108,23 +109,35 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
       marqueeScroll.appendChild(fragment)
     }
 
-    // GSAP animation for marquee content
-    const marqueeItems = marquee.querySelectorAll('[data-marquee-collection-target]')
-    const animation = gsap.to(marqueeItems, {
-      xPercent: -100,
-      repeat: -1,
-      duration: marqueeSpeedAttr,
-      ease: 'linear'
-    }).totalProgress(0.5)
-
-    gsap.set(marqueeItems, { xPercent: marqueeDirectionAttr === 1 ? 0 : 0 })
-    animation.timeScale(marqueeDirectionAttr)
-    animation.play()
-
-    return () => {
-      animation.kill()
-    }
+    marqueeInitializedRef.current = true
   }, [isMobile])
+
+  // Update marquee based on slider velocity
+  useEffect(() => {
+    if (!isMobile) return
+
+    const marquee = document.querySelector('[data-marquee-scroll-direction-target]')
+    if (!marquee) return
+
+    const marqueeItems = marquee.querySelectorAll('[data-marquee-collection-target]')
+    if (!marqueeItems.length) return
+
+    // Map slider velocity to marquee movement
+    // Positive velocity = scrolling down = marquee moves left
+    // Negative velocity = scrolling up = marquee moves right
+    const speed = sliderVelocity * 0.05 // Scale factor
+
+    marqueeItems.forEach(item => {
+      const currentX = gsap.getProperty(item, 'xPercent') || 0
+      let newX = currentX - speed
+
+      // Loop the marquee
+      if (newX <= -100) newX += 100
+      if (newX >= 0) newX -= 100
+
+      gsap.set(item, { xPercent: newX })
+    })
+  }, [sliderVelocity, isMobile])
 
   // Handle GSAP animations based on state changes
   useEffect(() => {

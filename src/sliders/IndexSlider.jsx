@@ -297,7 +297,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete, onCenteredProjectChange }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete, onCenteredProjectChange, onSliderVelocity }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -1342,6 +1342,11 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     if (centeredIndex !== lastCenteredProject.current && onCenteredProjectChange) {
       lastCenteredProject.current = centeredIndex
       onCenteredProjectChange(centeredIndex)
+    }
+
+    // Pass velocity to parent for marquee sync
+    if (onSliderVelocity) {
+      onSliderVelocity(sliderSpeed.current)
     }
     
     // Calculate sweep progress to match actual slider speed calculation  
