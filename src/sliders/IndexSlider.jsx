@@ -33,6 +33,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       fogIntensity: { value: 1.0 }, // Dynamic fog intensity multiplier
       dynamicFogNear: { value: isMobile ? 8 : 5 }, // Dynamic fog near plane
       dynamicFogFar: { value: isMobile ? 15 : 12 }, // Dynamic fog far plane
+      uCenteredTile: { value: 0.0 }, // Currently centered tile index
+      uCenterScale: { value: 1.0 }, // Scale factor for centered tile (animated)
       uIsTransitioning: { value: 0 },
       uSweepPosition: { value: -25 },
       uIsFlyingIn: { value: 0 },
@@ -95,6 +97,8 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       uniform float uSweepPosition;
       uniform float uIsFlyingIn;
       uniform float uFlyInPosition;
+      uniform float uCenteredTile;
+      uniform float uCenterScale;
       varying vec2 vUv;
       varying float vFogDepth;
       varying float vWorldX;
@@ -109,33 +113,42 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         vec2 tilesUV = globalUV * vec2(${aspect * 1.2}, 1.);
         float tileIndex = mod(floor(tilesUV.x), ${tilesCount}.0);
         int tileID = int(tileIndex);
-        
+
+        // Check if this tile is the centered one
+        float isCentered = 1.0 - step(0.5, abs(tileIndex - uCenteredTile));
+        // Handle wrap-around for first/last tile
+        if (tileIndex < 1.0 && uCenteredTile > ${tilesCount - 1}.0) isCentered = 1.0;
+        if (tileIndex > ${tilesCount - 1}.0 && uCenteredTile < 1.0) isCentered = 1.0;
+
+        // Apply scale only to centered tile
+        float tileScale = mix(1.0, uCenterScale, isCentered);
+
         vec2 tileUV = fract(tilesUV);
-        
+
         // Simple gap - no smoothing for now
         float gapSize = 0.035;
 
         // Hard discard for gap pixels
         if (tileUV.x < gapSize || tileUV.x > (1.0 - gapSize)) discard;
-        
+
         tileUV.x = (tileUV.x - gapSize) / (1.0 - 2.0 * gapSize);
         tileUV.y = vUv.y;
-        
+
         // Rotate texture coordinates 90 degrees counterclockwise for mobile
         if (uIsMobile > 0.5) {
           vec2 center = vec2(0.5, 0.5);
           tileUV -= center;
-          
+
           // Rotate 90 degrees counterclockwise but flip X to fix mirroring
           tileUV = vec2(tileUV.y, tileUV.x);
-          
+
           tileUV += center;
         }
-        
+
         // Zoom in on the texture to cover the entire plane and eliminate artifacts
         vec2 center = vec2(0.5, 0.5);
         tileUV -= center;
-        float baseZoom = 0.85; // Base zoom to cover plane - all images normal size
+        float baseZoom = 0.85 * tileScale; // Center tile slightly larger
         tileUV *= baseZoom;
         tileUV += center;
         
@@ -292,12 +305,17 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
     this.uniforms.dynamicFogNear.value = nearValue
     this.uniforms.dynamicFogFar.value = farValue
   }
-  
-  
+
+  material.updateCenteredTile = function(tileIndex, scale) {
+    this.uniforms.uCenteredTile.value = tileIndex
+    this.uniforms.uCenterScale.value = scale
+  }
+
+
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete, onCenteredProjectChange, onSliderVelocity }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete, onCenteredProjectChange, onSliderVelocity, onCenterScale }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -345,6 +363,13 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
 
   // Track centered project for UI counter
   const lastCenteredProject = useRef(-1)
+
+  // Center scale animation
+  const centerScaleTarget = useRef(1.0)
+  const currentCenterScale = useRef(1.0)
+  const centeredTime = useRef(0) // Track how long current tile has been centered
+  const scaledTileIndex = useRef(-1) // Which tile currently has the scale applied
+  const isScaleAnimatingOut = useRef(false) // True when animating back to 1.0
 
   const calculateCenteredProjectIndex = (currentPos) => {
     const aspect = isMobile ? 30 / 3.3 : 38 / 3.3
@@ -1339,9 +1364,60 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
 
     // Update centered project index for UI counter
     const centeredIndex = calculateCenteredProjectIndex(currentOffset.current)
-    if (centeredIndex !== lastCenteredProject.current && onCenteredProjectChange) {
+    if (centeredIndex !== lastCenteredProject.current) {
       lastCenteredProject.current = centeredIndex
-      onCenteredProjectChange(centeredIndex)
+      if (onCenteredProjectChange) {
+        onCenteredProjectChange(centeredIndex)
+      }
+      // Reset timer when centered tile changes
+      centeredTime.current = 0
+
+      // If we had a scaled tile and it's different from the new centered tile,
+      // start animating the scale OUT
+      if (scaledTileIndex.current !== -1 && scaledTileIndex.current !== centeredIndex) {
+        isScaleAnimatingOut.current = true
+        centerScaleTarget.current = 1.0 // Animate back to normal
+      }
+    }
+
+    // Only trigger scale when snapped and settled (not moving)
+    const isSettled = !isUserInteracting.current && Math.abs(sliderSpeed.current) < 5
+
+    // If user starts interacting, animate out
+    if (isUserInteracting.current && scaledTileIndex.current !== -1) {
+      isScaleAnimatingOut.current = true
+      centerScaleTarget.current = 1.0
+    }
+
+    if (isSettled && !isScaleAnimatingOut.current) {
+      centeredTime.current += delta
+      // Start zoom after being centered for 0.15 seconds
+      if (centeredTime.current > 0.15) {
+        scaledTileIndex.current = centeredIndex // Mark this tile as having the scale
+        centerScaleTarget.current = 0.92 // Zoom in (smaller = more zoomed)
+      }
+    }
+
+    // Smoothly animate current scale toward target - very slow and smooth
+    const scaleAnimSpeed = isScaleAnimatingOut.current ? 0.02 : 0.015 // Extra smooth transitions
+    currentCenterScale.current += (centerScaleTarget.current - currentCenterScale.current) * scaleAnimSpeed
+
+    // Check if scale has returned to normal (animation out complete)
+    if (isScaleAnimatingOut.current && Math.abs(currentCenterScale.current - 1.0) < 0.01) {
+      currentCenterScale.current = 1.0
+      isScaleAnimatingOut.current = false
+      scaledTileIndex.current = -1 // Reset scaled tile
+      centeredTime.current = 0 // Reset timer so new tile can start scaling
+    }
+
+    // Update material with the tile that currently has the scale applied
+    // Use scaledTileIndex if one exists, otherwise use centeredIndex (won't show scale yet)
+    const tileToScale = scaledTileIndex.current !== -1 ? scaledTileIndex.current : centeredIndex
+    material.updateCenteredTile(tileToScale, currentCenterScale.current)
+
+    // Pass center scale to parent for indicator animation
+    if (onCenterScale) {
+      onCenterScale(currentCenterScale.current)
     }
 
     // Pass velocity to parent for marquee sync

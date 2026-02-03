@@ -4,7 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 gsap.registerPlugin(ScrollTrigger)
 
-function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick, isTransitioningToContact, centeredProjectIndex, sliderVelocity }) {
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick, isTransitioningToContact, centeredProjectIndex, sliderVelocity, centerScale }) {
   const overlayRef = useRef(null)
 
   // State for smooth transitions between hovered projects
@@ -203,13 +203,18 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             )}
           </div>
 
-          {/* Center indicator lines */}
-          {!isGalleryMode && (
-            <>
-              <div className="ui-center-line ui-center-line-left"></div>
-              <div className="ui-center-line ui-center-line-right"></div>
-            </>
-          )}
+          {/* Center indicator lines - move inward with zoom */}
+          {!isGalleryMode && (() => {
+            // Map centerScale: 1.0 = no offset, 0.92 = max inward offset
+            const inwardAmount = (1.0 - (centerScale || 1.0)) / (1.0 - 0.92) // 0 to 1
+            const offset = inwardAmount * 1.5 // max 1.5em inward
+            return (
+              <>
+                <div className="ui-center-line ui-center-line-left" style={{ left: `${offset}em` }}></div>
+                <div className="ui-center-line ui-center-line-right" style={{ right: `${offset}em` }}></div>
+              </>
+            )
+          })()}
 
           <div className="ui-bottom-center">
             <div

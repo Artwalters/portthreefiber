@@ -49,6 +49,7 @@ function App() {
     const [isSliderAnimationComplete, setIsSliderAnimationComplete] = useState(true) // Start as true for initial state
     const [centeredProjectIndex, setCenteredProjectIndex] = useState(0) // Track centered project for mobile counter
     const [sliderVelocity, setSliderVelocity] = useState(0) // Track slider velocity for marquee
+    const [centerScale, setCenterScale] = useState(1.0) // Track center scale for indicator animation
 
     // Slider switching states
     const [showFilmStrip, setShowFilmStrip] = useState(true)
@@ -640,6 +641,7 @@ function App() {
                         onExitComplete={handleSliderExitComplete}
                         onCenteredProjectChange={setCenteredProjectIndex}
                         onSliderVelocity={setSliderVelocity}
+                        onCenterScale={setCenterScale}
                     />
                 )}
 
@@ -714,6 +716,7 @@ function App() {
                 isTransitioningToContact={isTransitioningToContact}
                 centeredProjectIndex={centeredProjectIndex}
                 sliderVelocity={sliderVelocity}
+                centerScale={centerScale}
             />
         </>
     )
