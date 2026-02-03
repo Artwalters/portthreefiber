@@ -11,25 +11,19 @@ import SimpleWater from './effects/water/SimpleWater.jsx'
 import MobileWater from './effects/water/MobileWater.jsx'
 import FishParticleSystem from './effects/particles/FishParticleSystem.jsx'
 import { getDeviceCapabilities } from './utils/deviceDetection.js'
-import ViewBasedProjects from './ViewBasedProjects.jsx'
 import CameraController from './components/CameraController.jsx'
 import RotatingDragon from './components/RotatingDragon.jsx'
+import Contact from './pages/Contact.jsx'
 
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
 function App() {
-    // Check URL for template test
-    const urlParams = new URLSearchParams(window.location.search)
-    const templateTest = urlParams.get('template') === 'barrel-distortion'
-    
+    // Page state
+    const [showContact, setShowContact] = useState(false)
+
     // Performance monitor visibility state
     const [showPerf, setShowPerf] = useState(false)
-    
-    // If template test is requested, render the template instead of main app
-    if (templateTest) {
-        return <ViewBasedProjects />
-    }
 
     const [hoveredProject, setHoveredProject] = useState(null)
     const [displayedProject, setDisplayedProject] = useState(null)
@@ -451,13 +445,18 @@ function App() {
 
     // Don't render until projects are loaded
     if (!projectsLoaded) {
-        return <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+        return <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             height: '100vh',
             fontFamily: 'PSTimesTrial, serif'
         }}>Loading...</div>
+    }
+
+    // Show contact page
+    if (showContact) {
+        return <Contact onBack={() => setShowContact(false)} />
     }
 
     return (
@@ -589,6 +588,7 @@ function App() {
                 hoveredProject={hoveredProject}
                 hoveredProjectIndex={hoveredProject ? projects.findIndex(p => p.id === hoveredProject.id) : -1}
                 totalProjects={projects.length}
+                onContactClick={() => setShowContact(true)}
             />
         </>
     )

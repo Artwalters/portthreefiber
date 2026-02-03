@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 
-function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects }) {
+function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onBackToSlider, selectedProject, currentImageIndex, isSliderAnimationComplete, hoveredProject, hoveredProjectIndex, totalProjects, onContactClick }) {
   const overlayRef = useRef(null)
 
   // State for smooth transitions between hovered projects
@@ -32,28 +32,25 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
 
     if (hoveredProject) {
       if (displayedHover && displayedHover.id !== hoveredProject.id) {
-        // Different project - fade out first, then change and fade in
         setIsHoverVisible(false)
         fadeInTimer = setTimeout(() => {
           setDisplayedHover(hoveredProject)
           setDisplayedHoverIndex(hoveredProjectIndex)
           setTimeout(() => setIsHoverVisible(true), 30)
-        }, 150) // Wait for fade out
+        }, 150)
       } else if (!displayedHover) {
-        // No current project - set and fade in after delay
         setDisplayedHover(hoveredProject)
         setDisplayedHoverIndex(hoveredProjectIndex)
         fadeInTimer = setTimeout(() => {
           setIsHoverVisible(true)
-        }, 200) // 0.2s delay for initial hover
+        }, 200)
       }
     } else {
-      // No hover - fade out
       setIsHoverVisible(false)
       fadeInTimer = setTimeout(() => {
         setDisplayedHover(null)
         setDisplayedHoverIndex(-1)
-      }, 150) // Clear after fade out
+      }, 150)
     }
 
     return () => clearTimeout(fadeInTimer)
@@ -66,7 +63,6 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
       return
     }
 
-    // Fade out, change, fade in
     setIsGalleryInfoVisible(false)
     const timer = setTimeout(() => {
       setDisplayedImageInfo(currentImageDescription)
@@ -75,20 +71,6 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
 
     return () => clearTimeout(timer)
   }, [currentImageIndex, currentImageDescription, isGalleryMode])
-
-  // Grey style for hover info
-  const hoverInfoStyle = {
-    color: 'rgba(0, 0, 0, 0.4)',
-    opacity: isHoverVisible ? 1 : 0,
-    transition: 'opacity 0.15s ease'
-  }
-
-  // Grey style for gallery info
-  const galleryInfoStyle = {
-    color: 'rgba(0, 0, 0, 0.4)',
-    opacity: isGalleryInfoVisible ? 1 : 0,
-    transition: 'opacity 0.2s ease'
-  }
 
   // Initialize overlay as visible on mount
   useEffect(() => {
@@ -137,127 +119,111 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
     >
 
       {isMobile ? (
-        // Mobile UI - Simplified layout
+        // Mobile UI
         <>
-          {/* Top Left: Back (in gallery) or Client (in index) */}
           <div className="ui-corner ui-top-left">
             {isGalleryMode ? (
               <span className="ui-text ui-clickable" onClick={onBackToSlider}>back</span>
             ) : (
               <span className="ui-text">
-                client<span style={hoverInfoStyle}>: {displayedHover?.client || ''}</span>
+                client<span className={`ui-info ${isHoverVisible ? 'visible' : ''}`}>: {displayedHover?.client || ''}</span>
               </span>
             )}
           </div>
 
-          {/* Top Right: contact or index */}
           <div className="ui-corner ui-top-right">
             {isGalleryMode ? (
               <span className="ui-text">{photoCounter}</span>
             ) : (
-              <span className="ui-text ui-clickable">contact</span>
+              <span className="ui-text ui-clickable" onClick={onContactClick}>contact</span>
             )}
           </div>
 
-          {/* Top Center: Client name in gallery mode */}
           {isGalleryMode && (
-            <div style={{ position: 'absolute', top: '4px', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+            <div className="ui-top-center">
               <span className="ui-text">{selectedProject?.client || ''}</span>
             </div>
           )}
 
-          {/* Bottom Left: Logo */}
           <div className="ui-corner ui-bottom-left">
             <img
               src="./img/logo/walters_logo.svg"
               alt="Walters Studio"
-              className="walters-logo"
+              className={`walters-logo ${isPostTransition ? 'clickable' : ''}`}
               onClick={isPostTransition ? onBackToSlider : undefined}
-              style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
             />
           </div>
 
-          {/* Bottom Right: Year (only on hover) or info in gallery */}
           <div className="ui-corner ui-bottom-right">
             {isGalleryMode ? (
-              <span className="ui-text" style={galleryInfoStyle}>
+              <span className={`ui-text ui-info-gallery ${isGalleryInfoVisible ? 'visible' : ''}`}>
                 {displayedImageInfo}
               </span>
             ) : (
-              <span className="ui-text" style={hoverInfoStyle}>
+              <span className={`ui-text ui-info ${isHoverVisible ? 'visible' : ''}`}>
                 {displayedHover?.year || ''}
               </span>
             )}
           </div>
         </>
       ) : (
-        // Desktop UI - Full layout
+        // Desktop UI
         <>
-          {/* Top Left: Back (in gallery) or Walters Studio (in index) + Client + Photo Counter/Index */}
-          <div className="ui-corner ui-top-left" style={{ display: 'flex', alignItems: 'flex-start', width: 'calc(100vw - 24px)' }}>
+          <div className="ui-corner ui-top-left ui-top-row">
             {isGalleryMode ? (
               <span className="ui-text ui-clickable" onClick={onBackToSlider}>back</span>
             ) : (
               <span className="ui-text">walters studio</span>
             )}
 
-            {/* Client section */}
-            <span className="ui-text" style={{ position: 'absolute', left: '25vw' }}>
+            <span className="ui-text ui-top-client">
               {isGalleryMode && selectedProject ? selectedProject.client : (
-                <>client<span style={hoverInfoStyle}>: {displayedHover?.client || ''}</span></>
+                <>client<span className={`ui-info ${isHoverVisible ? 'visible' : ''}`}>: {displayedHover?.client || ''}</span></>
               )}
             </span>
 
-            {/* Project type - only in gallery mode */}
             {isGalleryMode && selectedProject && (
-              <span className="ui-text" style={{ position: 'absolute', left: '68vw' }}>
+              <span className="ui-text ui-top-project-type">
                 {selectedProject.info}
               </span>
             )}
 
-            {/* Index section - only in gallery mode */}
             {isGalleryMode && (
-              <span className="ui-text" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+              <span className="ui-text ui-top-index">
                 {photoCounter}
               </span>
             )}
           </div>
 
-          {/* Top Right: About */}
           <div className="ui-corner ui-top-right">
-            <span className="ui-text ui-clickable">contact</span>
+            <span className="ui-text ui-clickable" onClick={onContactClick}>contact</span>
           </div>
 
-          {/* Bottom Left: Logo */}
           <div className="ui-corner ui-bottom-left">
             <img
               src="./img/logo/walters_logo.svg"
               alt="Walters Studio"
-              className="walters-logo"
+              className={`walters-logo ${isPostTransition ? 'clickable' : ''}`}
               onClick={isPostTransition ? onBackToSlider : undefined}
-              style={{ cursor: isPostTransition ? 'pointer' : 'default' }}
             />
           </div>
 
-          {/* Bottom Center: Year (only on hover in index mode) */}
-          <div style={{ position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-            <span className="ui-text" style={hoverInfoStyle}>
+          <div className="ui-bottom-center">
+            <span className={`ui-text ui-info ${isHoverVisible ? 'visible' : ''}`}>
               {!isGalleryMode ? (displayedHover?.year || '') : ''}
             </span>
           </div>
 
-          {/* Bottom at client position: Information */}
-          <div style={{ position: 'absolute', bottom: '12px', left: '25vw', pointerEvents: 'auto' }}>
+          <div className="ui-bottom-client">
             <span className="ui-text">
               {isGalleryMode ? (
-                <>about<span style={galleryInfoStyle}>: {displayedImageInfo}</span></>
+                <>about<span className={`ui-info-gallery ${isGalleryInfoVisible ? 'visible' : ''}`}>: {displayedImageInfo}</span></>
               ) : (
-                <>about<span style={hoverInfoStyle}>: {displayedHover?.info || ''}</span></>
+                <>about<span className={`ui-info ${isHoverVisible ? 'visible' : ''}`}>: {displayedHover?.info || ''}</span></>
               )}
             </span>
           </div>
 
-          {/* Bottom Right: All Rights Reserved */}
           <div className="ui-corner ui-bottom-right">
             <span className="ui-text">All Rights Reserved</span>
           </div>
