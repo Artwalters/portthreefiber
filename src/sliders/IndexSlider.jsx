@@ -218,13 +218,13 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         float fogFactor = smoothstep(dynamicFogNear, dynamicFogFar, vFogDepth);
         // Make fog curve more aggressive in the back
         fogFactor = fogFactor * fogFactor; // Quadratic curve - less fog in front, stronger in back
-        
+
         // Apply dynamic fog intensity during transitions
         fogFactor = fogFactor * fogIntensity;
         fogFactor = min(fogFactor, 0.98); // Cap at 98% for extreme fog
-        
+
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
-        
+
         // Ensure proper gamma correction
         gl_FragColor = vec4(finalColor, tileColor.a);
         gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(1.0/2.2)); // Gamma correction
@@ -403,7 +403,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     clearSnapTimeout()
     snapTimeout.current = setTimeout(() => {
       startSnapping()
-    }, 300) // Longer delay to let natural movement happen first
+    }, 150) // Faster snap trigger for more responsive feel
   }
   
   // Create curved geometry
@@ -649,24 +649,18 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       
       // No special fly-in handling needed - animation is cancelled on interaction
       
-      // Use momentum to determine direction and add continuation
-      if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
+      // Determine swipe direction based on momentum, but don't continue movement
+      if (Math.abs(momentum.current) > 0.1) {
         swipeDirection.current = momentum.current > 0 ? 1 : -1
-        
-        // Add momentum continuation - slider keeps moving in swipe direction
-        const momentumDistance = Math.min(Math.abs(momentum.current) * 15, 8) // Scale and cap momentum
-        const continuationOffset = momentumDistance * swipeDirection.current
-        targetOffset.current += continuationOffset
-        
-        // Set momentum to decay naturally
-        momentum.current *= 0.3
       } else {
-        // Small movement - just center to nearest
         swipeDirection.current = 0
       }
-      
-      // Schedule snap to center after user stops dragging
-      scheduleSnap()
+
+      // Stop momentum - no continuation
+      momentum.current = 0
+
+      // Snap immediately to nearest position
+      startSnapping()
       
       if (waterRef?.current?.updateMouse) {
         waterRef.current.updateMouse(0, 0, false)
@@ -783,24 +777,18 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       wheelEndTimeout = setTimeout(() => {
         isUserInteracting.current = false
         
-        // Use momentum to determine direction and add continuation like drag
-        if (Math.abs(momentum.current) > 0.1) { // Only if there's significant momentum
+        // Determine swipe direction based on momentum, but don't continue movement
+        if (Math.abs(momentum.current) > 0.1) {
           swipeDirection.current = momentum.current > 0 ? 1 : -1
-          
-          // Add momentum continuation - slider keeps moving in scroll direction
-          const momentumDistance = Math.min(Math.abs(momentum.current) * 15, 8) // Same as drag
-          const continuationOffset = momentumDistance * swipeDirection.current
-          targetOffset.current += continuationOffset
-          
-          // Set momentum to decay naturally
-          momentum.current *= 0.3
         } else {
-          // Small movement - just center to nearest
           swipeDirection.current = 0
         }
-        
-        // Schedule snap after momentum continuation
-        scheduleSnap()
+
+        // Stop momentum - no continuation
+        momentum.current = 0
+
+        // Snap immediately to nearest position
+        startSnapping()
         wheelEndTimeout = null
       }, 150) // Same delay as drag for natural feel
     }
@@ -1287,35 +1275,28 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
       const lerpSpeed = (isUserInteracting.current || (flyInTween.current && animationEndTime.current === 0)) ? 0.15 : 0.08
       currentOffset.current += (targetOffset.current - currentOffset.current) * lerpSpeed
       
-      // Handle very subtle snapping only when not interacting
+      // Handle snapping when not interacting - direct lerp to target
       if (isSnapping.current && !isUserInteracting.current) {
-        const snapDistance = snapTarget.current - currentOffset.current
-        
-        // Extremely gentle snap influence - barely noticeable
-        const snapInfluence = 0.006 // Much weaker snap force
-        const snapDirection = Math.sign(snapDistance)
-        const snapForce = Math.min(Math.abs(snapDistance) * snapInfluence, 0.02) // Cap maximum snap force
-        
-        // Apply gentle bias toward snap target
-        targetOffset.current += snapDirection * snapForce
-        
-        // Stop snapping when reasonably close
-        if (Math.abs(snapDistance) < 0.01) {
+        const snapDistance = snapTarget.current - targetOffset.current
+
+        // Strong direct lerp to snap target for immediate, accurate snapping
+        const snapLerp = 0.18 // Very strong lerp for direct feel
+        targetOffset.current += snapDistance * snapLerp
+
+        // Stop snapping when very close
+        if (Math.abs(snapDistance) < 0.003) {
+          targetOffset.current = snapTarget.current // Snap exactly to target
           isSnapping.current = false
         }
       }
       
-      // Apply momentum decay when not interacting
-      if (!isUserInteracting.current && Math.abs(momentum.current) > 0.001) {
-        momentum.current *= 0.95 // Gradual momentum decay
-        targetOffset.current += momentum.current // Continue movement from momentum
-      }
+      // No momentum continuation - slider stops and snaps directly
       
-      // Very subtle continuous centering when idle (almost imperceptible)
+      // Continuous centering when idle - stronger pull to center
       if (!isUserInteracting.current && !isSnapping.current && Math.abs(momentum.current) < 0.01) {
         const continuousSnapTarget = calculateNearestSnapPosition(currentOffset.current, 0)
-        const centeringForce = 0.002 // Extremely weak centering
-        targetOffset.current += (continuousSnapTarget - targetOffset.current) * centeringForce
+        const centeringLerp = 0.03 // Stronger continuous centering
+        targetOffset.current += (continuousSnapTarget - targetOffset.current) * centeringLerp
       }
       
       // Fade deformation effect - stop updating when very small
