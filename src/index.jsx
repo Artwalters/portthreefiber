@@ -497,7 +497,7 @@ function App() {
                 <CameraController />
 
                 {/* Rotating Snake */}
-                <RotatingDragon />
+                {/* <RotatingDragon /> */}
 
                 {/* Intro Scene */}
                 {/* <IntroScene waterRef={waterRef} /> */}
@@ -535,11 +535,11 @@ function App() {
                 )}
 
                 {/* Layer 3: Water (top) - Use appropriate water shader based on device */}
-                {deviceCapabilities?.shouldUseMobileWater ? (
+                {/* {deviceCapabilities?.shouldUseMobileWater ? (
                     <MobileWater ref={waterRef} />
                 ) : (
                     <SimpleWater ref={waterRef} />
-                )}
+                )} */}
 
 
                 {/* Performance Monitor with visibility toggle */}
@@ -573,7 +573,7 @@ function App() {
                 {showPerf ? '◼ PERF' : '▶ PERF'}
             </button>
             
-            <UIOverlay 
+            <UIOverlay
                 highlightedProject={highlightedProject}
                 isHighlightVisible={isHighlightVisible}
                 displayedProject={displayedProject}
@@ -586,6 +586,9 @@ function App() {
                 currentImageIndex={currentImageIndex}
                 onBackToSlider={handleBackToSlider}
                 isSliderAnimationComplete={isSliderAnimationComplete}
+                hoveredProject={hoveredProject}
+                hoveredProjectIndex={hoveredProject ? projects.findIndex(p => p.id === hoveredProject.id) : -1}
+                totalProjects={projects.length}
             />
         </>
     )

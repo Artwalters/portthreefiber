@@ -9,7 +9,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   // Critical: Limit uniform array size for mobile Safari compatibility
   const maxUniforms = isMobile ? 8 : 16 // Mobile Safari limit: ~64 fragment uniforms total
   const tilesCount = Math.min(Math.max(tiles.length, 1), maxUniforms)
-  const aspect = isMobile ? 24 / 3.3 : 30 / 3.3  // Mobile: original, Desktop: more square
+  const aspect = isMobile ? 30 / 3.3 : 38 / 3.3  // Narrower tiles
   
   // Slice tiles array to respect mobile limits
   const limitedTiles = tiles.slice(0, tilesCount)
@@ -353,7 +353,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     // At screen center vUv.x = 0.5, so we want: (0.5 + 1000.0 + offset * 0.01) * aspect * 1.2
     // to align with a project boundary
     
-    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+    const aspect = isMobile ? 30 / 3.3 : 38 / 3.3
     const tileScaling = aspect * 1.2
     
     // Calculate which tile index is currently closest to screen center
@@ -409,7 +409,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   // Create curved geometry
   const geometry = useMemo(() => {
     const splineSegments = isMobile ? 100 : 150 // Reduced segments for performance
-    const filmWidth = isMobile ? 3.2 : 3.2 // Same size for both mobile and desktop
+    const filmWidth = isMobile ? 2.56 : 2.56 // 80% of original size (3.2 * 0.8)
     
     let curve
     if (isMobile) {
@@ -991,7 +991,7 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     if (!uv) return
     
     // Use exact same logic as fragment shader to calculate tile
-    const aspect = isMobile ? 24 / 3.3 : 30 / 3.3
+    const aspect = isMobile ? 30 / 3.3 : 38 / 3.3
     const globalUV = uv.x + 1000.0 + currentOffset.current * 0.01
     const tilesUV = globalUV * aspect * 1.2
     const tileIndex = Math.floor(tilesUV) % Math.max(textures.length, 1)
@@ -1053,18 +1053,61 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     isClickDragging.current = false
     clickStartPos.current = { x: event.clientX, y: event.clientY }
   }
-  
+
   const handlePointerMove = (event) => {
-    if (!clickStartPos.current) return
-    
-    const deltaX = Math.abs(event.clientX - clickStartPos.current.x)
-    const deltaY = Math.abs(event.clientY - clickStartPos.current.y)
-    
-    if (deltaX > clickThreshold || deltaY > clickThreshold) {
-      isClickDragging.current = true
+    // Check for dragging
+    if (clickStartPos.current) {
+      const deltaX = Math.abs(event.clientX - clickStartPos.current.x)
+      const deltaY = Math.abs(event.clientY - clickStartPos.current.y)
+
+      if (deltaX > clickThreshold || deltaY > clickThreshold) {
+        isClickDragging.current = true
+      }
+    }
+
+    // Handle hover detection
+    const uv = event.uv
+    if (!uv || !onHover) return
+
+    // Use same logic as click to calculate which tile is being hovered
+    const aspect = isMobile ? 30 / 3.3 : 38 / 3.3
+    const globalUV = uv.x + 1000.0 + currentOffset.current * 0.01
+    const tilesUV = globalUV * aspect * 1.2
+    const tileIndex = Math.floor(tilesUV) % Math.max(textures.length, 1)
+
+    // Check if we're on a visible texture (not a gap)
+    let tileUV = {
+      x: (tilesUV - Math.floor(tilesUV)),
+      y: uv.y
+    }
+
+    if (isMobile) {
+      const center = { x: 0.5, y: 0.5 }
+      tileUV.x -= center.x
+      tileUV.y -= center.y
+      const rotatedX = tileUV.y
+      const rotatedY = tileUV.x
+      tileUV.x = rotatedX + center.x
+      tileUV.y = rotatedY + center.y
+    }
+
+    const gapSize = 0.035
+    const isInTexture = (tileUV.x >= gapSize && tileUV.x <= (1.0 - gapSize))
+
+    if (isInTexture && tileIndex >= 0 && tileIndex < projects.length) {
+      onHover(projects[tileIndex])
+    } else {
+      onHover(null)
     }
   }
-  
+
+  const handlePointerLeave = () => {
+    // Clear hover when mouse leaves the mesh
+    if (onHover) {
+      onHover(null)
+    }
+  }
+
   const handlePointerUp = () => {
     // Reset after a short delay to allow click event to fire
     setTimeout(() => {
@@ -1264,14 +1307,6 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
         // Natural momentum system handles coast-down automatically
       }
       
-      // Hover events
-      if (projects.length > 0) {
-        const currentProjectIndex = Math.floor(Math.abs(currentOffset.current * 10) % projects.length)
-        const currentProject = projects[currentProjectIndex]
-        if (currentProject && onHover) {
-          onHover(currentProject)
-        }
-      }
     }
     
     // Update material
@@ -1352,15 +1387,16 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   if (!material) return null
   
   return (
-    <mesh 
-      ref={meshRef} 
-      geometry={geometry} 
-      material={material} 
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      material={material}
       visible={isInitiallyVisible}
       onClick={handleMeshClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
     />
   )
 }

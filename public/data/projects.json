@@ -3,6 +3,9 @@
     {
       "id": "project-1",
       "name": "project-1",
+      "client": "Nike",
+      "year": "2024",
+      "info": "Brand campaign for global launch",
       "title": "Interactive Web Experience",
       "description": "Interactive web experience with modern UI",
       "images": [
@@ -61,6 +64,9 @@
     {
       "id": "project-2",
       "name": "project-2",
+      "client": "Adidas",
+      "year": "2023",
+      "info": "E-commerce redesign project",
       "title": "E-commerce Platform",
       "description": "E-commerce platform with seamless checkout",
       "images": [
@@ -119,6 +125,9 @@
     {
       "id": "project-3",
       "name": "project-3",
+      "client": "Studio Dumbar",
+      "year": "2024",
+      "info": "Creative portfolio website",
       "title": "Creative Portfolio",
       "description": "Creative portfolio showcasing visual identity",
       "images": [
@@ -177,6 +186,9 @@
     {
       "id": "project-4",
       "name": "project-4",
+      "client": "Apple",
+      "year": "2023",
+      "info": "Mobile app UI/UX design",
       "title": "Mobile App Design",
       "description": "Mobile app with intuitive user interface",
       "images": [
@@ -235,6 +247,9 @@
     {
       "id": "project-5",
       "name": "project-5",
+      "client": "Spotify",
+      "year": "2022",
+      "info": "Brand identity redesign",
       "title": "Brand Identity System",
       "description": "Brand identity and logo design system",
       "images": [
@@ -293,6 +308,9 @@
     {
       "id": "project-6",
       "name": "project-6",
+      "client": "Google",
+      "year": "2024",
+      "info": "Digital marketing campaign",
       "title": "Digital Marketing Campaign",
       "description": "Digital marketing campaign visualization",
       "images": [
@@ -351,6 +369,9 @@
     {
       "id": "project-7",
       "name": "project-7",
+      "client": "Museum of Modern Art",
+      "year": "2023",
+      "info": "Interactive art installation",
       "title": "Art Installation",
       "description": "Art installation with interactive elements",
       "images": [
