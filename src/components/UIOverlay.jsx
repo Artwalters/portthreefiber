@@ -9,12 +9,19 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
   const [displayedHoverIndex, setDisplayedHoverIndex] = useState(-1)
   const [isHoverVisible, setIsHoverVisible] = useState(false)
 
+  // State for gallery info animation
+  const [displayedImageInfo, setDisplayedImageInfo] = useState('')
+  const [isGalleryInfoVisible, setIsGalleryInfoVisible] = useState(false)
+
   // Check if we're in gallery mode
   const isGalleryMode = isPostTransition && selectedProject
 
   // Calculate photo counter
   const totalImages = selectedProject?.images?.length || 0
-  const photoCounter = isGalleryMode ? `${currentImageIndex + 1}/${totalImages}` : 'index'
+  const photoCounter = isGalleryMode ? `${currentImageIndex + 1}/${totalImages}` : ''
+
+  // Get current image description
+  const currentImageDescription = selectedProject?.images?.[currentImageIndex]?.description || ''
 
   // Check if mobile
   const isMobile = window.innerWidth <= 768
@@ -52,11 +59,35 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
     return () => clearTimeout(fadeInTimer)
   }, [hoveredProject, hoveredProjectIndex])
 
+  // Handle gallery info transitions when image changes
+  useEffect(() => {
+    if (!isGalleryMode) {
+      setIsGalleryInfoVisible(false)
+      return
+    }
+
+    // Fade out, change, fade in
+    setIsGalleryInfoVisible(false)
+    const timer = setTimeout(() => {
+      setDisplayedImageInfo(currentImageDescription)
+      setTimeout(() => setIsGalleryInfoVisible(true), 50)
+    }, 150)
+
+    return () => clearTimeout(timer)
+  }, [currentImageIndex, currentImageDescription, isGalleryMode])
+
   // Grey style for hover info
   const hoverInfoStyle = {
     color: 'rgba(0, 0, 0, 0.4)',
     opacity: isHoverVisible ? 1 : 0,
     transition: 'opacity 0.15s ease'
+  }
+
+  // Grey style for gallery info
+  const galleryInfoStyle = {
+    color: 'rgba(0, 0, 0, 0.4)',
+    opacity: isGalleryInfoVisible ? 1 : 0,
+    transition: 'opacity 0.2s ease'
   }
 
   // Initialize overlay as visible on mount
@@ -119,10 +150,21 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             )}
           </div>
 
-          {/* Top Right: About */}
+          {/* Top Right: contact or index */}
           <div className="ui-corner ui-top-right">
-            <span className="ui-text ui-clickable">about</span>
+            {isGalleryMode ? (
+              <span className="ui-text">{photoCounter}</span>
+            ) : (
+              <span className="ui-text ui-clickable">contact</span>
+            )}
           </div>
+
+          {/* Top Center: Client name in gallery mode */}
+          {isGalleryMode && (
+            <div style={{ position: 'absolute', top: '4px', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+              <span className="ui-text">{selectedProject?.client || ''}</span>
+            </div>
+          )}
 
           {/* Bottom Left: lioni */}
           <div className="ui-corner ui-bottom-left">
@@ -133,11 +175,17 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             >lioni</span>
           </div>
 
-          {/* Bottom Right: Year (only on hover) */}
+          {/* Bottom Right: Year (only on hover) or info in gallery */}
           <div className="ui-corner ui-bottom-right">
-            <span className="ui-text" style={hoverInfoStyle}>
-              {displayedHover?.year || ''}
-            </span>
+            {isGalleryMode ? (
+              <span className="ui-text" style={galleryInfoStyle}>
+                {displayedImageInfo}
+              </span>
+            ) : (
+              <span className="ui-text" style={hoverInfoStyle}>
+                {displayedHover?.year || ''}
+              </span>
+            )}
           </div>
         </>
       ) : (
@@ -153,15 +201,29 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
 
             {/* Client section */}
             <span className="ui-text" style={{ position: 'absolute', left: '25vw' }}>
-              {isGalleryMode && selectedProject ? selectedProject.name : (
+              {isGalleryMode && selectedProject ? selectedProject.client : (
                 <>client<span style={hoverInfoStyle}>: {displayedHover?.client || ''}</span></>
               )}
             </span>
+
+            {/* Project type - only in gallery mode */}
+            {isGalleryMode && selectedProject && (
+              <span className="ui-text" style={{ position: 'absolute', left: '68vw' }}>
+                {selectedProject.info}
+              </span>
+            )}
+
+            {/* Index section - only in gallery mode */}
+            {isGalleryMode && (
+              <span className="ui-text" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+                {photoCounter}
+              </span>
+            )}
           </div>
 
           {/* Top Right: About */}
           <div className="ui-corner ui-top-right">
-            <span className="ui-text ui-clickable">about</span>
+            <span className="ui-text ui-clickable">contact</span>
           </div>
 
           {/* Bottom Left: lioni */}
@@ -173,7 +235,7 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
             >lioni</span>
           </div>
 
-          {/* Bottom Center: Year (only on hover) */}
+          {/* Bottom Center: Year (only on hover in index mode) */}
           <div style={{ position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
             <span className="ui-text" style={hoverInfoStyle}>
               {!isGalleryMode ? (displayedHover?.year || '') : ''}
@@ -183,7 +245,11 @@ function UIOverlay({ isTransitioning, isPostTransition, isReturningToSlider, onB
           {/* Bottom at client position: Information */}
           <div style={{ position: 'absolute', bottom: '12px', left: '25vw', pointerEvents: 'auto' }}>
             <span className="ui-text">
-              information<span style={hoverInfoStyle}>: {!isGalleryMode ? (displayedHover?.info || '') : ''}</span>
+              {isGalleryMode ? (
+                <>about<span style={galleryInfoStyle}>: {displayedImageInfo}</span></>
+              ) : (
+                <>about<span style={hoverInfoStyle}>: {displayedHover?.info || ''}</span></>
+              )}
             </span>
           </div>
 

@@ -20,26 +20,6 @@
             }
         }(window.location))
     </script>
-    <!-- Eruda Mobile Console - For debugging -->
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>
-        // Initialize Eruda immediately
-        eruda.init();
-        console.log('%c🔍 ERUDA CONSOLE LOADED! Look for green button bottom-right!', 'background: #00ff00; color: #000; font-size: 20px; font-weight: bold; padding: 10px;');
-
-        // Make button bigger and more visible
-        setTimeout(function() {
-            var erudaBtn = document.querySelector('.eruda-entry-btn');
-            if (erudaBtn) {
-                erudaBtn.style.width = '60px';
-                erudaBtn.style.height = '60px';
-                erudaBtn.style.fontSize = '30px';
-                erudaBtn.style.backgroundColor = '#00ff00';
-                erudaBtn.style.zIndex = '999999';
-                console.log('%c✅ Eruda button enlarged!', 'background: #00ff00; color: #000; font-size: 16px; padding: 5px;');
-            }
-        }, 1000);
-    </script>
 </head>
 <body>
     <div id="root"></div>
