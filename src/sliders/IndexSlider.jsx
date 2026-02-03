@@ -46,21 +46,22 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       varying float vFogDepth;
       varying float vWorldX;
       varying float vWorldY;
-      
+      varying vec2 vScreenPos;
+
       #define M_PI 3.1415926535897932384626433832795
-      
+
       void main() {
         vec3 pos = position;
-        
+
         // Simple global deformation like original WebGLSlider - 50% less intense
         if (uIsMobile > 0.5) {
           // Mobile: reduced deformation intensity
           pos.y = pos.y + ((sin(uv.y * M_PI) * uVelo) * 0.00075);
         } else {
-          // Desktop: reduced deformation intensity  
+          // Desktop: reduced deformation intensity
           pos.x = pos.x - ((sin(uv.y * M_PI) * uVelo) * 0.0008);
         }
-        
+
         vUv = uv;
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
         vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
@@ -68,6 +69,9 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         vWorldX = worldPosition.x;
         vWorldY = worldPosition.y;
         gl_Position = projectionMatrix * mvPosition;
+
+        // Calculate screen position (0-1 range)
+        vScreenPos = (gl_Position.xy / gl_Position.w) * 0.5 + 0.5;
       }
     `,
     fragmentShader: `
@@ -95,15 +99,11 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
       varying float vFogDepth;
       varying float vWorldX;
       varying float vWorldY;
+      varying vec2 vScreenPos;
       
       void main() {
-        // Calculate chromatic aberration - always present with base amount
-        float baseAberration = 0.0008; // Very subtle RGB split (reduced from 0.0021)
-        float velocityAberration = abs(uVelo) * 0.0003; // Minimal additional based on movement (reduced from 0.0007)
-        
-        // Combine base and velocity-based aberration
-        float aberrationStrength = baseAberration + velocityAberration;
-        aberrationStrength = min(aberrationStrength, 0.0015); // Very low maximum for extreme subtlety (reduced from 0.0042)
+        // Chromatic aberration disabled for testing
+        float aberrationStrength = 0.0;
         
         vec2 globalUV = (vUv + vec2(1000. + time * 0.01, 0.));
         vec2 tilesUV = globalUV * vec2(${aspect * 1.2}, 1.);
@@ -112,25 +112,11 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
         
         vec2 tileUV = fract(tilesUV);
         
-        // Dynamic gap size based on movement - smaller gaps when moving
-        float baseGapSize = 0.035; // Reduced from 0.05 for tighter spacing
-        float movementFactor = abs(uVelo) * 0.001; // Scale movement to gap reduction
-        float gapSize = baseGapSize * (1.0 - min(movementFactor, 0.9)); // Reduce gaps up to 90% during movement
-        float edgeSmooth = 0.002; // Much smaller for sharper edges
-        
-        // Use fwidth for pixel-perfect edge smoothing
-        float pixelSize = fwidth(tileUV.x);
-        float smoothSize = max(edgeSmooth, pixelSize * 1.5); // Less aggressive smoothing for sharper edges
-        
-        // Smooth discard edges with better transitions
-        if (tileUV.x < gapSize + smoothSize) {
-          float edgeFactor = smoothstep(gapSize - smoothSize, gapSize + smoothSize, tileUV.x);
-          if (edgeFactor < 0.5) discard;
-        }
-        if (tileUV.x > (1.0 - gapSize - smoothSize)) {
-          float edgeFactor = smoothstep(1.0 - gapSize + smoothSize, 1.0 - gapSize - smoothSize, tileUV.x);
-          if (edgeFactor < 0.5) discard;
-        }
+        // Simple gap - no smoothing for now
+        float gapSize = 0.035;
+
+        // Hard discard for gap pixels
+        if (tileUV.x < gapSize || tileUV.x > (1.0 - gapSize)) discard;
         
         tileUV.x = (tileUV.x - gapSize) / (1.0 - 2.0 * gapSize);
         tileUV.y = vUv.y;
@@ -161,13 +147,14 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
           vec4 gChannel = vec4(0);
           vec4 bChannel = vec4(0);
           
-          vec2 rUV = tileUV + vec2(aberrationStrength, 0.0);
-          vec2 gUV = tileUV;
-          vec2 bUV = tileUV - vec2(aberrationStrength, 0.0);
-          
+          // Clamp UVs to prevent edge bleeding
+          vec2 rUV = clamp(tileUV + vec2(aberrationStrength, 0.0), 0.001, 0.999);
+          vec2 gUV = clamp(tileUV, 0.001, 0.999);
+          vec2 bUV = clamp(tileUV - vec2(aberrationStrength, 0.0), 0.001, 0.999);
+
           // Sample each channel with offset
           ${Array.from({length: tilesCount}, (_, tID) => `
-          if (tileID == ${tID}) { 
+          if (tileID == ${tID}) {
             rChannel = texture2D(tiles[${tID}], rUV);
             gChannel = texture2D(tiles[${tID}], gUV);
             bChannel = texture2D(tiles[${tID}], bUV);
@@ -225,15 +212,30 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
 
         vec3 finalColor = mix(tileColor.rgb, fogColor, fogFactor);
 
-        // Ensure proper gamma correction
-        gl_FragColor = vec4(finalColor, tileColor.a);
-        gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(1.0/2.2)); // Gamma correction
+        // Screen edge fog - fade to white at screen edges (not texture edges)
+        if (uIsMobile > 0.5) {
+          // Mobile: fade at top and bottom of SCREEN
+          float edgeFadeTop = smoothstep(0.95, 0.85, vScreenPos.y);
+          float edgeFadeBottom = smoothstep(0.05, 0.15, vScreenPos.y);
+          float edgeFade = edgeFadeTop * edgeFadeBottom;
+          finalColor = mix(vec3(1.0), finalColor, edgeFade);
+        } else {
+          // Desktop: fade at left and right of SCREEN
+          float edgeFadeLeft = smoothstep(0.05, 0.15, vScreenPos.x);
+          float edgeFadeRight = smoothstep(0.95, 0.85, vScreenPos.x);
+          float edgeFade = edgeFadeLeft * edgeFadeRight;
+          finalColor = mix(vec3(1.0), finalColor, edgeFade);
+        }
+
+        // Convert from linear back to sRGB for display
+        gl_FragColor = vec4(pow(finalColor, vec3(1.0/2.2)), 1.0);
       }
     `,
     side: THREE.DoubleSide,
-    transparent: false, // Keep opaque to prevent double rendering
+    transparent: false,
     depthWrite: true,
-    depthTest: true
+    depthTest: true,
+    toneMapped: false // Prevent Three.js tone mapping for accurate colors
   })
   
   // Add helper methods
@@ -295,7 +297,7 @@ const createFilmStripMaterial = (tiles = [], isMobile = false) => {
   return material
 }
 
-const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete }) => {
+const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTransitionComplete, onBackgroundColorChange, onImageSelect, isReturningFromGallery = false, onFlyInComplete, shouldExit = false, onExitComplete, onCenteredProjectChange }) => {
   const meshRef = useRef()
   const [textures, setTextures] = useState([])
   const { gl } = useThree()
@@ -340,6 +342,19 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   // Fog smoothing refs
   const currentFogNear = useRef(isMobile ? 8 : 5)
   const currentFogFar = useRef(isMobile ? 15 : 12)
+
+  // Track centered project for UI counter
+  const lastCenteredProject = useRef(-1)
+
+  const calculateCenteredProjectIndex = (currentPos) => {
+    const aspect = isMobile ? 30 / 3.3 : 38 / 3.3
+    const tileScaling = aspect * 1.2
+    const centerUV = 0.5 + 1000.0 + currentPos * 0.01
+    const centerTilePos = centerUV * tileScaling
+    const centeredIndex = Math.round(centerTilePos - 0.5) % Math.max(projects.length, 1)
+    // Handle negative modulo
+    return centeredIndex < 0 ? centeredIndex + projects.length : centeredIndex
+  }
 
   // Center snapping functions
   const calculateNearestSnapPosition = (currentPos, direction = 0) => {
@@ -408,20 +423,20 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
   
   // Create curved geometry
   const geometry = useMemo(() => {
-    const splineSegments = isMobile ? 100 : 150 // Reduced segments for performance
+    const splineSegments = isMobile ? 200 : 300 // Much higher segments for smooth barrel distortion
     const filmWidth = isMobile ? 2.56 : 2.56 // 80% of original size (3.2 * 0.8)
     
     let curve
     if (isMobile) {
-      // Mobile curve - shorter for better mobile fit
+      // Mobile curve - faster curve backwards
       const mobileCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-12, 0, -7.0),   // Far left - off screen (shorter)
-        new THREE.Vector3(-8, 0, -4.0),    // Left curve start
-        new THREE.Vector3(-4, 0, -0.2),    // Left transition to flat
+        new THREE.Vector3(-12, 0, -9.0),   // Far - deeper back
+        new THREE.Vector3(-6, 0, -5.0),    // Curve starts sooner
+        new THREE.Vector3(-3, 0, -1.0),    // Transition closer to center
         new THREE.Vector3(0, 0, 0.2),      // Center flat
-        new THREE.Vector3(4, 0, -0.2),     // Right transition from flat
-        new THREE.Vector3(8, 0, -4.0),     // Right curve start
-        new THREE.Vector3(12, 0, -7.0)     // Far right - off screen (shorter)
+        new THREE.Vector3(3, 0, -1.0),     // Transition closer to center
+        new THREE.Vector3(6, 0, -5.0),     // Curve starts sooner
+        new THREE.Vector3(12, 0, -9.0)     // Far - deeper back
       ], false, "catmullrom", 0.5)
       
       // Rotate for mobile: 90 degrees and move forward subtly closer to camera
@@ -443,35 +458,35 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     }
     
     const curvePoints = curve.getSpacedPoints(splineSegments)
-    
-    // Create plane geometry with optimized subdivisions
-    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 16) // Reduced height segments
+
+    // Create plane geometry with high subdivisions for smooth barrel distortion
+    const geo = new THREE.PlaneGeometry(1, 1, splineSegments, 64) // High subdivisions both directions
       .translate(0.5, 0, 0)
       .scale(splineSegments, 1, 1)
     
     const positions = geo.attributes.position
     const vertex = new THREE.Vector3()
-    
+
     for (let i = 0; i < positions.count; i++) {
       vertex.fromBufferAttribute(positions, i)
       const idx = Math.round(vertex.x)
       const curvePoint = curvePoints[idx]
-      
+
       if (curvePoint) {
         if (isMobile) {
           // For mobile: map curve to Y axis and apply width to X
           positions.setXYZ(
-            i, 
-            curvePoint.x + vertex.y * filmWidth, 
-            curvePoint.y, 
+            i,
+            curvePoint.x + vertex.y * filmWidth,
+            curvePoint.y,
             curvePoint.z
           )
         } else {
           // For desktop: normal horizontal mapping
           positions.setXYZ(
-            i, 
-            curvePoint.x, 
-            curvePoint.y + vertex.y * filmWidth, 
+            i,
+            curvePoint.x,
+            curvePoint.y + vertex.y * filmWidth,
             curvePoint.z
           )
         }
@@ -495,14 +510,14 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
             // Ensure correct color space for accurate colors
             tex.colorSpace = THREE.SRGBColorSpace
             // Maximum quality texture settings
-            tex.generateMipmaps = true // Enable mipmaps for better performance
-            tex.wrapS = THREE.RepeatWrapping // Allow texture to repeat and cover full plane
-            tex.wrapT = THREE.RepeatWrapping // Prevents edge artifacts
-            // Use nearest neighbor for pixel-perfect sharpness
-            tex.minFilter = THREE.LinearFilter
-            tex.magFilter = THREE.LinearFilter
+            tex.generateMipmaps = true // Enable mipmaps for smoother scaling
+            tex.wrapS = THREE.ClampToEdgeWrapping // Prevent edge bleeding
+            tex.wrapT = THREE.ClampToEdgeWrapping // Prevent edge bleeding
+            // High quality filtering for smooth edges
+            tex.minFilter = THREE.LinearMipmapLinearFilter // Trilinear filtering for smooth minification
+            tex.magFilter = THREE.LinearFilter // Linear for magnification
             // Maximum anisotropic filtering for sharp textures at angles
-            tex.anisotropy = Math.min(isMobile ? 4 : 8, gl.capabilities.getMaxAnisotropy()) // Reduced for performance
+            tex.anisotropy = gl.capabilities.getMaxAnisotropy() // Use maximum available
             // Ensure texture updates
             tex.needsUpdate = true
             resolve(tex)
@@ -1321,6 +1336,13 @@ const IndexSlider = ({ projects = [], onHover, waterRef, onTransitionStart, onTr
     const velocityToApply = (isFading || isFlyingIn) ? 0 : sliderSpeed.current
     material.updateVelocity(velocityToApply)
     material.updateFogIntensity(fogIntensity)
+
+    // Update centered project index for UI counter
+    const centeredIndex = calculateCenteredProjectIndex(currentOffset.current)
+    if (centeredIndex !== lastCenteredProject.current && onCenteredProjectChange) {
+      lastCenteredProject.current = centeredIndex
+      onCenteredProjectChange(centeredIndex)
+    }
     
     // Calculate sweep progress to match actual slider speed calculation  
     if (isFading) {

@@ -229,6 +229,58 @@ body,
     opacity: 0.7;
 }
 
+/* Center indicator lines (mobile) */
+.ui-center-line {
+    position: absolute;
+    top: 50%;
+    width: 1.5em;
+    height: 1px;
+    background-color: black;
+    pointer-events: none;
+}
+
+.ui-center-line-left {
+    left: 0;
+}
+
+.ui-center-line-right {
+    right: 0;
+}
+
+/* Dragon logo container (mobile) */
+.dragon-logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.15em 0;
+    border: 1px solid black;
+    pointer-events: auto;
+    overflow: hidden;
+    width: 10em;
+}
+
+.dragon-logo-container.clickable {
+    cursor: pointer;
+}
+
+.dragon-marquee-scroll {
+    display: flex;
+    will-change: transform;
+}
+
+.dragon-marquee-collection {
+    display: flex;
+    align-items: center;
+    gap: 0.1em;
+    will-change: transform;
+}
+
+.dragon-logo {
+    width: 2.5em;
+    height: auto;
+    flex-shrink: 0;
+}
+
 /* =========================
    Canvas
    ========================= */

@@ -47,6 +47,7 @@ function App() {
     const [isReturningFromGallery, setIsReturningFromGallery] = useState(false)
     const [shouldExitGallery, setShouldExitGallery] = useState(false)
     const [isSliderAnimationComplete, setIsSliderAnimationComplete] = useState(true) // Start as true for initial state
+    const [centeredProjectIndex, setCenteredProjectIndex] = useState(0) // Track centered project for mobile counter
 
     // Slider switching states
     const [showFilmStrip, setShowFilmStrip] = useState(true)
@@ -583,17 +584,16 @@ function App() {
                     position: [0, 0, deviceCapabilities?.shouldUseMobileWater ? 8 : 5],
                     fov: 75
                 }}
-                gl={{ 
+                gl={{
                     alpha: false,
-                    antialias: !deviceCapabilities?.shouldUseMobileWater,
+                    antialias: true, // Always enable for smooth edges
                     powerPreference: 'high-performance',
-                    pixelRatio: deviceCapabilities?.shouldUseMobileWater ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio,
                     // Proper color management for accurate texture colors
                     outputColorSpace: THREE.SRGBColorSpace,
                     toneMapping: THREE.NoToneMapping,
                     toneMappingExposure: 1.0
                 }}
-                dpr={deviceCapabilities?.shouldUseMobileWater ? [1, 2] : [1, 3]}
+                dpr={[1, window.devicePixelRatio]} // Use full device pixel ratio
                 // Enable multi-sample antialiasing
                 frameloop="always"
                 flat={false}
@@ -637,6 +637,7 @@ function App() {
                         onFlyInComplete={handleFlyInComplete}
                         shouldExit={shouldExitSlider}
                         onExitComplete={handleSliderExitComplete}
+                        onCenteredProjectChange={setCenteredProjectIndex}
                     />
                 )}
 
@@ -664,12 +665,12 @@ function App() {
                 {showPerf && <Perf position="bottom-right" />}
             </Canvas>
             
-            {/* Performance Monitor Toggle Button */}
-            <button
+            {/* Performance Monitor Toggle Button - Hidden */}
+            {/* <button
                 onClick={() => setShowPerf(!showPerf)}
                 style={{
                     position: 'fixed',
-                    bottom: showPerf ? '250px' : '20px', // Move up when monitor is visible
+                    bottom: showPerf ? '250px' : '20px',
                     right: '20px',
                     padding: '6px 10px',
                     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -689,7 +690,7 @@ function App() {
                 onMouseLeave={(e) => e.target.style.opacity = '0.6'}
             >
                 {showPerf ? '◼ PERF' : '▶ PERF'}
-            </button>
+            </button> */}
             
             <UIOverlay
                 highlightedProject={highlightedProject}
@@ -709,6 +710,7 @@ function App() {
                 totalProjects={projects.length}
                 onContactClick={handleContactClick}
                 isTransitioningToContact={isTransitioningToContact}
+                centeredProjectIndex={centeredProjectIndex}
             />
         </>
     )
