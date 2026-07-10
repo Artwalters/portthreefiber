@@ -14,11 +14,18 @@ import { getDeviceCapabilities } from './utils/deviceDetection.js'
 import CameraController from './components/CameraController.jsx'
 import RotatingDragon from './components/RotatingDragon.jsx'
 import Contact from './pages/Contact.jsx'
+import BlossomTemplate from './effects/blossom/BlossomTemplate.jsx'
 
 
 const root = ReactDOM.createRoot(document.querySelector('#root'))
 
 function App() {
+    // Blossom experiment: GPGPU petals that follow the cursor (?template=blossom)
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('template') === 'blossom') {
+        return <BlossomTemplate />
+    }
+
     // Page state
     const [showContact, setShowContact] = useState(false)
     const [isTransitioningToContact, setIsTransitioningToContact] = useState(false)

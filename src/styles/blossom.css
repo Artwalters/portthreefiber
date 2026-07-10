@@ -1,0 +1,59 @@
+.blossom-page {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: #c7bbc6;
+    cursor: crosshair;
+}
+
+.blossom-page canvas {
+    position: absolute;
+    inset: 0;
+}
+
+.blossom-ui {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4rem 2rem 3rem;
+    pointer-events: none;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #3a2f3d;
+}
+
+.blossom-ui__intro {
+    max-width: 22rem;
+    text-align: center;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    opacity: 0.75;
+}
+
+.blossom-ui__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 1rem 2.25rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.28);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.blossom-ui__label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    opacity: 0.6;
+}
+
+.blossom-ui__product {
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+}
